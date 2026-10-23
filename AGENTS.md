@@ -19,11 +19,11 @@ pnpm dev                # frontend only, in a browser (Tauri APIs unavailable)
 pnpm build              # tsc type-check + vite build to dist/
 pnpm tauri build        # release build of the native app
 pnpm lint               # biome check --fix: lint + format, applying safe fixes
-pnpm exec biome check   # lint + format check only, no writes
+pnpm lint:ci            # biome check: lint + format check only, no writes (run by CI)
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-There is no test setup yet.
+There is no test setup yet. CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`.
 
 ## Architecture
 

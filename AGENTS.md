@@ -19,11 +19,11 @@ pnpm dev                # frontend only, in a browser (Tauri APIs unavailable)
 pnpm build              # tsc type-check + vite build to dist/
 pnpm tauri build        # release build of the native app
 pnpm lint               # biome check --fix: lint + format, applying safe fixes
-pnpm lint:ci            # biome check: lint + format check only, no writes (run by CI)
+pnpm lint:ci            # biome check without fixes; reserved for the CI workflow
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-There is no test setup yet. CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`.
+There is no test setup yet. CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
 ## Architecture
 
@@ -45,6 +45,8 @@ These follow from the project goal and are easy to get wrong:
 - Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk.
 
 ## Git
+
+**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 

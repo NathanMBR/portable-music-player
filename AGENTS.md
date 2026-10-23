@@ -50,6 +50,20 @@ These follow from the project goal and are easy to get wrong:
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 
+## Clean code
+
+All code (TypeScript and Rust) must follow Clean Code principles:
+
+- **Meaningful names**: names should say what something is for, and be easy to read and search. Don't abbreviate or use single letters outside tiny scopes (`track`, not `t`). Booleans read as predicates (`isPlaying`, `hasCover`), functions as verbs (`loadPlaylist`), components and types as nouns (`TrackList`, `Playlist`).
+- **Small functions that do one thing**: keep each function at a single level of abstraction. If a block needs a comment to explain what it does, extract it into a well-named function. Keep parameter lists short, and group related values into an object or struct.
+- **Single responsibility**: each module, component and store has one reason to change. Components render UI, Zustand stores hold state and its actions, Rust commands handle file I/O and system access, and pure helper functions hold the logic (path normalization, sorting, filtering). Keep business logic out of JSX.
+- **No duplication, no speculation**: extract logic instead of copy-pasting it, but don't build abstractions or options for needs that don't exist yet (KISS, YAGNI).
+- **No magic values**: use named constants for file names, limits, defaults and similar values.
+- **Explicit types**: no `any`. Model domain data with explicit types, and prefer types that make invalid states impossible to represent.
+- **Errors are handled, never swallowed**: Rust commands return `Result` instead of calling `unwrap`/`expect` on fallible operations. This matters here: the release profile uses `panic = "abort"`, so a panic kills the whole app. On the frontend, handle rejected `invoke` promises and show the failure to the user.
+- **Comments explain why, not what**: code should explain itself. Don't leave commented-out code.
+- **Leave it cleaner**: improve the code you touch, but keep unrelated refactors out of the change.
+
 ## Code style (Biome)
 
 Single quotes, no semicolons, no trailing commas, 2-space indent, 100-column lines, arrow params without parens when possible. `noFloatingPromises` is an error, so every promise (e.g. `invoke(...)`) must be awaited or explicitly handled. `noConsole` is a warning. Components are named exports (`export const App = ...`).

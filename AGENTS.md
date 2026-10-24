@@ -68,6 +68,9 @@ src/
 ### Rust layout
 
 - `portable.rs`: `root_dir()`, the folder containing the executable. Every app file lives under it.
+- `main_window.rs`: the window remembers only its size, saved by the official `tauri-plugin-window-state`. It always opens centered.
+  - The window starts hidden (`"visible": false` in `tauri.conf.json`). `show()` reads the saved size from the plugin's file, shrinks it to fit the current screen, centers it, and only then shows the window, so it never visibly jumps.
+  - The plugin's own restore is skipped because on Linux it applies the size asynchronously, too late for centering. For the same reason Tauri's `center()` can't be used: GTK reports a 0×0 outer size until the window is first drawn.
 - One module per feature (e.g. `library.rs`) holding its constants, data structs, commands and error enum.
 - `settings.rs`: user settings in `settings.json` next to the executable.
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added.
@@ -79,7 +82,7 @@ src/
 
 These follow from the project goal and are easy to get wrong:
 
-- **Resolve data paths from the executable's location** (`std::env::current_exe()` → parent dir), in Rust. Don't use Tauri's `app_data_dir` / `app_config_dir` or the OS user profile, because they write outside the flash drive. Keep file I/O for the JSON stores in Rust commands, not in the webview.
+- **Resolve data paths from the executable's location** (`std::env::current_exe()` → parent dir), in Rust. Don't use Tauri's `app_data_dir` / `app_config_dir` or the OS user profile, because they write outside the flash drive. The one deliberate exception is the window size, which the window-state plugin keeps in each computer's `app_config_dir`, because every computer has a different screen. Keep file I/O for the JSON stores in Rust commands, not in the webview.
 - Both executables share the same folder and the same JSON files, so data formats must be OS-agnostic. Store music paths **relative to the executable folder** (the drive letter or mount point changes between machines and OSes), and normalize path separators.
 - The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` is `"all"`). If an AppImage is ever used, `current_exe()` points inside a temporary mount, so read the `APPIMAGE` env var instead.
 - Each OS executable has to be built on (or cross-compiled for) that OS. Development here happens in WSL2, which produces the Linux binary.

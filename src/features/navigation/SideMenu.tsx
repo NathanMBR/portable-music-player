@@ -1,7 +1,7 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/20/solid'
 import { IconButton } from '../../components/IconButton'
-import { APP_TITLE } from '../../constants'
+import { APP_TITLE_LINES } from '../../constants'
 import { ThemeToggle } from '../settings/ThemeToggle'
 import { CategoryList } from './CategoryList'
 import { useNavigationStore } from './navigationStore'
@@ -19,12 +19,17 @@ export const SideMenu = () => {
       {/* Same padding as the page header, so the close button sits exactly where the menu button was. */}
       <DialogPanel
         transition
-        className="fixed inset-y-0 left-0 flex w-72 flex-col border-r border-ink bg-paper px-6 pt-8 pb-6 transition duration-200 ease-out data-closed:-translate-x-full motion-reduce:transition-none"
+        className="fixed inset-y-0 left-0 flex w-72 flex-col border-r border-rule bg-paper px-6 pt-8 pb-6 transition duration-200 ease-out data-closed:-translate-x-full motion-reduce:transition-none"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <IconButton icon={XMarkIcon} label="Close menu" shape="square" onClick={closeMenu} />
-          <DialogTitle className="text-base font-bold text-ink font-stretch-semi-condensed">
-            {APP_TITLE}
+          {/* Same type as the page title. The trailing spaces keep the accessible name "Portable Music Player". */}
+          <DialogTitle className="text-lg leading-tight font-extrabold tracking-tight text-ink font-stretch-expanded">
+            {APP_TITLE_LINES.map(line => (
+              <span key={line} className="block">
+                {line}{' '}
+              </span>
+            ))}
           </DialogTitle>
         </div>
         <div className="mt-8">

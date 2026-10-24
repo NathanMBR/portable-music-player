@@ -45,7 +45,7 @@ src/
   main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, renders <App />
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
-  constants.ts          app-wide constants (APP_TITLE); feature constants live in their feature
+  constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
   components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice)
   features/<feature>/   everything one feature owns
     types.ts            data shapes returned by Rust (mirror the Rust structs)

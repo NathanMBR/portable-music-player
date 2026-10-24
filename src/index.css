@@ -33,4 +33,17 @@
   body {
     @apply bg-paper text-ink antialiased;
   }
+
+  /* Tailwind v4 resets buttons to the default arrow cursor; the pointer shows they're clickable,
+     and disabled ones say they aren't. Non-button elements use aria-disabled, since :disabled
+     only matches form controls. */
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }

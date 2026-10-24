@@ -9,8 +9,8 @@ const LibraryContent = () => {
 
   if (lastScan === null) return null
   if (lastScan.kind === 'failed') return <ScanFailure message={lastScan.message} />
-  if (lastScan.library.tracks.length === 0) return <EmptyLibrary />
-  return <TrackList tracks={lastScan.library.tracks} />
+  if (lastScan.tracks.length === 0) return <EmptyLibrary />
+  return <TrackList tracks={lastScan.tracks} />
 }
 
 export const LibraryView = () => (

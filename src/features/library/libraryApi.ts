@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { MusicLibrary } from './types'
+import type { Track } from './types'
 
-export const loadMusicLibrary = () => invoke<MusicLibrary>('load_music_library')
+export const loadMusicLibrary = () => invoke<Track[]>('load_music_library')
 
-export const openMusicsFolder = () => invoke<void>('open_musics_folder')
+export const openSongsFolder = () => invoke<void>('open_songs_folder')

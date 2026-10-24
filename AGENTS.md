@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 A portable music player that runs on Linux and Windows **without installation**, so it can live on a flash drive. The drive holds both executables (one per OS) side by side; the user runs whichever matches their current OS. All app data (library, playlists, settings, etc.) is stored as `.json` files **in the same folder as the executable**.
 
-Built with Tauri 2 + React 19 + TypeScript. Implemented so far: the music library scan, which creates the `Musics` folder next to the executable if it's missing and lists its `.mp3` files alphabetically.
+Built with Tauri 2 + React 19 + TypeScript. Implemented so far: the music library scan, which creates the `Songs` folder next to the executable if it's missing and lists its `.mp3` files alphabetically.
 
 ## Commands
 
@@ -24,7 +24,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests (#[cfg(test)] modules next to the code)
 ```
 
-There is no frontend test runner yet. In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Musics` folder is `src-tauri/target/debug/Musics` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
+There is no frontend test runner yet. In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
 ## Architecture
 

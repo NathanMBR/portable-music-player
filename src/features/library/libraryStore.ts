@@ -10,10 +10,10 @@ type LibraryStore = {
   scanLibrary: () => Promise<void>
 }
 
-const scanMusicsFolder = async (): Promise<ScanOutcome> => {
+const scanSongsFolder = async (): Promise<ScanOutcome> => {
   try {
-    const library = await loadMusicLibrary()
-    return { kind: 'loaded', library: { ...library, tracks: sortTracksByTitle(library.tracks) } }
+    const tracks = await loadMusicLibrary()
+    return { kind: 'loaded', tracks: sortTracksByTitle(tracks) }
   } catch (error) {
     return { kind: 'failed', message: String(error) }
   }
@@ -26,6 +26,6 @@ export const useLibraryStore = create<LibraryStore>()((set, get) => ({
     if (get().isScanning) return
 
     set({ isScanning: true })
-    set({ lastScan: await scanMusicsFolder(), isScanning: false })
+    set({ lastScan: await scanSongsFolder(), isScanning: false })
   }
 }))

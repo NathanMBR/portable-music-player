@@ -7,7 +7,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             library::load_music_library,
-            library::open_musics_folder
+            library::open_songs_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

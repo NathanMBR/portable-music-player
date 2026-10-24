@@ -5,9 +5,7 @@ const formatSongCount = (count: number) =>
 
 export const describeLibraryStatus = (lastScan: ScanOutcome | null, isScanning: boolean) => {
   if (isScanning) return 'Scanning…'
-  if (lastScan?.kind !== 'loaded') return ''
-
-  const { tracks, folderPath } = lastScan.library
-  if (tracks.length === 0) return folderPath
-  return `${formatSongCount(tracks.length)} in ${folderPath}`
+  if (lastScan === null) return ''
+  if (lastScan.kind === 'failed') return 'Failed to check songs'
+  return formatSongCount(lastScan.tracks.length)
 }

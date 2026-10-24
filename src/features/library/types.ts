@@ -4,11 +4,4 @@ export type Track = {
   title: string
 }
 
-export type MusicLibrary = {
-  folderPath: string
-  tracks: Track[]
-}
-
-export type ScanOutcome =
-  | { kind: 'loaded'; library: MusicLibrary }
-  | { kind: 'failed'; message: string }
+export type ScanOutcome = { kind: 'loaded'; tracks: Track[] } | { kind: 'failed'; message: string }

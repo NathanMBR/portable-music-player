@@ -7,15 +7,8 @@ use serde::{Serialize, Serializer};
 
 use crate::portable;
 
-const MUSICS_FOLDER_NAME: &str = "Musics";
+const SONGS_FOLDER_NAME: &str = "Songs";
 const MP3_EXTENSION: &str = "mp3";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MusicLibrary {
-    folder_path: String,
-    tracks: Vec<Track>,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,11 +23,11 @@ pub struct Track {
 pub enum LibraryError {
     #[error("Couldn't find the folder the player is running from: {0}")]
     RootDir(io::Error),
-    #[error("Couldn't create the Musics folder at {}: {source}", .path.display())]
+    #[error("Couldn't create the Songs folder at {}: {source}", .path.display())]
     CreateFolder { path: PathBuf, source: io::Error },
-    #[error("Couldn't read the Musics folder at {}: {source}", .path.display())]
+    #[error("Couldn't read the Songs folder at {}: {source}", .path.display())]
     ReadFolder { path: PathBuf, source: io::Error },
-    #[error("Couldn't open the Musics folder: {0}")]
+    #[error("Couldn't open the Songs folder: {0}")]
     OpenFolder(tauri_plugin_opener::Error),
 }
 
@@ -45,40 +38,36 @@ impl Serialize for LibraryError {
 }
 
 #[tauri::command]
-pub async fn load_music_library() -> Result<MusicLibrary, LibraryError> {
-    let musics_dir = ensure_musics_dir()?;
-    let tracks = find_tracks(&musics_dir)?;
-    Ok(MusicLibrary {
-        folder_path: musics_dir.display().to_string(),
-        tracks,
-    })
+pub async fn load_music_library() -> Result<Vec<Track>, LibraryError> {
+    let songs_dir = ensure_songs_dir()?;
+    find_tracks(&songs_dir)
 }
 
 #[tauri::command]
-pub async fn open_musics_folder() -> Result<(), LibraryError> {
-    let musics_dir = ensure_musics_dir()?;
-    tauri_plugin_opener::open_path(&musics_dir, None::<&str>).map_err(LibraryError::OpenFolder)
+pub async fn open_songs_folder() -> Result<(), LibraryError> {
+    let songs_dir = ensure_songs_dir()?;
+    tauri_plugin_opener::open_path(&songs_dir, None::<&str>).map_err(LibraryError::OpenFolder)
 }
 
-/// Returns the Musics folder, creating it first if it's missing.
-fn ensure_musics_dir() -> Result<PathBuf, LibraryError> {
-    let musics_dir = portable::root_dir()
+/// Returns the Songs folder, creating it first if it's missing.
+fn ensure_songs_dir() -> Result<PathBuf, LibraryError> {
+    let songs_dir = portable::root_dir()
         .map_err(LibraryError::RootDir)?
-        .join(MUSICS_FOLDER_NAME);
-    fs::create_dir_all(&musics_dir).map_err(|source| LibraryError::CreateFolder {
-        path: musics_dir.clone(),
+        .join(SONGS_FOLDER_NAME);
+    fs::create_dir_all(&songs_dir).map_err(|source| LibraryError::CreateFolder {
+        path: songs_dir.clone(),
         source,
     })?;
-    Ok(musics_dir)
+    Ok(songs_dir)
 }
 
-fn find_tracks(musics_dir: &Path) -> Result<Vec<Track>, LibraryError> {
+fn find_tracks(songs_dir: &Path) -> Result<Vec<Track>, LibraryError> {
     let read_error = |source: io::Error| LibraryError::ReadFolder {
-        path: musics_dir.to_path_buf(),
+        path: songs_dir.to_path_buf(),
         source,
     };
     let mut tracks = Vec::new();
-    for entry in fs::read_dir(musics_dir).map_err(read_error)? {
+    for entry in fs::read_dir(songs_dir).map_err(read_error)? {
         let path = entry.map_err(read_error)?.path();
         if is_mp3(&path) {
             tracks.push(track_from(&path));
@@ -91,7 +80,7 @@ fn track_from(file: &Path) -> Track {
     let file_name = file.file_name().unwrap_or_default().to_string_lossy();
     let title = file.file_stem().unwrap_or_default().to_string_lossy();
     Track {
-        path: format!("{MUSICS_FOLDER_NAME}/{file_name}"),
+        path: format!("{SONGS_FOLDER_NAME}/{file_name}"),
         title: title.into_owned(),
     }
 }

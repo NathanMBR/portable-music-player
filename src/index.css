@@ -10,22 +10,24 @@
   --color-rule: #d9dfee;
   --color-pen: #2c46d1;
   --color-correction: #c0362c;
+  --color-shade: #1a2463;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-paper: #131a3b;
-    --color-ink: #e4e8f7;
-    --color-ink-faded: #98a1c6;
-    --color-rule: #27305c;
-    --color-pen: #8fa2ff;
-    --color-correction: #ff8a80;
-  }
+/* data-theme is set before the first paint by index.html and later by the theme toggle. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #131a3b;
+  --color-ink: #e4e8f7;
+  --color-ink-faded: #98a1c6;
+  --color-rule: #27305c;
+  --color-pen: #8fa2ff;
+  --color-correction: #ff8a80;
+  --color-shade: #05081a;
 }
 
 @layer base {
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
   }
 
   body {

@@ -14,7 +14,7 @@ const LibraryContent = () => {
 }
 
 export const LibraryView = () => (
-  <div className="mx-auto max-w-3xl px-6">
+  <div className="px-6">
     <LibraryHeader />
     <main>
       <LibraryContent />

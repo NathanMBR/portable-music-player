@@ -6,7 +6,10 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 A portable music player that runs on Linux and Windows **without installation**, so it can live on a flash drive. The drive holds both executables (one per OS) side by side; the user runs whichever matches their current OS. All app data (library, playlists, settings, etc.) is stored as `.json` files **in the same folder as the executable**.
 
-Built with Tauri 2 + React 19 + TypeScript. Implemented so far: the music library scan, which creates the `Songs` folder next to the executable if it's missing and lists its `.mp3` files alphabetically.
+Built with Tauri 2 + React 19 + TypeScript. Implemented so far:
+- the music library scan, which creates the `Songs` folder next to the executable if it's missing and lists its `.mp3` files alphabetically;
+- a side menu (an overlay drawer opened by the top-left button) listing the categories, so far only Songs;
+- a dark theme toggle, saved in `settings.json` next to the executable.
 
 ## Commands
 
@@ -39,7 +42,7 @@ There is no frontend test runner yet. In dev the executable is `src-tauri/target
 
 ```
 src/
-  main.tsx              entry: font + CSS imports, starts the first library scan, renders <App />
+  main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, renders <App />
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice)
@@ -53,7 +56,11 @@ src/
 
 - Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
 - Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`.
-- Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`). Tailwind's default palette is disabled with `--color-*: initial`. Dark mode follows the OS by redefining the same variables under `prefers-color-scheme: dark`, so components never use `dark:`.
+- Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.
+- The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
+  - An inline script in `index.html` sets the attribute from the OS before the first paint.
+  - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
+- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view. That map lives in `App.tsx` because views render `MenuButton`; putting it in navigation would create a circular import. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 
@@ -61,6 +68,9 @@ src/
 
 - `portable.rs`: `root_dir()`, the folder containing the executable. Every app file lives under it.
 - One module per feature (e.g. `library.rs`) holding its constants, data structs, commands and error enum.
+- `settings.rs`: user settings in `settings.json` next to the executable.
+  - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added.
+  - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
 - Commands are `async`: sync commands run on the main thread, and file I/O on a slow USB drive would freeze the window.
 - Commands return `Result<T, FeatureError>`. The error enum uses `thiserror` for messages and serializes as its message string, which the frontend shows to the user. Structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.
 

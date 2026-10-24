@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-*: initial;
+  --color-paper: #f7f8fb;
+  --color-ink: #1a2463;
+  --color-ink-faded: #5d668f;
+  --color-rule: #d9dfee;
+  --color-pen: #2c46d1;
+  --color-correction: #c0362c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #131a3b;
+    --color-ink: #e4e8f7;
+    --color-ink-faded: #98a1c6;
+    --color-rule: #27305c;
+    --color-pen: #8fa2ff;
+    --color-correction: #ff8a80;
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+}

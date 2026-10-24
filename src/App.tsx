@@ -1,3 +1,3 @@
-export const App = () => {
-  return <h1>Hello, world!</h1>
-}
+import { LibraryView } from './features/library/LibraryView'
+
+export const App = () => <LibraryView />

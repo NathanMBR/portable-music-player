@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 A portable music player that runs on Linux and Windows **without installation**, so it can live on a flash drive. The drive holds both executables (one per OS) side by side; the user runs whichever matches their current OS. All app data (library, playlists, settings, etc.) is stored as `.json` files **in the same folder as the executable**.
 
-This is currently a fresh Tauri 2 + React 19 + TypeScript scaffold (`src/App.tsx` is a placeholder; `src-tauri/src/lib.rs` still has the template `greet` command).
+Built with Tauri 2 + React 19 + TypeScript. Implemented so far: the music library scan, which creates the `Musics` folder next to the executable if it's missing and lists its `.mp3` files alphabetically.
 
 ## Commands
 
@@ -21,9 +21,10 @@ pnpm tauri build        # release build of the native app
 pnpm lint               # biome check --fix: lint + format, applying safe fixes
 pnpm lint:ci            # biome check without fixes; reserved for the CI workflow
 cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests (#[cfg(test)] modules next to the code)
 ```
 
-There is no test setup yet. CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
+There is no frontend test runner yet. In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Musics` folder is `src-tauri/target/debug/Musics` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
 ## Architecture
 
@@ -34,6 +35,35 @@ There is no test setup yet. CI (`.github/workflows/quality-assurance.yml`) runs 
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
 
+### Frontend layout
+
+```
+src/
+  main.tsx              entry: font + CSS imports, starts the first library scan, renders <App />
+  App.tsx               page shell
+  index.css             Tailwind import, @theme design tokens, dark overrides, base styles
+  components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice)
+  features/<feature>/   everything one feature owns
+    types.ts            data shapes returned by Rust (mirror the Rust structs)
+    <feature>Api.ts     the only place that calls invoke() for the feature
+    <feature>Store.ts   Zustand store: state + actions
+    *.ts                pure helpers (sorting, formatting)
+    *.tsx               feature components
+```
+
+- Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
+- Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`.
+- Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`). Tailwind's default palette is disabled with `--color-*: initial`. Dark mode follows the OS by redefining the same variables under `prefers-color-scheme: dark`, so components never use `dark:`.
+- Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
+- Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
+
+### Rust layout
+
+- `portable.rs`: `root_dir()`, the folder containing the executable. Every app file lives under it.
+- One module per feature (e.g. `library.rs`) holding its constants, data structs, commands and error enum.
+- Commands are `async`: sync commands run on the main thread, and file I/O on a slow USB drive would freeze the window.
+- Commands return `Result<T, FeatureError>`. The error enum uses `thiserror` for messages and serializes as its message string, which the frontend shows to the user. Structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.
+
 ## Portability constraints
 
 These follow from the project goal and are easy to get wrong:
@@ -43,6 +73,8 @@ These follow from the project goal and are easy to get wrong:
 - The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` is `"all"`). If an AppImage is ever used, `current_exe()` points inside a temporary mount, so read the `APPIMAGE` env var instead.
 - Each OS executable has to be built on (or cross-compiled for) that OS. Development here happens in WSL2, which produces the Linux binary.
 - Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk.
+- Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/features/library/sortTracks.ts`).
+- Don't canonicalize paths shown to the user: on Windows, `canonicalize` adds a `\\?\` prefix.
 
 ## Git
 

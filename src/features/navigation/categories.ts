@@ -1,6 +1,6 @@
-import { MusicalNoteIcon } from '@heroicons/react/20/solid'
+import { SONGS_ICON } from '../library/constants'
 
-export const CATEGORIES = [{ id: 'songs', label: 'Songs', icon: MusicalNoteIcon }] as const
+export const CATEGORIES = [{ id: 'songs', label: 'Songs', icon: SONGS_ICON }] as const
 
 export type CategoryId = (typeof CATEGORIES)[number]['id']
 

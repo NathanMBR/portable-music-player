@@ -1,6 +1,5 @@
 import { ArrowPathIcon, FolderOpenIcon } from '@heroicons/react/20/solid'
 import { IconButton } from '../../components/IconButton'
-import { MenuButton } from '../navigation/MenuButton'
 import { SONGS_FOLDER_NAME, SONGS_ICON } from './constants'
 import { describeLibraryStatus } from './libraryStatus'
 import { useLibraryStore } from './libraryStore'
@@ -14,11 +13,10 @@ export const LibraryHeader = () => {
 
   return (
     <header className="sticky top-0 border-b-2 border-ink bg-paper pt-8 pb-4">
-      {/* A grid keeps the status lines in the title's column, whatever the button and icon sizes. */}
-      <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-3">
-        <MenuButton />
+      {/* min-h-10 matches the menu button's height, so the two line up across their columns. */}
+      <div className="flex min-h-10 items-center gap-3">
         <SONGS_ICON className="size-8 text-ink" />
-        <h1 className="text-4xl leading-none font-extrabold tracking-tight font-stretch-expanded">
+        <h1 className="flex-1 text-4xl leading-none font-extrabold tracking-tight font-stretch-expanded">
           {SONGS_FOLDER_NAME}
         </h1>
         <div className="flex gap-1">
@@ -30,18 +28,15 @@ export const LibraryHeader = () => {
             onClick={scanLibrary}
           />
         </div>
-        <p
-          aria-live="polite"
-          className="col-span-2 col-start-3 mt-3 min-h-5 truncate text-sm text-ink-faded"
-        >
-          {describeLibraryStatus(lastScan, isScanning)}
-        </p>
-        {openFolderError && (
-          <p role="alert" className="col-span-2 col-start-3 mt-1 text-sm text-correction">
-            {openFolderError}
-          </p>
-        )}
       </div>
+      <p aria-live="polite" className="mt-3 min-h-5 truncate text-sm text-ink-faded">
+        {describeLibraryStatus(lastScan, isScanning)}
+      </p>
+      {openFolderError && (
+        <p role="alert" className="mt-1 text-sm text-correction">
+          {openFolderError}
+        </p>
+      )}
     </header>
   )
 }

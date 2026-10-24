@@ -14,10 +14,10 @@ const LibraryContent = () => {
 }
 
 export const LibraryView = () => (
-  <div className="px-6">
+  <>
     <LibraryHeader />
     <main>
       <LibraryContent />
     </main>
-  </div>
+  </>
 )

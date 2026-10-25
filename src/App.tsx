@@ -19,13 +19,15 @@ export const App = () => {
     <>
       <SideMenu />
       <div className="flex gap-4 px-6">
-        {/* The menu button has a column of its own, so nothing ever sits under it. */}
-        <div className="sticky top-0 self-start pt-8">
+        {/* The menu button has a column of its own, so nothing ever sits under it. An empty
+            column of the same width on the right keeps the view's margins equal on both sides. */}
+        <div className="sticky top-0 w-10 shrink-0 self-start pt-8">
           <MenuButton />
         </div>
         <div className="min-w-0 flex-1">
           <CurrentView />
         </div>
+        <div aria-hidden="true" className="w-10 shrink-0" />
       </div>
     </>
   )

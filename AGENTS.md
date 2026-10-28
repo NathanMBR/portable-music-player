@@ -21,8 +21,8 @@ pnpm tauri dev          # run the desktop app (starts Vite on :1420 via beforeDe
 pnpm dev                # frontend only, in a browser (Tauri APIs unavailable)
 pnpm build              # tsc type-check + vite build to dist/
 pnpm tauri build        # release build of the native app
-pnpm lint               # biome check --fix: lint + format, applying safe fixes
-pnpm lint:ci            # biome check without fixes; reserved for the CI workflow
+pnpm lint               # tsc --noEmit type-check (writes nothing), then biome check --fix: lint + format, applying safe fixes
+pnpm lint:ci            # tsc --noEmit type-check, then biome check without fixes; reserved for the CI workflow
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests (#[cfg(test)] modules next to the code)
 ```

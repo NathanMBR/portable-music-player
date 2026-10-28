@@ -54,7 +54,12 @@ fn saved_size(app: &App) -> Option<PhysicalSize<u32>> {
         .ok()?
         .join(tauri_plugin_window_state::DEFAULT_FILENAME);
     let contents = fs::read_to_string(path).ok()?;
-    let windows: HashMap<String, SavedWindow> = serde_json::from_str(&contents).ok()?;
+    size_from_saved_state(&contents)
+}
+
+/// Reads this window's size from the contents of the plugin's file, if it holds a usable one.
+fn size_from_saved_state(contents: &str) -> Option<PhysicalSize<u32>> {
+    let windows: HashMap<String, SavedWindow> = serde_json::from_str(contents).ok()?;
     let saved = windows.get(LABEL)?;
     let has_size = saved.width > 0 && saved.height > 0;
     has_size.then(|| PhysicalSize::new(saved.width, saved.height))
@@ -113,5 +118,31 @@ mod tests {
         let (_, position) =
             fit_and_center(PhysicalSize::new(800, 600), &work_area(1920, 40, 1600, 900));
         assert_eq!(position, PhysicalPosition::new(2320, 190));
+    }
+
+    #[test]
+    fn reads_the_saved_size_of_the_main_window() {
+        let contents = r#"{"main":{"width":1100,"height":760,"x":10,"y":20,"maximized":false}}"#;
+        assert_eq!(
+            size_from_saved_state(contents),
+            Some(PhysicalSize::new(1100, 760))
+        );
+    }
+
+    #[test]
+    fn ignores_an_empty_saved_size() {
+        let contents = r#"{"main":{"width":0,"height":0}}"#;
+        assert_eq!(size_from_saved_state(contents), None);
+    }
+
+    #[test]
+    fn ignores_other_windows() {
+        let contents = r#"{"settings":{"width":400,"height":300}}"#;
+        assert_eq!(size_from_saved_state(contents), None);
+    }
+
+    #[test]
+    fn ignores_a_corrupted_file() {
+        assert_eq!(size_from_saved_state(r#"{"main":{"width":"#), None);
     }
 }

@@ -49,11 +49,13 @@ pub async fn open_songs_folder() -> Result<(), LibraryError> {
     tauri_plugin_opener::open_path(&songs_dir, None::<&str>).map_err(LibraryError::OpenFolder)
 }
 
-/// Returns the Songs folder, creating it first if it's missing.
 fn ensure_songs_dir() -> Result<PathBuf, LibraryError> {
-    let songs_dir = portable::root_dir()
-        .map_err(LibraryError::RootDir)?
-        .join(SONGS_FOLDER_NAME);
+    ensure_songs_dir_in(&portable::root_dir().map_err(LibraryError::RootDir)?)
+}
+
+/// Returns the Songs folder inside `root`, creating it first if it's missing.
+fn ensure_songs_dir_in(root: &Path) -> Result<PathBuf, LibraryError> {
+    let songs_dir = root.join(SONGS_FOLDER_NAME);
     fs::create_dir_all(&songs_dir).map_err(|source| LibraryError::CreateFolder {
         path: songs_dir.clone(),
         source,
@@ -129,15 +131,89 @@ mod tests {
 
     #[test]
     fn rejects_folders_named_like_mp3_files() {
-        let test_dir = std::env::temp_dir().join(format!("pmp-library-{}", std::process::id()));
-        let folder = test_dir.join("folder.mp3");
-        let file = test_dir.join("song.mp3");
-        fs::create_dir_all(&folder).unwrap();
+        let test_dir = tempfile::tempdir().unwrap();
+        let folder = test_dir.path().join("folder.mp3");
+        let file = test_dir.path().join("song.mp3");
+        fs::create_dir(&folder).unwrap();
         fs::write(&file, b"").unwrap();
 
-        let results = (is_mp3(&folder), is_mp3(&file));
-        fs::remove_dir_all(&test_dir).unwrap();
+        assert!(!is_mp3(&folder));
+        assert!(is_mp3(&file));
+    }
 
-        assert_eq!(results, (false, true));
+    #[test]
+    fn creates_the_songs_folder_when_missing() {
+        let root = tempfile::tempdir().unwrap();
+
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+
+        assert_eq!(songs_dir, root.path().join(SONGS_FOLDER_NAME));
+        assert!(songs_dir.is_dir());
+    }
+
+    #[test]
+    fn keeps_the_songs_of_an_existing_songs_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let song = root.path().join(SONGS_FOLDER_NAME).join("song.mp3");
+        fs::create_dir(root.path().join(SONGS_FOLDER_NAME)).unwrap();
+        fs::write(&song, b"").unwrap();
+
+        ensure_songs_dir_in(root.path()).unwrap();
+
+        assert!(song.is_file());
+    }
+
+    #[test]
+    fn lists_only_the_mp3_files_of_the_songs_folder() {
+        let songs_dir = tempfile::tempdir().unwrap();
+        for file_name in ["b.mp3", "A.MP3", "notes.txt", "song.wav", "._b.mp3"] {
+            fs::write(songs_dir.path().join(file_name), b"").unwrap();
+        }
+        fs::create_dir(songs_dir.path().join("folder.mp3")).unwrap();
+
+        let mut titles: Vec<String> = find_tracks(songs_dir.path())
+            .unwrap()
+            .into_iter()
+            .map(|track| track.title)
+            .collect();
+        // The folder is read in no particular order; the frontend sorts the tracks.
+        titles.sort();
+
+        assert_eq!(titles, ["A", "b"]);
+    }
+
+    #[test]
+    fn names_tracks_after_their_file_with_a_path_valid_on_any_os() {
+        let track = track_from(&Path::new("/media/usb/Songs").join("Artist - Song.mp3"));
+
+        assert_eq!(track.title, "Artist - Song");
+        assert_eq!(track.path, "Songs/Artist - Song.mp3");
+    }
+
+    #[test]
+    fn serializes_tracks_like_the_frontend_track_type() {
+        // Mirrors `Track` in src/features/library/types.ts.
+        let track = Track {
+            path: "Songs/Song.mp3".into(),
+            title: "Song".into(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&track).unwrap(),
+            serde_json::json!({ "path": "Songs/Song.mp3", "title": "Song" })
+        );
+    }
+
+    #[test]
+    fn serializes_errors_as_their_message() {
+        let error = LibraryError::ReadFolder {
+            path: PathBuf::from("Songs"),
+            source: io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&error).unwrap(),
+            serde_json::json!("Couldn't read the Songs folder at Songs: permission denied")
+        );
     }
 }

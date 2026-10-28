@@ -94,17 +94,15 @@ fn write_settings(path: &Path, settings: &Settings) -> Result<(), SettingsError>
 
 #[cfg(test)]
 mod tests {
+    use tempfile::TempDir;
+
     use super::*;
 
-    fn temporary_settings_path(test_name: &str) -> PathBuf {
-        let test_dir =
-            std::env::temp_dir().join(format!("pmp-settings-{test_name}-{}", std::process::id()));
-        fs::create_dir_all(&test_dir).unwrap();
-        test_dir.join(SETTINGS_FILE_NAME)
-    }
-
-    fn remove_test_dir(settings_path: &Path) {
-        fs::remove_dir_all(settings_path.parent().unwrap()).unwrap();
+    /// The folder is deleted when the returned `TempDir` drops, so tests keep it alive.
+    fn temporary_settings_path() -> (TempDir, PathBuf) {
+        let test_dir = tempfile::tempdir().unwrap();
+        let path = test_dir.path().join(SETTINGS_FILE_NAME);
+        (test_dir, path)
     }
 
     #[test]
@@ -121,30 +119,70 @@ mod tests {
 
     #[test]
     fn missing_file_gives_defaults() {
-        let path = temporary_settings_path("missing");
+        let (_test_dir, path) = temporary_settings_path();
         let settings = read_settings(&path).unwrap();
-        remove_test_dir(&path);
         assert_eq!(settings, Settings::default());
     }
 
     #[test]
     fn saved_settings_load_back() {
-        let path = temporary_settings_path("roundtrip");
+        let (_test_dir, path) = temporary_settings_path();
         let saved = Settings {
             theme: Some(Theme::Light),
         };
         write_settings(&path, &saved).unwrap();
         let loaded = read_settings(&path).unwrap();
-        remove_test_dir(&path);
         assert_eq!(loaded, saved);
     }
 
     #[test]
+    fn saving_leaves_no_temporary_file_behind() {
+        let (test_dir, path) = temporary_settings_path();
+        write_settings(&path, &Settings::default()).unwrap();
+
+        let file_names: Vec<_> = fs::read_dir(test_dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+
+        assert_eq!(file_names, [SETTINGS_FILE_NAME]);
+    }
+
+    #[test]
     fn invalid_json_is_a_parse_error() {
-        let path = temporary_settings_path("invalid");
+        let (_test_dir, path) = temporary_settings_path();
         fs::write(&path, "{ not json").unwrap();
         let result = read_settings(&path);
-        remove_test_dir(&path);
         assert!(matches!(result, Err(SettingsError::Parse { .. })));
+    }
+
+    #[test]
+    fn serializes_settings_like_the_frontend_settings_type() {
+        // Mirrors `Settings` in src/features/settings/types.ts, where no theme is `null`.
+        let dark = Settings {
+            theme: Some(Theme::Dark),
+        };
+
+        assert_eq!(
+            serde_json::to_value(Settings::default()).unwrap(),
+            serde_json::json!({ "theme": null })
+        );
+        assert_eq!(
+            serde_json::to_value(dark).unwrap(),
+            serde_json::json!({ "theme": "dark" })
+        );
+    }
+
+    #[test]
+    fn serializes_errors_as_their_message() {
+        let error = SettingsError::Write {
+            path: PathBuf::from("settings.json"),
+            source: io::Error::new(io::ErrorKind::PermissionDenied, "read-only file system"),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&error).unwrap(),
+            serde_json::json!("Couldn't save the settings at settings.json: read-only file system")
+        );
     }
 }

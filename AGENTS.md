@@ -6,10 +6,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 A portable music player that runs on Linux and Windows **without installation**, so it can live on a flash drive. The drive holds both executables (one per OS) side by side; the user runs whichever matches their current OS. All app data (library, playlists, settings, etc.) is stored as `.json` files **in the same folder as the executable**.
 
-Built with Tauri 2 + React 19 + TypeScript. Implemented so far:
-- the music library scan, which creates the `Songs` folder next to the executable if it's missing and lists its `.mp3` files alphabetically;
-- a side menu (an overlay drawer opened by the top-left button) listing the categories, so far only Songs;
-- a dark theme toggle, saved in `settings.json` next to the executable.
+Built with Tauri 2 + React 19 + TypeScript. The features implemented so far are listed under **Features** in `README.md`.
 
 ## Commands
 
@@ -17,17 +14,24 @@ Package manager is **pnpm**.
 
 ```bash
 pnpm install
+pnpm exec playwright install chromium   # once per machine: the browser the story tests run in
 pnpm tauri dev          # run the desktop app (starts Vite on :1420 via beforeDevCommand)
 pnpm dev                # frontend only, in a browser (Tauri APIs unavailable)
 pnpm build              # tsc type-check + vite build to dist/
 pnpm tauri build        # release build of the native app
 pnpm lint               # tsc --noEmit type-check (writes nothing), then biome check --fix: lint + format, applying safe fixes
 pnpm lint:ci            # tsc --noEmit type-check, then biome check without fixes; reserved for the CI workflow
+pnpm test               # every Vitest test once: unit tests (jsdom) + every story (headless Chromium)
+pnpm test:watch         # the same, in watch mode
+pnpm exec vitest run --project unit        # only the unit tests
+pnpm exec vitest run --project storybook   # only the story tests
+pnpm storybook          # Storybook on :6006: the UI documentation, and the MCP server for agents
+pnpm build-storybook    # static Storybook in storybook-static/
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests (#[cfg(test)] modules next to the code)
 ```
 
-There is no frontend test runner yet. In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
+In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
 ## Architecture
 
@@ -41,6 +45,8 @@ There is no frontend test runner yet. In dev the executable is `src-tauri/target
 ### Frontend layout
 
 ```
+.storybook/             Storybook config: main.ts (addons, components manifest), preview.tsx (app CSS,
+                        theme toolbar, fake Rust commands, store reset, a11y checks)
 src/
   main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, renders <App />
   App.tsx               page shell
@@ -53,6 +59,10 @@ src/
     <feature>Store.ts   Zustand store: state + actions
     *.ts                pure helpers (sorting, formatting)
     *.tsx               feature components
+    *.test.ts           unit tests of the module next to them
+    *.stories.tsx       stories of the component next to them: its documentation and component tests
+  docs/                 Storybook MDX pages (Introduction, Design tokens)
+  testing/              helpers shared by tests and stories (mockCommands, resetStores, unit test setup)
 ```
 
 - Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
@@ -90,9 +100,78 @@ These follow from the project goal and are easy to get wrong:
 - Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/features/library/sortTracks.ts`).
 - Don't canonicalize paths shown to the user: on Windows, `canonicalize` adds a `\\?\` prefix.
 
+## Documentation
+
+- **Storybook is the detailed documentation of the UI.** To understand how the interface works, read it rather than expecting it here:
+  - the `*.stories.tsx` next to each component, one story per situation it handles;
+  - the JSDoc of the components and their props;
+  - the MDX pages in `src/docs/`: `Introduction.mdx` (app shell, data flow, how stories fake Rust) and `DesignTokens.mdx` (colors, type, interaction states).
+- With `pnpm storybook` running, the `storybook` MCP server (`.mcp.json`, `http://localhost:6006/mcp`) serves these docs. Before UI work:
+  - list the documented components with `docs-list` and read the ones involved with `docs-show`;
+  - never guess a component's props: if one isn't documented, ask the user;
+  - call `get-storybook-story-instructions` before writing or changing stories;
+  - check the result with `test-run` (or `pnpm test`).
+  - Without the server, read the story and MDX files directly.
+- Every exported component has a JSDoc block saying what it's for and when it's used, ending with a `@summary` line, and every prop has a JSDoc line. This is the one exception to "comments explain why, not what": Storybook's Docs pages and its components manifest (what the MCP server serves) are built from them.
+- Every component has a `<Component>.stories.tsx` next to it, in CSF 3:
+  - one concept per story, with a JSDoc description saying when that situation happens;
+  - stories set the store state they show in `beforeEach`, and mock the commands they trigger with `mockCommands`;
+  - stories that set store state use `renderInOwnFrame`, so they don't overwrite each other on Docs pages;
+  - stories written by an agent keep the `ai-generated` tag until the user reviews them and removes it, and stories that don't pass yet also carry `needs-work`.
+- MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
+- `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
+- Update the stories, the docs and the README in the same change as the feature.
+
+## Testing
+
+| Layer | Where | Runs with |
+|---|---|---|
+| Rust: file system, data formats, window sizing | `#[cfg(test)] mod tests` at the bottom of the module | `cargo test` |
+| Frontend logic: helpers and stores | `*.test.ts` next to the module | Vitest `unit` project (jsdom) |
+| Components: rendering, interactions, accessibility | stories and their `play` functions | Vitest `storybook` project (headless Chromium) |
+
+- Vitest is configured in `vite.config.ts` (`test.projects`), and `pnpm test` runs both projects. Unit tests import `describe`, `it`, `expect` and `vi` from `vitest` explicitly (no globals).
+- **Fake the Rust side only through `mockCommands`** (`src/testing/mockCommands.ts`):
+  - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
+  - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
+  - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
+- Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there.
+- **Every story is a test**:
+  - It must render, its `play` function must pass, and the axe accessibility check must find no violations. That check is `a11y.test: 'error'` in `.storybook/preview.tsx`, run on the whole `<body>` so portaled dialogs are included.
+  - Write a `play` only when it proves something the render doesn't: an interaction, async content, an aria state.
+  - In a `play`, use the `canvas` and `userEvent` it receives. Query portaled content, like the side menu, with `within(canvasElement.ownerDocument.body)`.
+  - The `CssCheck` story in `Button.stories.tsx` proves the app's CSS loads in Storybook; there is only one.
+- **Rust commands stay thin**:
+  - a command resolves its path from `portable::root_dir()` and delegates to a function that takes it (`ensure_songs_dir_in`, `read_settings`, `write_settings`);
+  - tests call that function with a `tempfile::tempdir()`, never the real executable folder, and the folder is deleted even when a test fails.
+- Every struct and error sent to the frontend has a test pinning its JSON (`serde_json::to_value`), which must match the TypeScript type in the feature's `types.ts`.
+- `unwrap`/`expect` are fine in tests: a panic is how a Rust test fails.
+- Name a test after the rule it checks: `rejects_hidden_and_non_mp3_names`, `it('compares numbers by value')`.
+
+## Test-driven development
+
+Features and fixes are developed test first. A test states a rule the system must follow, and the code comes after it, to make it pass:
+
+1. **State the rule** the change introduces, e.g. "hidden files are not songs" or "a failed save keeps the chosen theme on screen".
+2. **Write the test first**, in the layer that owns the rule: a Rust test for file system and data rules, a `*.test.ts` for frontend logic and stores, or a story with a `play` function for what the user sees and does.
+3. **Run it and watch it fail** for the expected reason: the missing behavior, not a typo or a missing import.
+4. **Write the least code that makes it pass.**
+5. **Refactor** with every test green.
+
+- A bug fix starts with a test that reproduces the bug.
+- A feature is done when its tests pass, its components have stories and JSDoc, and its line is in the README.
+
+## Packages
+
+- Look up a package's documentation (setup, APIs, configuration, migrations) with the `/context7:docs` skill instead of relying on memory: the dependencies here are recent majors whose APIs differ from older, better-known versions.
+- **Set up new packages with their own init command.** When a package's official documentation declares an init or setup command, run it first, then edit the files it generated; never write those files by hand.
+  - For example, adding TypeScript means running `pnpm exec tsc --init` and then editing the generated `tsconfig.json`. Storybook addons go through `pnpm exec storybook add <addon>`.
+  - This applies when the package isn't set up in the project yet and the command doesn't conflict with the project's current state. Otherwise edit the existing files.
+  - Remove whatever the command generates that the project doesn't use (example files, unused addons), and pin any version it wrote as `latest` to a version range.
+
 ## Git
 
-**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit.
+**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit. Make sure `pnpm test` and `cargo test --manifest-path src-tauri/Cargo.toml` pass before committing, too.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 
@@ -107,7 +186,7 @@ All code (TypeScript and Rust) must follow Clean Code principles:
 - **No magic values**: use named constants for file names, limits, defaults and similar values.
 - **Explicit types**: no `any`. Model domain data with explicit types, and prefer types that make invalid states impossible to represent.
 - **Errors are handled, never swallowed**: Rust commands return `Result` instead of calling `unwrap`/`expect` on fallible operations. This matters here: the release profile uses `panic = "abort"`, so a panic kills the whole app. On the frontend, handle rejected `invoke` promises and show the failure to the user.
-- **Comments explain why, not what**: code should explain itself. Don't leave commented-out code.
+- **Comments explain why, not what**: code should explain itself. Don't leave commented-out code. The one exception is the JSDoc that documents components and their props (see Documentation).
 - **Leave it cleaner**: improve the code you touch, but keep unrelated refactors out of the change.
 
 ## Code style (Biome)

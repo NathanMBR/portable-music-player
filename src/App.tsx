@@ -11,6 +11,12 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
   songs: LibraryView
 }
 
+/**
+ * The page shell: the side menu, the menu button's column on the left, the current category's
+ * view, and an empty column on the right that keeps the view's margins equal.
+ *
+ * @summary App shell
+ */
 export const App = () => {
   const currentCategory = useNavigationStore(state => state.currentCategory)
   const CurrentView = viewByCategory[currentCategory]

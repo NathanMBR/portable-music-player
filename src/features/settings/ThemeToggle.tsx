@@ -4,6 +4,13 @@ import { useSettingsStore } from './settingsStore'
 
 const TOGGLE_LABEL = 'Dark theme'
 
+/**
+ * Switch between the light and dark themes. The choice applies at once and is saved in
+ * settings.json next to the executable. If saving fails, the theme still changes and the error
+ * shows under the switch.
+ *
+ * @summary Light and dark theme switch
+ */
 export const ThemeToggle = () => {
   const theme = useSettingsStore(state => state.theme)
   const settingsError = useSettingsStore(state => state.settingsError)

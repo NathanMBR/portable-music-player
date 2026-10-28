@@ -5,6 +5,12 @@ import { useNavigationStore } from './navigationStore'
 const CURRENT_CATEGORY_CLASSES = 'bg-pen/10 font-semibold text-pen'
 const OTHER_CATEGORY_CLASSES = 'text-ink data-hover:bg-rule/60'
 
+/**
+ * The side menu's categories. The current one is highlighted and marked as the current page.
+ * Choosing one switches the view and closes the menu.
+ *
+ * @summary Category navigation of the side menu
+ */
 export const CategoryList = () => {
   const currentCategory = useNavigationStore(state => state.currentCategory)
   const selectCategory = useNavigationStore(state => state.selectCategory)

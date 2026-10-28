@@ -2,10 +2,19 @@ import { Button as HeadlessButton } from '@headlessui/react'
 import type { ReactNode } from 'react'
 
 type ButtonProps = {
+  /** The button's text. */
   children: ReactNode
+  /** Runs when the button is clicked or pressed from the keyboard. */
   onClick: () => void
 }
 
+/**
+ * Filled button for the one main action on screen, like "Try again" under a failed scan. It uses
+ * the `pen` color so it stands out from the quiet icon buttons of the headers, which use
+ * `IconButton` instead.
+ *
+ * @summary Filled button for the main action of a view or notice
+ */
 export const Button = ({ children, onClick }: ButtonProps) => (
   <HeadlessButton
     onClick={onClick}

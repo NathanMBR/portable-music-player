@@ -6,6 +6,13 @@ import { ThemeToggle } from '../settings/ThemeToggle'
 import { CategoryList } from './CategoryList'
 import { useNavigationStore } from './navigationStore'
 
+/**
+ * Drawer that slides in from the left over a dimmed page, with the app's name, the categories and
+ * the theme toggle. Its close button sits exactly where the menu button was. It closes with that
+ * button, Escape, a click outside, or by choosing a category.
+ *
+ * @summary Side menu drawer
+ */
 export const SideMenu = () => {
   const isMenuOpen = useNavigationStore(state => state.isMenuOpen)
   const closeMenu = useNavigationStore(state => state.closeMenu)

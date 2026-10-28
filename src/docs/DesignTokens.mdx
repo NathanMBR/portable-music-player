@@ -1,0 +1,84 @@
+import { ColorItem, ColorPalette, Meta } from '@storybook/addon-docs/blocks'
+
+<Meta
+  title="Design tokens"
+  summary="The semantic colors, type and interaction states every component uses"
+/>
+
+# Design tokens
+
+Components use only the semantic colors below, through Tailwind utilities such as `bg-paper`,
+`text-ink` or `border-rule`. Tailwind's default palette is turned off (`--color-*: initial` in
+`src/index.css`), so a raw color like `bg-blue-500` doesn't exist.
+
+Each token has a light and a dark value. The theme is the `data-theme` attribute on `<html>`, and
+the dark values are redefined under `:root[data-theme="dark"]`, so components never use `dark:`
+variants.
+
+<ColorPalette>
+  <ColorItem
+    title="paper"
+    subtitle="Page and surface background; text on pen-filled buttons"
+    colors={{ Light: '#f7f8fb', Dark: '#131a3b' }}
+  />
+  <ColorItem
+    title="ink"
+    subtitle="Main text, icons and the strong rule under headers"
+    colors={{ Light: '#1a2463', Dark: '#e4e8f7' }}
+  />
+  <ColorItem
+    title="ink-faded"
+    subtitle="Secondary text: status lines, descriptions, quiet icons"
+    colors={{ Light: '#5d668f', Dark: '#98a1c6' }}
+  />
+  <ColorItem
+    title="rule"
+    subtitle="Dividers, outlines and hover backgrounds"
+    colors={{ Light: '#d9dfee', Dark: '#27305c' }}
+  />
+  <ColorItem
+    title="pen"
+    subtitle="Accent: main buttons, the current category, focus outlines, the switch when on"
+    colors={{ Light: '#2c46d1', Dark: '#8fa2ff' }}
+  />
+  <ColorItem
+    title="correction"
+    subtitle="Errors: failure titles and alert lines"
+    colors={{ Light: '#c0362c', Dark: '#ff8a80' }}
+  />
+  <ColorItem
+    title="shade"
+    subtitle="Dimming overlays, like the backdrop behind the side menu"
+    colors={{ Light: '#1a2463', Dark: '#05081a' }}
+  />
+</ColorPalette>
+
+## Dimming with shade
+
+`ink` turns light in the dark theme, so an overlay made of `ink` would brighten the page instead of
+dimming it. Overlays use `shade` with an opacity (the side menu's backdrop is `bg-shade/30`), which
+stays dark in both themes.
+
+## Type
+
+The only typeface is **Archivo Variable**, bundled with the app through
+`@fontsource-variable/archivo`. Nothing loads from a CDN, because the player must work offline on
+any computer. It has a weight axis and a width axis (`font-stretch`):
+
+- **Titles** are `font-extrabold tracking-tight font-stretch-expanded`: the Songs header
+  (`text-4xl`) and the app's name in the side menu (`text-lg`).
+- **Song rows** are `font-stretch-semi-condensed`, so long titles fit before they are cut.
+- **Body text** keeps the default width.
+
+## Interaction states
+
+- Headless UI exposes component states as data attributes. Style them with `data-hover:`,
+  `data-focus:`, `data-checked:` and `data-disabled:`, never with `:hover` or `:focus`.
+- **Focus:** every interactive element shows `data-focus:outline-2 data-focus:outline-offset-2
+  data-focus:outline-pen`.
+- **Hover:** quiet buttons get `data-hover:bg-rule/60`. Pen-filled buttons get
+  `data-hover:bg-pen/90`.
+- **Cursors:** buttons show a pointer and disabled ones show `not-allowed` (base styles in
+  `src/index.css`).
+- **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
+  `motion-reduce:`).

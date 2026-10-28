@@ -1,0 +1,78 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta
+  title="Introduction"
+  summary="How the player's UI is built, how it talks to Rust, and how these stories fake that in a browser"
+/>
+
+# Portable Music Player UI
+
+This Storybook is the detailed documentation of the player's interface. Every component has a
+`*.stories.tsx` file next to it. Its Docs page describes what the component is for, lists its props
+(read from the JSDoc in the component's source) and shows one story per situation it handles. The
+**Design tokens** page covers colors, type and interaction states.
+
+## The app shell
+
+`App` lays the window out in three columns:
+
+- **Left:** the menu button, in a column of its own, so views never include it and nothing scrolls
+  under it.
+- **Middle:** the view of the current category. `App` maps each category id to its view
+  (`viewByCategory`), so the navigation feature never imports the views it switches between.
+- **Right:** an empty column as wide as the left one, which keeps the view's side margins equal.
+
+The **side menu** is an overlay drawer (`SideMenu`) opened by the menu button. It lists the
+categories from `src/features/navigation/categories.ts` and holds the theme toggle. Choosing a
+category switches the view and closes the drawer. Adding a category takes one entry in `CATEGORIES`
+and one view in `viewByCategory`.
+
+The only category so far is **Songs** (`LibraryView`): a sticky header with the song count, then the
+song list, a notice for an empty Songs folder, or the reason the last scan failed.
+
+## Where the code lives
+
+- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`), built on
+  Headless UI and styled with Tailwind.
+- `src/features/<feature>/`: everything one feature owns. Its types mirror the Rust structs,
+  `<feature>Api.ts` is the only file that calls Rust, `<feature>Store.ts` is its Zustand store, and
+  its components sit next to their stories.
+
+## How data flows
+
+A component reads its state from a Zustand store and calls the store's actions. The store calls its
+feature's `*Api.ts`, which uses Tauri's `invoke()` to run a Rust command. The Rust commands read
+and write the `Songs` folder and the `.json` files next to the executable, so everything stays on the
+flash drive.
+
+Rust errors reach the frontend as their message string. Components show them as they are, in a
+`Notice` or in an alert line under the control that failed.
+
+## How the stories run without Tauri
+
+Storybook runs the UI in a plain browser, where there is no Rust side. Three pieces make the stories
+work anyway:
+
+- **Fake commands.** `mockCommands` (`src/testing/mockCommands.ts`) answers Rust commands through
+  Tauri's own `mockIPC`. Each story mocks the commands its interactions trigger, which also
+  documents the commands a component uses. A command that isn't mocked rejects with
+  `Unmocked command: <name>`, and `failingCommand(message)` fakes a Rust error.
+- **Fresh stores.** Before every story, `resetStores` puts every store back to its initial state. A
+  story then sets the state it shows in its `beforeEach`, for example a failed scan.
+- **One frame per story on Docs pages.** The stores are shared by everything on a page, so stories
+  that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
+  each other's state.
+
+The **theme** toolbar switches `data-theme` on `<html>` between `light` and `dark`, like the app's
+own toggle does.
+
+## Stories are tests
+
+`pnpm test` runs every story as a Vitest test in headless Chromium:
+
+- the story must render without errors;
+- its `play` function, if any, must pass (e.g. clicking "Try again" brings the songs back);
+- the axe accessibility check must find no violations.
+
+The pure logic and the stores have their own unit tests (`*.test.ts`), and the Rust side has its
+own tests (`cargo test`).

@@ -13,6 +13,13 @@ const LibraryContent = () => {
   return <TrackList tracks={lastScan.tracks} />
 }
 
+/**
+ * The Songs category. Below the header it shows nothing until the first scan finishes, then the
+ * song list, the empty-folder notice or the scan failure. The previous list stays on screen while
+ * a new scan runs.
+ *
+ * @summary Songs category view
+ */
 export const LibraryView = () => (
   <>
     <LibraryHeader />

@@ -3,6 +3,8 @@
 @theme {
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
 
+  /* src/docs/DesignTokens.mdx repeats these values (and the dark ones) for the docs and their
+     manifest, which only read content written in the file; keep it in sync. */
   --color-*: initial;
   --color-paper: #f7f8fb;
   --color-ink: #1a2463;

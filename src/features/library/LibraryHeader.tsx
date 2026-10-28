@@ -5,6 +5,13 @@ import { describeLibraryStatus } from './libraryStatus'
 import { useLibraryStore } from './libraryStore'
 import { useOpenSongsFolder } from './useOpenSongsFolder'
 
+/**
+ * Sticky header of the Songs view: the title, the "Open folder" and "Scan again" buttons, and a
+ * status line that screen readers announce as it changes. When the file manager can't open the
+ * Songs folder, the reason shows under the status line.
+ *
+ * @summary Songs view header with the folder and rescan actions
+ */
 export const LibraryHeader = () => {
   const lastScan = useLibraryStore(state => state.lastScan)
   const isScanning = useLibraryStore(state => state.isScanning)

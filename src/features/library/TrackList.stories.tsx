@@ -4,7 +4,7 @@ import { SAMPLE_TRACKS } from './sampleTracks'
 import { TrackList } from './TrackList'
 
 const LONG_TITLE =
-  'Symphony No. 9 in D Minor, Op. 125 "Choral" - IV. Presto - Allegro assai (Live at the Royal Albert Hall)'
+  'The Rage of the Waters (Live, Remastered and Extended Edition with the Bonus Orchestral Introduction)'
 
 const meta = {
   component: TrackList,

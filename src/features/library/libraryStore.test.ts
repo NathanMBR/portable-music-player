@@ -9,13 +9,21 @@ const scanLibrary = () => useLibraryStore.getState().scanLibrary()
 
 describe('scanLibrary', () => {
   it('loads the songs from Rust, sorted by title', async () => {
-    mockCommands({ load_music_library: () => [trackTitled('b'), trackTitled('a')] })
+    mockCommands({
+      load_music_library: () => [
+        trackTitled('Silence and Distance'),
+        trackTitled('Generation Warriors')
+      ]
+    })
 
     await scanLibrary()
 
     expect(useLibraryStore.getState()).toMatchObject({
       isScanning: false,
-      lastScan: { kind: 'loaded', tracks: [trackTitled('a'), trackTitled('b')] }
+      lastScan: {
+        kind: 'loaded',
+        tracks: [trackTitled('Generation Warriors'), trackTitled('Silence and Distance')]
+      }
     })
   })
 
@@ -31,7 +39,10 @@ describe('scanLibrary', () => {
   })
 
   it('keeps the previous result on screen while scanning again', async () => {
-    const previousScan: ScanOutcome = { kind: 'loaded', tracks: [trackTitled('a')] }
+    const previousScan: ScanOutcome = {
+      kind: 'loaded',
+      tracks: [trackTitled('Generation Warriors')]
+    }
     useLibraryStore.setState({ lastScan: previousScan })
     let answerScan: (tracks: Track[]) => void = () => undefined
     mockCommands({
@@ -44,11 +55,11 @@ describe('scanLibrary', () => {
     const scan = scanLibrary()
     expect(useLibraryStore.getState()).toMatchObject({ isScanning: true, lastScan: previousScan })
 
-    answerScan([trackTitled('b')])
+    answerScan([trackTitled('Silence and Distance')])
     await scan
     expect(useLibraryStore.getState()).toMatchObject({
       isScanning: false,
-      lastScan: { kind: 'loaded', tracks: [trackTitled('b')] }
+      lastScan: { kind: 'loaded', tracks: [trackTitled('Silence and Distance')] }
     })
   })
 

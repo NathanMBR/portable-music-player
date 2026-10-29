@@ -110,10 +110,10 @@ mod tests {
     #[test]
     fn accepts_mp3_names_in_any_case() {
         for name in [
-            "song.mp3",
-            "SONG.MP3",
-            "Song.Mp3",
-            "Artist - Song (Live).mp3",
+            "Lisbon.mp3",
+            "LISBON.MP3",
+            "Lisbon.Mp3",
+            "Running Alone (Live).mp3",
         ] {
             assert!(has_mp3_name(Path::new(name)), "{name} should be an mp3");
         }
@@ -121,7 +121,13 @@ mod tests {
 
     #[test]
     fn rejects_hidden_and_non_mp3_names() {
-        for name in ["._song.mp3", ".song.mp3", "song.wav", "song.mp3.txt", "mp3"] {
+        for name in [
+            "._Holy Land.mp3",
+            ".Holy Land.mp3",
+            "Holy Land.wav",
+            "Holy Land.mp3.txt",
+            "mp3",
+        ] {
             assert!(
                 !has_mp3_name(Path::new(name)),
                 "{name} should not be an mp3"
@@ -132,8 +138,8 @@ mod tests {
     #[test]
     fn rejects_folders_named_like_mp3_files() {
         let test_dir = tempfile::tempdir().unwrap();
-        let folder = test_dir.path().join("folder.mp3");
-        let file = test_dir.path().join("song.mp3");
+        let folder = test_dir.path().join("Extreme Dream.mp3");
+        let file = test_dir.path().join("Nova Era.mp3");
         fs::create_dir(&folder).unwrap();
         fs::write(&file, b"").unwrap();
 
@@ -154,7 +160,7 @@ mod tests {
     #[test]
     fn keeps_the_songs_of_an_existing_songs_folder() {
         let root = tempfile::tempdir().unwrap();
-        let song = root.path().join(SONGS_FOLDER_NAME).join("song.mp3");
+        let song = root.path().join(SONGS_FOLDER_NAME).join("Carolina IV.mp3");
         fs::create_dir(root.path().join(SONGS_FOLDER_NAME)).unwrap();
         fs::write(&song, b"").unwrap();
 
@@ -166,10 +172,16 @@ mod tests {
     #[test]
     fn lists_only_the_mp3_files_of_the_songs_folder() {
         let songs_dir = tempfile::tempdir().unwrap();
-        for file_name in ["b.mp3", "A.MP3", "notes.txt", "song.wav", "._b.mp3"] {
+        for file_name in [
+            "Spread Your Fire.mp3",
+            "LASTING CHILD.MP3",
+            "notes.txt",
+            "Unfinished Allegro.wav",
+            "._Spread Your Fire.mp3",
+        ] {
             fs::write(songs_dir.path().join(file_name), b"").unwrap();
         }
-        fs::create_dir(songs_dir.path().join("folder.mp3")).unwrap();
+        fs::create_dir(songs_dir.path().join("The Shadow Hunter.mp3")).unwrap();
 
         let mut titles: Vec<String> = find_tracks(songs_dir.path())
             .unwrap()
@@ -179,28 +191,28 @@ mod tests {
         // The folder is read in no particular order; the frontend sorts the tracks.
         titles.sort();
 
-        assert_eq!(titles, ["A", "b"]);
+        assert_eq!(titles, ["LASTING CHILD", "Spread Your Fire"]);
     }
 
     #[test]
     fn names_tracks_after_their_file_with_a_path_valid_on_any_os() {
-        let track = track_from(&Path::new("/media/usb/Songs").join("Artist - Song.mp3"));
+        let track = track_from(&Path::new("/media/usb/Songs").join("The Temple of Hate.mp3"));
 
-        assert_eq!(track.title, "Artist - Song");
-        assert_eq!(track.path, "Songs/Artist - Song.mp3");
+        assert_eq!(track.title, "The Temple of Hate");
+        assert_eq!(track.path, "Songs/The Temple of Hate.mp3");
     }
 
     #[test]
     fn serializes_tracks_like_the_frontend_track_type() {
         // Mirrors `Track` in src/features/library/types.ts.
         let track = Track {
-            path: "Songs/Song.mp3".into(),
-            title: "Song".into(),
+            path: "Songs/Nothing To Say.mp3".into(),
+            title: "Nothing To Say".into(),
         };
 
         assert_eq!(
             serde_json::to_value(&track).unwrap(),
-            serde_json::json!({ "path": "Songs/Song.mp3", "title": "Song" })
+            serde_json::json!({ "path": "Songs/Nothing To Say.mp3", "title": "Nothing To Say" })
         );
     }
 

@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { describeLibraryStatus } from './libraryStatus'
-import type { ScanOutcome, Track } from './types'
+import { SAMPLE_TRACKS } from './sampleTracks'
+import type { ScanOutcome } from './types'
 
 const loadedWith = (count: number): ScanOutcome => ({
   kind: 'loaded',
-  tracks: Array.from(
-    { length: count },
-    (_, index): Track => ({
-      path: `Songs/${index}.mp3`,
-      title: String(index)
-    })
-  )
+  tracks: SAMPLE_TRACKS.slice(0, count)
 })
 
 describe('describeLibraryStatus', () => {

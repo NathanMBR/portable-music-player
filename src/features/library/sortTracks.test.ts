@@ -9,29 +9,33 @@ const sortTitles = (titles: string[]) =>
 
 describe('sortTracksByTitle', () => {
   it('ignores case, so lowercase titles are not pushed after every uppercase one', () => {
-    expect(sortTitles(['banana', 'Cherry', 'apple', 'Blueberry'])).toEqual([
-      'apple',
-      'banana',
-      'Blueberry',
-      'Cherry'
+    expect(sortTitles(['lease of life', 'Judgement Day', 'deep blue', 'Fireworks'])).toEqual([
+      'deep blue',
+      'Fireworks',
+      'Judgement Day',
+      'lease of life'
     ])
   })
 
   it('ignores accents', () => {
-    expect(sortTitles(['Ezra', 'Ébano', 'Ecco'])).toEqual(['Ébano', 'Ecco', 'Ezra'])
+    expect(sortTitles(['Awake from Darkness', 'Ángels Cry', 'Ashes'])).toEqual([
+      'Ángels Cry',
+      'Ashes',
+      'Awake from Darkness'
+    ])
   })
 
   it('compares numbers by value', () => {
-    expect(sortTitles(['Track 10', 'Track 2', 'Track 1'])).toEqual([
-      'Track 1',
-      'Track 2',
-      'Track 10'
+    expect(sortTitles(['10 Streets of Tomorrow', '2 Petrified Eyes', '1 Time'])).toEqual([
+      '1 Time',
+      '2 Petrified Eyes',
+      '10 Streets of Tomorrow'
     ])
   })
 
   it('leaves the given list untouched', () => {
-    const tracks = ['b', 'a'].map(trackTitled)
+    const tracks = ['Waiting Silence', 'Mystery Machine'].map(trackTitled)
     sortTracksByTitle(tracks)
-    expect(tracks.map(track => track.title)).toEqual(['b', 'a'])
+    expect(tracks.map(track => track.title)).toEqual(['Waiting Silence', 'Mystery Machine'])
   })
 })

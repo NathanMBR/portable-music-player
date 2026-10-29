@@ -68,11 +68,11 @@ own toggle does.
 
 ## Stories are tests
 
-`pnpm test` runs every story as a Vitest test in headless Chromium:
+`pnpm test:ts:storybook` runs every story as a Vitest test in headless Chromium:
 
 - the story must render without errors;
 - its `play` function, if any, must pass (e.g. clicking "Try again" brings the songs back);
 - the axe accessibility check must find no violations.
 
 The pure logic and the stores have their own unit tests (`*.test.ts`), and the Rust side has its
-own tests (`cargo test`).
+own tests (`pnpm test:rs`). `pnpm test` runs all of them.

@@ -60,7 +60,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:ts
 
   rust-tests:
     name: Rust tests

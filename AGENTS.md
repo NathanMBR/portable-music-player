@@ -21,17 +21,18 @@ pnpm build              # tsc type-check + vite build to dist/
 pnpm tauri build        # release build of the native app
 pnpm lint               # tsc --noEmit type-check (writes nothing), then biome check --fix: lint + format, applying safe fixes
 pnpm lint:ci            # tsc --noEmit type-check, then biome check without fixes; reserved for the CI workflow
-pnpm test               # every Vitest test once: unit tests (jsdom) + every story (headless Chromium)
-pnpm test:watch         # the same, in watch mode
-pnpm exec vitest run --project unit        # only the unit tests
-pnpm exec vitest run --project storybook   # only the story tests
+pnpm test               # every test: the TypeScript tests, then the Rust tests
+pnpm test:ts            # every Vitest test once: unit tests (jsdom) + every story (headless Chromium)
+pnpm test:ts:unit       # only the TypeScript unit tests
+pnpm test:ts:storybook  # only the story tests
+pnpm test:rs            # only the Rust tests (cargo test)
+pnpm test:watch         # the Vitest tests in watch mode
 pnpm storybook          # Storybook on :6006: the UI documentation, and the MCP server for agents
 pnpm build-storybook    # static Storybook in storybook-static/
 cargo check --manifest-path src-tauri/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests (#[cfg(test)] modules next to the code)
 ```
 
-In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
+In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test:ts` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
 ## Architecture
 
@@ -110,7 +111,7 @@ These follow from the project goal and are easy to get wrong:
   - list the documented components with `docs-list` and read the ones involved with `docs-show`;
   - never guess a component's props: if one isn't documented, ask the user;
   - call `get-storybook-story-instructions` before writing or changing stories;
-  - check the result with `test-run` (or `pnpm test`).
+  - check the result with `test-run` (or `pnpm test:ts:storybook`).
   - Without the server, read the story and MDX files directly.
 - Every exported component has a JSDoc block saying what it's for and when it's used, ending with a `@summary` line, and every prop has a JSDoc line. This is the one exception to "comments explain why, not what": Storybook's Docs pages and its components manifest (what the MCP server serves) are built from them.
 - Every component has a `<Component>.stories.tsx` next to it, in CSF 3:
@@ -126,11 +127,11 @@ These follow from the project goal and are easy to get wrong:
 
 | Layer | Where | Runs with |
 |---|---|---|
-| Rust: file system, data formats, window sizing | `#[cfg(test)] mod tests` at the bottom of the module | `cargo test` |
+| Rust: file system, data formats, window sizing | `#[cfg(test)] mod tests` at the bottom of the module | `pnpm test:rs` |
 | Frontend logic: helpers and stores | `*.test.ts` next to the module | Vitest `unit` project (jsdom) |
 | Components: rendering, interactions, accessibility | stories and their `play` functions | Vitest `storybook` project (headless Chromium) |
 
-- Vitest is configured in `vite.config.ts` (`test.projects`), and `pnpm test` runs both projects. Unit tests import `describe`, `it`, `expect` and `vi` from `vitest` explicitly (no globals).
+- Vitest is configured in `vite.config.ts` (`test.projects`), and `pnpm test:ts` runs both projects. Unit tests import `describe`, `it`, `expect` and `vi` from `vitest` explicitly (no globals).
 - **Fake the Rust side only through `mockCommands`** (`src/testing/mockCommands.ts`):
   - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
   - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
@@ -175,7 +176,7 @@ Features and fixes are developed test first. A test states a rule the system mus
 
 ## Git
 
-**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit. Make sure `pnpm test` and `cargo test --manifest-path src-tauri/Cargo.toml` pass before committing, too.
+**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit. Make sure `pnpm test` passes before committing, too.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 

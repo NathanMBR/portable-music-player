@@ -12,7 +12,11 @@
     "lint:ci": "tsc --noEmit && biome check",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "vitest run",
+    "test": "pnpm test:ts && pnpm test:rs",
+    "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:ts": "vitest run",
+    "test:ts:unit": "vitest run --project unit",
+    "test:ts:storybook": "vitest run --project storybook",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -9,8 +9,13 @@ import { defineConfig } from 'vite'
 
 const host = process.env.TAURI_DEV_HOST
 
+// `vitest run --mode test-report` (used by test/generate_test_report.sh) also writes a
+// self-contained HTML report into the gitignored private/ folder.
+const TEST_REPORT_MODE = 'test-report'
+const TEST_REPORT_DIR = 'private/test-report/typescript'
+
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -35,6 +40,9 @@ export default defineConfig(() => ({
   },
   // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
   test: {
+    ...(mode === TEST_REPORT_MODE && {
+      reporters: ['default', ['html', { outputDir: TEST_REPORT_DIR, singleFile: true }]]
+    }),
     projects: [
       {
         test: {

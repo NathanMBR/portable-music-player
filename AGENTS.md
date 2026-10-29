@@ -26,11 +26,14 @@ pnpm test:ts            # every Vitest test once: unit tests (jsdom) + every sto
 pnpm test:ts:unit       # only the TypeScript unit tests
 pnpm test:ts:storybook  # only the story tests
 pnpm test:rs            # only the Rust tests (cargo test)
+pnpm test:report        # every test, writing reports to private/test-report/ (needs cargo-nextest, see below)
 pnpm test:watch         # the Vitest tests in watch mode
 pnpm storybook          # Storybook on :6006: the UI documentation, and the MCP server for agents
 pnpm build-storybook    # static Storybook in storybook-static/
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
+
+`pnpm test:report` runs `test/generate_test_report.sh`: Vitest writes a single-file HTML report to `private/test-report/typescript/index.html` (the `test-report` mode in `vite.config.ts`, through `@vitest/ui`), and nextest writes a JUnit report of the Rust tests, copied to `private/test-report/rust/junit.xml` (the `report` profile in `src-tauri/.config/nextest.toml`). Both suites always run, so one failing still reports the other. It needs cargo-nextest once per machine: `cargo install cargo-nextest --locked`.
 
 In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test:ts` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed.
 
@@ -121,6 +124,7 @@ These follow from the project goal and are easy to get wrong:
   - stories written by an agent keep the `ai-generated` tag until the user reviews them and removes it, and stories that don't pass yet also carry `needs-work`.
 - MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
 - `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
+- `private/` holds the user's own files and the generated test reports. Git tracks only its `.gitignore`, which ignores everything else in it. `private/tests.html` is a hand-written guide to the tests: never update it, even when the tests change, unless the user asks for it.
 - Update the stories, the docs and the README in the same change as the feature.
 
 ## Testing

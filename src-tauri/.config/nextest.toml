@@ -1,0 +1,4 @@
+# `cargo nextest run --profile report` (used by test/generate_test_report.sh) also writes a JUnit
+# report, to target/nextest/report/junit.xml.
+[profile.report.junit]
+path = "junit.xml"

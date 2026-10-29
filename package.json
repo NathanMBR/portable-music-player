@@ -17,6 +17,7 @@
     "test:ts": "vitest run",
     "test:ts:unit": "vitest run --project unit",
     "test:ts:storybook": "vitest run --project storybook",
+    "test:report": "test/generate_test_report.sh",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/browser-playwright": "^5.0.5",
+    "@vitest/ui": "^5.0.5",
     "jsdom": "^30.1.3",
     "playwright": "^1.64.1",
     "storybook": "^10.6.5",

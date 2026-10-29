@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, waitFor } from 'storybook/test'
+import { expect, fn, waitFor, within } from 'storybook/test'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { renderInOwnFrame } from '../../testing/storyParameters'
+import { withNotificationArea } from '../../testing/withNotificationArea'
 import { useSettingsStore } from './settingsStore'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -46,13 +47,20 @@ export const SwitchesToDark: Story = {
   }
 }
 
-/** If settings.json can't be written, the theme still changes and the error shows below. */
+/** If settings.json can't be written, the theme still changes and a notification says why. */
 export const SaveFails: Story = {
+  parameters: renderInOwnFrame(240),
+  decorators: [withNotificationArea],
   beforeEach: () => {
     mockCommands({ save_settings: failingCommand(SAVE_ERROR) })
   },
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
     await userEvent.click(canvas.getByRole('switch', { name: 'Dark theme' }))
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(SAVE_ERROR)
+
+    await expect(canvasElement.ownerDocument.documentElement.dataset.theme).toBe('dark')
+    await waitFor(() => expect(page.getByText(SAVE_ERROR)).toBeVisible())
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
   }
 }

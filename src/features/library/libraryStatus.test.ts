@@ -18,8 +18,7 @@ describe('describeLibraryStatus', () => {
   })
 
   it('reports a failed scan', () => {
-    const failed: ScanOutcome = { kind: 'failed', message: "Couldn't read the Songs folder" }
-    expect(describeLibraryStatus(failed, false)).toBe('Failed to check songs')
+    expect(describeLibraryStatus({ kind: 'failed' }, false)).toBe('Failed to check songs')
   })
 
   it('counts one song in the singular', () => {

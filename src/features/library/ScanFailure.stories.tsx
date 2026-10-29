@@ -8,9 +8,6 @@ const loadMusicLibrary = fn(() => SAMPLE_TRACKS)
 
 const meta = {
   component: ScanFailure,
-  args: {
-    message: "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
-  },
   beforeEach: () => {
     mockCommands({ load_music_library: loadMusicLibrary })
   }
@@ -19,7 +16,10 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Rust's error message as it is, and a button that scans the library again. */
+/**
+ * A calm notice in place of the song list, and a button that scans the library again. Rust's reason
+ * is in the notification the failed scan raised.
+ */
 export const Default: Story = {
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))

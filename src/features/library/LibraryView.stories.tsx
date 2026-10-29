@@ -37,16 +37,13 @@ export const Empty: Story = {
   }
 }
 
-/** The scan failed: the view shows Rust's error, and "Try again" brings the songs back. */
+/**
+ * The scan failed: a notification gave Rust's reason, the view offers "Try again", and trying again
+ * brings the songs back.
+ */
 export const ScanFailed: Story = {
   beforeEach: () => {
-    useLibraryStore.setState({
-      lastScan: {
-        kind: 'failed',
-        message:
-          "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
-      }
-    })
+    useLibraryStore.setState({ lastScan: { kind: 'failed' } })
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))

@@ -15,23 +15,14 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** For situations that aren't errors, like an empty Songs folder. */
-export const NeutralTone: Story = {}
-
-/** For failures: the title takes the `correction` color and the description carries Rust's error. */
-export const ErrorTone: Story = {
-  args: {
-    tone: 'error',
-    title: "Couldn't load your music",
-    description:
-      "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
-  }
-}
+/** Fills a view that has nothing to show, like an empty Songs folder. */
+export const Default: Story = {}
 
 /** With a call to action under the description, so the user can fix the situation from here. */
 export const WithAction: Story = {
   args: {
-    ...ErrorTone.args,
+    title: "Couldn't load your music",
+    description: 'Check that the drive is still connected, then try again.',
     action: <Button onClick={fn()}>Try again</Button>
   }
 }

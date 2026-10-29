@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
+import { shownNotifications } from '../../testing/notifications'
 import { useSettingsStore } from './settingsStore'
 import type { Theme } from './types'
 
@@ -35,13 +36,15 @@ describe('restoreSettings', () => {
     expect(themeOnScreen()).toBe('dark')
   })
 
-  it("shows why the settings couldn't be loaded", async () => {
+  it("notifies why the settings couldn't be loaded", async () => {
     const loadError = "The settings at settings.json aren't valid: expected value"
     mockCommands({ load_settings: failingCommand(loadError) })
 
     await useSettingsStore.getState().restoreSettings()
 
-    expect(useSettingsStore.getState().settingsError).toBe(loadError)
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't load your settings", description: loadError }
+    ])
   })
 })
 
@@ -57,21 +60,14 @@ describe('setTheme', () => {
     expect(saveSettings).toHaveBeenCalledWith({ settings: { theme: 'dark' } })
   })
 
-  it('keeps the chosen theme on screen and shows the error when saving fails', async () => {
+  it('keeps the chosen theme on screen and notifies why saving failed', async () => {
     mockCommands({ save_settings: failingCommand(SAVE_ERROR) })
 
     await useSettingsStore.getState().setTheme('dark')
 
     expect(themeOnScreen()).toBe('dark')
-    expect(useSettingsStore.getState().settingsError).toBe(SAVE_ERROR)
-  })
-
-  it('clears an earlier error once a save succeeds', async () => {
-    useSettingsStore.setState({ settingsError: SAVE_ERROR })
-    mockCommands({ save_settings: () => undefined })
-
-    await useSettingsStore.getState().setTheme('light')
-
-    expect(useSettingsStore.getState().settingsError).toBeNull()
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't save the theme", description: SAVE_ERROR }
+    ])
   })
 })

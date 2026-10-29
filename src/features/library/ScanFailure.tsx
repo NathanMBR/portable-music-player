@@ -2,25 +2,20 @@ import { Button } from '../../components/Button'
 import { Notice } from '../../components/Notice'
 import { useLibraryStore } from './libraryStore'
 
-type ScanFailureProps = {
-  /** The error from Rust, shown as it is. */
-  message: string
-}
-
 /**
- * Shown in place of the song list when the last scan failed: Rust's error message and a "Try
- * again" button that scans the library again.
+ * Shown in place of the song list when the last scan failed: a calm notice and a "Try again"
+ * button that scans the library again. Rust's reason is in the notification the failed scan
+ * raised.
  *
  * @summary Notice for a failed library scan
  */
-export const ScanFailure = ({ message }: ScanFailureProps) => {
+export const ScanFailure = () => {
   const scanLibrary = useLibraryStore(state => state.scanLibrary)
 
   return (
     <Notice
-      tone="error"
       title="Couldn't load your music"
-      description={message}
+      description="Check that the drive is still connected, then try again."
       action={<Button onClick={scanLibrary}>Try again</Button>}
     />
   )

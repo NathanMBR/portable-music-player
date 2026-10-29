@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import type { StoreApi } from 'zustand'
 import { useLibraryStore } from '../features/library/libraryStore'
 import { useNavigationStore } from '../features/navigation/navigationStore'
@@ -7,10 +8,12 @@ const resetStore = <State>(store: StoreApi<State>) => store.setState(store.getIn
 
 /**
  * Stores are module-level singletons, so state set by one test or story would leak into the next.
- * Every store must be listed here.
+ * Every store must be listed here. Sonner keeps the notifications in a singleton of its own, so
+ * they're dismissed too.
  */
 export const resetStores = () => {
   resetStore(useLibraryStore)
   resetStore(useNavigationStore)
   resetStore(useSettingsStore)
+  toast.dismiss()
 }

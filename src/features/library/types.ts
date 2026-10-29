@@ -4,4 +4,5 @@ export type Track = {
   title: string
 }
 
-export type ScanOutcome = { kind: 'loaded'; tracks: Track[] } | { kind: 'failed'; message: string }
+/** A failed scan carries no reason: the notification it raised shows Rust's message. */
+export type ScanOutcome = { kind: 'loaded'; tracks: Track[] } | { kind: 'failed' }

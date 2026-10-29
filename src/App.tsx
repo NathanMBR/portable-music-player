@@ -4,6 +4,7 @@ import type { CategoryId } from './features/navigation/categories'
 import { MenuButton } from './features/navigation/MenuButton'
 import { useNavigationStore } from './features/navigation/navigationStore'
 import { SideMenu } from './features/navigation/SideMenu'
+import { NotificationArea } from './features/notifications/NotificationArea'
 
 // Kept here, where the features meet, so the navigation feature never imports the views it
 // switches between.
@@ -13,7 +14,8 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
 
 /**
  * The page shell: the side menu, the menu button's column on the left, the current category's
- * view, and an empty column on the right that keeps the view's margins equal.
+ * view, an empty column on the right that keeps the view's margins equal, and the notification
+ * area in the bottom-right corner.
  *
  * @summary App shell
  */
@@ -35,6 +37,7 @@ export const App = () => {
         </div>
         <div aria-hidden="true" className="w-10 shrink-0" />
       </div>
+      <NotificationArea />
     </>
   )
 }

@@ -42,6 +42,7 @@ In dev the executable is `src-tauri/target/debug/portable-music-player`, so the 
 - `src/`: React frontend, bundled by Vite into `dist/`, which Tauri embeds into the binary (`frontendDist`). The frontend calls Rust through `invoke()` from `@tauri-apps/api`.
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin. Configuration is CSS-first: there is no `tailwind.config.js`; theme customization goes in `@theme` blocks in `src/index.css`, which is imported by `main.tsx`. Biome's `css.parser.tailwindDirectives` is enabled so `@theme`, `@apply`, etc. parse.
 - UI primitives come from Headless UI (`@headlessui/react`, unstyled and accessible; style it with Tailwind) and icons from Heroicons (`@heroicons/react/24/outline`, `/24/solid`, `/20/solid`, `/16/solid`).
+- Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
@@ -66,7 +67,8 @@ src/
     *.test.ts           unit tests of the module next to them
     *.stories.tsx       stories of the component next to them: its documentation and component tests
   docs/                 Storybook MDX pages (Introduction, Design tokens)
-  testing/              helpers shared by tests and stories (mockCommands, resetStores, unit test setup)
+  testing/              helpers shared by tests and stories (mockCommands, resetStores, shownNotifications,
+                        withNotificationArea, unit test setup)
 ```
 
 - Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
@@ -139,7 +141,10 @@ These follow from the project goal and are easy to get wrong:
   - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
   - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
   - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
-- Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there.
+- Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification.
+- Notifications are checked through what the user sees:
+  - in unit tests, `shownNotifications()` (`src/testing/notifications.ts`) lists the ones on screen as `{ type, title, description }`;
+  - stories of a component that raises them add the `withNotificationArea` decorator and find the text in `<body>`. Notifications fade in, so wait for them with `waitFor(() => expect(...).toBeVisible())`.
 - **Every story is a test**:
   - It must render, its `play` function must pass, and the axe accessibility check must find no violations. That check is `a11y.test: 'error'` in `.storybook/preview.tsx`, run on the whole `<body>` so portaled dialogs are included.
   - Write a `play` only when it proves something the render doesn't: an interaction, async content, an aria state.
@@ -193,7 +198,7 @@ All code (TypeScript and Rust) must follow Clean Code principles:
 - **No duplication, no speculation**: extract logic instead of copy-pasting it, but don't build abstractions or options for needs that don't exist yet (KISS, YAGNI).
 - **No magic values**: use named constants for file names, limits, defaults and similar values.
 - **Explicit types**: no `any`. Model domain data with explicit types, and prefer types that make invalid states impossible to represent.
-- **Errors are handled, never swallowed**: Rust commands return `Result` instead of calling `unwrap`/`expect` on fallible operations. This matters here: the release profile uses `panic = "abort"`, so a panic kills the whole app. On the frontend, handle rejected `invoke` promises and show the failure to the user.
+- **Errors are handled, never swallowed**: Rust commands return `Result` instead of calling `unwrap`/`expect` on fallible operations. This matters here: the release profile uses `panic = "abort"`, so a panic kills the whole app. On the frontend, handle rejected `invoke` promises and show the failure to the user with `notifyError`, never as red text in the view.
 - **Comments explain why, not what**: code should explain itself. Don't leave commented-out code. The one exception is the JSDoc that documents components and their props (see Documentation).
 - **Leave it cleaner**: improve the code you touch, but keep unrelated refactors out of the change.
 

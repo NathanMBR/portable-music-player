@@ -6,20 +6,19 @@ const TOGGLE_LABEL = 'Dark theme'
 
 /**
  * Switch between the light and dark themes. The choice applies at once and is saved in
- * settings.json next to the executable. If saving fails, the theme still changes and the error
- * shows under the switch.
+ * settings.json next to the executable. If saving fails, the theme still changes and a
+ * notification says why.
  *
  * @summary Light and dark theme switch
  */
 export const ThemeToggle = () => {
   const theme = useSettingsStore(state => state.theme)
-  const settingsError = useSettingsStore(state => state.settingsError)
   const setTheme = useSettingsStore(state => state.setTheme)
   const isDark = theme === 'dark'
   const KnobIcon = isDark ? MoonIcon : SunIcon
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex justify-center">
       <Switch
         aria-label={TOGGLE_LABEL}
         title={TOGGLE_LABEL}
@@ -31,11 +30,6 @@ export const ThemeToggle = () => {
           <KnobIcon className="size-4 text-pen" />
         </span>
       </Switch>
-      {settingsError && (
-        <p role="alert" className="mt-2 text-center text-sm text-correction">
-          {settingsError}
-        </p>
-      )}
     </div>
   )
 }

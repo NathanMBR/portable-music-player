@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
+import { shownNotifications } from '../../testing/notifications'
 import { useLibraryStore } from './libraryStore'
 import type { ScanOutcome, Track } from './types'
 
 const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+
+const READ_ERROR =
+  "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
 
 const scanLibrary = () => useLibraryStore.getState().scanLibrary()
 
@@ -27,15 +31,15 @@ describe('scanLibrary', () => {
     })
   })
 
-  it("turns a failed load into a failed scan with Rust's message", async () => {
-    mockCommands({ load_music_library: failingCommand("Couldn't read the Songs folder") })
+  it("turns a failed load into a failed scan and notifies Rust's message", async () => {
+    mockCommands({ load_music_library: failingCommand(READ_ERROR) })
 
     await scanLibrary()
 
-    expect(useLibraryStore.getState().lastScan).toEqual({
-      kind: 'failed',
-      message: "Couldn't read the Songs folder"
-    })
+    expect(useLibraryStore.getState().lastScan).toEqual({ kind: 'failed' })
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't load your music", description: READ_ERROR }
+    ])
   })
 
   it('keeps the previous result on screen while scanning again', async () => {
@@ -70,5 +74,28 @@ describe('scanLibrary', () => {
     await Promise.all([scanLibrary(), scanLibrary()])
 
     expect(loadMusicLibrary).toHaveBeenCalledOnce()
+  })
+})
+
+describe('openFolder', () => {
+  it('asks Rust to open the Songs folder', async () => {
+    const openSongsFolder = vi.fn()
+    mockCommands({ open_songs_folder: openSongsFolder })
+
+    await useLibraryStore.getState().openFolder()
+
+    expect(openSongsFolder).toHaveBeenCalledOnce()
+    expect(shownNotifications()).toEqual([])
+  })
+
+  it("notifies why the Songs folder couldn't be opened", async () => {
+    const openError = "Couldn't open the Songs folder: no application can open folders"
+    mockCommands({ open_songs_folder: failingCommand(openError) })
+
+    await useLibraryStore.getState().openFolder()
+
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't open the Songs folder", description: openError }
+    ])
   })
 })

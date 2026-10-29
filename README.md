@@ -12,6 +12,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Scan the library again
 - Side menu with the categories
 - Dark theme
+- Error notifications in the bottom-right corner
 - Remembers the window size on each computer
 - Always opens centered
 

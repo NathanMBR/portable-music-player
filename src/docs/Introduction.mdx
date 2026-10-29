@@ -22,18 +22,25 @@ This Storybook is the detailed documentation of the player's interface. Every co
   (`viewByCategory`), so the navigation feature never imports the views it switches between.
 - **Right:** an empty column as wide as the left one, which keeps the view's side margins equal.
 
+The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
+the side menu included. Notifications pop up there, close by themselves after a few seconds or
+earlier with their × button, and pause while hovered.
+
 The **side menu** is an overlay drawer (`SideMenu`) opened by the menu button. It lists the
 categories from `src/features/navigation/categories.ts` and holds the theme toggle. Choosing a
 category switches the view and closes the drawer. Adding a category takes one entry in `CATEGORIES`
 and one view in `viewByCategory`.
 
 The only category so far is **Songs** (`LibraryView`): a sticky header with the song count, then the
-song list, a notice for an empty Songs folder, or the reason the last scan failed.
+song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
+scan.
 
 ## Where the code lives
 
 - `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`), built on
   Headless UI and styled with Tailwind.
+- `src/features/notifications/`: the notification area and `notify.ts`, the only module that calls
+  Sonner, the toast library behind the notifications.
 - `src/features/<feature>/`: everything one feature owns. Its types mirror the Rust structs,
   `<feature>Api.ts` is the only file that calls Rust, `<feature>Store.ts` is its Zustand store, and
   its components sit next to their stories.
@@ -45,8 +52,11 @@ feature's `*Api.ts`, which uses Tauri's `invoke()` to run a Rust command. The Ru
 and write the `Songs` folder and the `.json` files next to the executable, so everything stays on the
 flash drive.
 
-Rust errors reach the frontend as their message string. Components show them as they are, in a
-`Notice` or in an alert line under the control that failed.
+Rust errors reach the frontend as their message string. The store that caught one calls
+`notifyError(title, error)`: the title says what failed, and Rust's message, shown as it is, says
+why. Raising the same failure again replaces the notification on screen instead of stacking a copy.
+The view itself never shows red text: when a failure leaves it with nothing to show, like a failed
+scan, it shows a calm `Notice` with what to do next.
 
 ## How the stories run without Tauri
 
@@ -57,8 +67,10 @@ work anyway:
   Tauri's own `mockIPC`. Each story mocks the commands its interactions trigger, which also
   documents the commands a component uses. A command that isn't mocked rejects with
   `Unmocked command: <name>`, and `failingCommand(message)` fakes a Rust error.
-- **Fresh stores.** Before every story, `resetStores` puts every store back to its initial state. A
-  story then sets the state it shows in its `beforeEach`, for example a failed scan.
+- **Fresh stores.** Before every story, `resetStores` puts every store back to its initial state and
+  dismisses every notification. A story then sets the state it shows in its `beforeEach`, for
+  example a failed scan. Stories of a component that raises notifications render the notification
+  area next to it with the `withNotificationArea` decorator.
 - **One frame per story on Docs pages.** The stores are shared by everything on a page, so stories
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.

@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { renderInOwnFrame } from '../../testing/storyParameters'
+import { withNotificationArea } from '../../testing/withNotificationArea'
 import { LibraryHeader } from './LibraryHeader'
 import { useLibraryStore } from './libraryStore'
 import { SAMPLE_TRACKS } from './sampleTracks'
@@ -40,19 +41,23 @@ export const Scanning: Story = {
 /** After a failed scan the status line reports it; the view below shows the details. */
 export const ScanFailed: Story = {
   beforeEach: () => {
-    useLibraryStore.setState({
-      lastScan: { kind: 'failed', message: "Couldn't read the Songs folder" }
-    })
+    useLibraryStore.setState({ lastScan: { kind: 'failed' } })
   }
 }
 
-/** When the file manager can't open the Songs folder, the reason shows under the status line. */
+/** When the file manager can't open the Songs folder, a notification says why. */
 export const OpenFolderFails: Story = {
+  parameters: renderInOwnFrame(260),
+  decorators: [withNotificationArea],
   beforeEach: () => {
     mockCommands({ open_songs_folder: failingCommand(OPEN_FOLDER_ERROR) })
   },
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
     await userEvent.click(canvas.getByRole('button', { name: 'Open folder' }))
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(OPEN_FOLDER_ERROR)
+
+    await waitFor(() => expect(page.getByText(OPEN_FOLDER_ERROR)).toBeVisible())
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
   }
 }

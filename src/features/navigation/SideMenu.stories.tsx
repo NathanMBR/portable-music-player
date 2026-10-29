@@ -12,7 +12,6 @@ const openMenu = () => {
 
 const meta = {
   component: SideMenu,
-  tags: ['ai-generated'],
   parameters: { layout: 'fullscreen', ...renderInOwnFrame(520) },
   // A closed side menu renders nothing, so the stories also show the menu button that opens it,
   // with the same padding as in the app shell.

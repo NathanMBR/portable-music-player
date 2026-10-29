@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { EmptyLibrary } from './EmptyLibrary'
 
 const meta = {
-  component: EmptyLibrary,
-  tags: ['ai-generated']
+  component: EmptyLibrary
 } satisfies Meta<typeof EmptyLibrary>
 
 export default meta

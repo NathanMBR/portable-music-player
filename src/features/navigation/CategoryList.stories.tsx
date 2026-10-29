@@ -4,7 +4,6 @@ import { CategoryList } from './CategoryList'
 
 const meta = {
   component: CategoryList,
-  tags: ['ai-generated'],
   // As wide as the side menu's content.
   decorators: [
     Story => (

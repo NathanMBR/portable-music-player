@@ -4,7 +4,6 @@ import { Button } from './Button'
 
 const meta = {
   component: Button,
-  tags: ['ai-generated'],
   args: { children: 'Try again', onClick: fn() }
 } satisfies Meta<typeof Button>
 

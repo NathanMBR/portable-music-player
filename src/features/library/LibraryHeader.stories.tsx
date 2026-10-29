@@ -10,7 +10,6 @@ const OPEN_FOLDER_ERROR = "Couldn't open the Songs folder: no application can op
 
 const meta = {
   component: LibraryHeader,
-  tags: ['ai-generated'],
   parameters: renderInOwnFrame(180),
   beforeEach: () => {
     mockCommands({

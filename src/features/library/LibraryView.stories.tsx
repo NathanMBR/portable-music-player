@@ -8,7 +8,6 @@ import { SAMPLE_TRACKS } from './sampleTracks'
 
 const meta = {
   component: LibraryView,
-  tags: ['ai-generated'],
   parameters: renderInOwnFrame(420),
   beforeEach: () => {
     mockCommands({

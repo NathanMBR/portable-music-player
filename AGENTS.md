@@ -121,7 +121,6 @@ These follow from the project goal and are easy to get wrong:
   - one concept per story, with a JSDoc description saying when that situation happens;
   - stories set the store state they show in `beforeEach`, and mock the commands they trigger with `mockCommands`;
   - stories that set store state use `renderInOwnFrame`, so they don't overwrite each other on Docs pages;
-  - stories written by an agent keep the `ai-generated` tag until the user reviews them and removes it, and stories that don't pass yet also carry `needs-work`.
 - MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
 - `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
 - `private/` holds the user's own files and the generated test reports. Git tracks only its `.gitignore`, which ignores everything else in it. `private/tests.html` is a hand-written guide to the tests: never update it, even when the tests change, unless the user asks for it.

@@ -8,7 +8,6 @@ const LONG_TITLE =
 
 const meta = {
   component: TrackList,
-  tags: ['ai-generated'],
   args: { tracks: SAMPLE_TRACKS }
 } satisfies Meta<typeof TrackList>
 

@@ -8,7 +8,6 @@ import { renderInOwnFrame } from './testing/storyParameters'
 
 const meta = {
   component: App,
-  tags: ['ai-generated'],
   parameters: { layout: 'fullscreen', ...renderInOwnFrame(560) },
   beforeEach: () => {
     mockCommands({

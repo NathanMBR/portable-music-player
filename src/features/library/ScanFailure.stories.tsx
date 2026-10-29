@@ -8,7 +8,6 @@ const loadMusicLibrary = fn(() => SAMPLE_TRACKS)
 
 const meta = {
   component: ScanFailure,
-  tags: ['ai-generated'],
   args: {
     message: "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
   },

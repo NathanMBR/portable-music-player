@@ -5,7 +5,6 @@ import { Notice } from './Notice'
 
 const meta = {
   component: Notice,
-  tags: ['ai-generated'],
   args: {
     title: 'Your Songs folder is empty',
     description: 'Copy .mp3 files into it, then scan again.'

@@ -5,7 +5,6 @@ import { IconButton } from './IconButton'
 
 const meta = {
   component: IconButton,
-  tags: ['ai-generated'],
   args: { icon: ArrowPathIcon, label: 'Scan again', onClick: fn() },
   argTypes: { icon: { control: false } }
 } satisfies Meta<typeof IconButton>

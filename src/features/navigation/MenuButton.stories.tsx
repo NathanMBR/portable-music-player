@@ -4,8 +4,7 @@ import { MenuButton } from './MenuButton'
 import { useNavigationStore } from './navigationStore'
 
 const meta = {
-  component: MenuButton,
-  tags: ['ai-generated']
+  component: MenuButton
 } satisfies Meta<typeof MenuButton>
 
 export default meta

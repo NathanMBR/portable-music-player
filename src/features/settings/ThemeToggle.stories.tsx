@@ -12,7 +12,6 @@ const saveSettings = fn()
 
 const meta = {
   component: ThemeToggle,
-  tags: ['ai-generated'],
   parameters: renderInOwnFrame(140),
   globals: { theme: 'light' },
   beforeEach: () => {

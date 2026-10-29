@@ -184,7 +184,9 @@ Features and fixes are developed test first. A test states a rule the system mus
 
 ## Git
 
-**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit. Make sure `pnpm test` passes before committing, too.
+**Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit.
+
+**Run `pnpm test` when you finish a task**, to check that everything still works. There's no need to run it again before committing: the CI workflow runs the tests on every push.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 

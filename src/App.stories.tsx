@@ -2,10 +2,18 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor, within } from 'storybook/test'
 import { App } from './App'
 import { useLibraryStore } from './features/library/libraryStore'
-import { SAMPLE_TRACKS } from './features/library/sampleTracks'
+import type { Track } from './features/library/types'
 import { DISMISS_LABEL } from './features/notifications/constants'
 import { failingCommand, mockCommands } from './testing/mockCommands'
 import { renderInOwnFrame } from './testing/storyParameters'
+
+const TRACKS: Track[] = [
+  { path: 'Songs/In Excelsis.mp3', title: 'In Excelsis' },
+  { path: 'Songs/Ride Into The Storm.mp3', title: 'Ride Into The Storm' },
+  { path: 'Songs/Running Alone.mp3', title: 'Running Alone' },
+  { path: 'Songs/Streets of Tomorrow.mp3', title: 'Streets of Tomorrow' },
+  { path: 'Songs/Unholy Wars.mp3', title: 'Unholy Wars' }
+]
 
 const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
@@ -15,11 +23,11 @@ const meta = {
   parameters: { layout: 'fullscreen', ...renderInOwnFrame(560) },
   beforeEach: () => {
     mockCommands({
-      load_music_library: () => SAMPLE_TRACKS,
+      load_music_library: () => TRACKS,
       open_songs_folder: () => undefined,
       save_settings: () => undefined
     })
-    useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: SAMPLE_TRACKS } })
+    useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: TRACKS } })
   }
 } satisfies Meta<typeof App>
 
@@ -52,7 +60,7 @@ export const NavigatesFromTheSideMenu: Story = {
 export const NotifiesAboveTheSideMenu: Story = {
   beforeEach: () => {
     mockCommands({
-      load_music_library: () => SAMPLE_TRACKS,
+      load_music_library: () => TRACKS,
       save_settings: failingCommand(SAVE_ERROR)
     })
   },

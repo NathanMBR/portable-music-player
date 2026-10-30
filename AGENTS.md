@@ -157,7 +157,7 @@ These follow from the project goal and are easy to get wrong:
 - `unwrap`/`expect` are fine in tests: a panic is how a Rust test fails.
 - **Example songs come from `test/get_mock_songs.sh`**, in stories, tests (frontend and Rust) and docs: titles, file names and paths alike. Never make up a song name.
   - Run `test/get_mock_songs.sh <count>`, asking for as many songs as the example needs, and use the titles it prints (one per line, picked at random from `test/mock_songs.txt`). It repeats songs only when you ask for more than the file holds.
-  - Reuse `SAMPLE_TRACKS` (`src/features/library/sampleTracks.ts`) when any list of songs will do.
+  - Example songs are the exception to "No duplication": never share them through a constant or helper module, and never reuse songs written elsewhere. Every time an example needs songs, run the script again and write the songs where they're used.
   - A test that needs a special title (lowercase, accents, numbers) adapts a drawn title, e.g. lowercases it or prefixes a track number, or draws more songs and keeps the ones that fit.
 - Name a test after the rule it checks: `rejects_hidden_and_non_mp3_names`, `it('compares numbers by value')`.
 

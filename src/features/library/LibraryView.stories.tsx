@@ -4,14 +4,22 @@ import { mockCommands } from '../../testing/mockCommands'
 import { renderInOwnFrame } from '../../testing/storyParameters'
 import { LibraryView } from './LibraryView'
 import { useLibraryStore } from './libraryStore'
-import { SAMPLE_TRACKS } from './sampleTracks'
+import type { Track } from './types'
+
+const TRACKS: Track[] = [
+  { path: 'Songs/Metal Icarus.mp3', title: 'Metal Icarus' },
+  { path: 'Songs/Millennium Sun.mp3', title: 'Millennium Sun' },
+  { path: 'Songs/No Pain for the Dead.mp3', title: 'No Pain for the Dead' },
+  { path: 'Songs/Nothing To Say.mp3', title: 'Nothing To Say' },
+  { path: 'Songs/The Temple of Hate.mp3', title: 'The Temple of Hate' }
+]
 
 const meta = {
   component: LibraryView,
   parameters: renderInOwnFrame(420),
   beforeEach: () => {
     mockCommands({
-      load_music_library: () => SAMPLE_TRACKS,
+      load_music_library: () => TRACKS,
       open_songs_folder: () => undefined
     })
   }
@@ -23,7 +31,7 @@ type Story = StoryObj<typeof meta>
 /** The usual view: the header and the song list. */
 export const Loaded: Story = {
   beforeEach: () => {
-    useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: SAMPLE_TRACKS } })
+    useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: TRACKS } })
   }
 }
 

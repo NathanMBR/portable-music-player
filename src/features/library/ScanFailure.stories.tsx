@@ -2,9 +2,15 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, waitFor } from 'storybook/test'
 import { mockCommands } from '../../testing/mockCommands'
 import { ScanFailure } from './ScanFailure'
-import { SAMPLE_TRACKS } from './sampleTracks'
+import type { Track } from './types'
 
-const loadMusicLibrary = fn(() => SAMPLE_TRACKS)
+const TRACKS: Track[] = [
+  { path: 'Songs/Unfinished Allegro.mp3', title: 'Unfinished Allegro' },
+  { path: 'Songs/Extreme Dream.mp3', title: 'Extreme Dream' },
+  { path: 'Songs/Dead Man On Display.mp3', title: 'Dead Man On Display' }
+]
+
+const loadMusicLibrary = fn(() => TRACKS)
 
 const meta = {
   component: ScanFailure,

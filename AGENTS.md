@@ -90,7 +90,7 @@ src/
 
 ### Rust layout
 
-- `portable.rs`: `root_dir()`, the folder containing the executable. Every app file lives under it.
+- `portable.rs`: `root_dir()`, the folder containing the executable, or the AppImage it runs from. Every app file lives under it.
 - `main_window.rs`: the window remembers only its size, saved by the official `tauri-plugin-window-state`. It always opens centered.
   - The window starts hidden (`"visible": false` in `tauri.conf.json`). `show()` reads the saved size from the plugin's file, shrinks it to fit the current screen, centers it, and only then shows the window, so it never visibly jumps.
   - The plugin's own restore is skipped because on Linux it applies the size asynchronously, too late for centering. For the same reason Tauri's `center()` can't be used: GTK reports a 0×0 outer size until the window is first drawn.
@@ -107,7 +107,7 @@ These follow from the project goal and are easy to get wrong:
 
 - **Resolve data paths from the executable's location** (`std::env::current_exe()` → parent dir), in Rust. Don't use Tauri's `app_data_dir` / `app_config_dir` or the OS user profile, because they write outside the flash drive. The one deliberate exception is the window size, which the window-state plugin keeps in each computer's `app_config_dir`, because every computer has a different screen. Keep file I/O for the JSON stores in Rust commands, not in the webview.
 - Both executables share the same folder and the same JSON files, so data formats must be OS-agnostic. Store music paths **relative to the executable folder** (the drive letter or mount point changes between machines and OSes), and normalize path separators.
-- The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` is `"all"`). If an AppImage is ever used, `current_exe()` points inside a temporary mount, so read the `APPIMAGE` env var instead.
+- The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` is `"all"`). An AppImage works too: it runs the executable from a temporary read-only mount, so `root_dir()` uses the folder of the AppImage file (`APPIMAGE`) while the executable is inside that mount (`APPDIR`). Programs started from an AppImage inherit both variables, so outside the mount they're ignored.
 - Each OS executable has to be built on (or cross-compiled for) that OS. Development here happens in WSL2, which produces the Linux binary.
 - Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk.
 - Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/features/library/sortTracks.ts`).

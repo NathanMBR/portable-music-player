@@ -68,7 +68,7 @@ jobs:
           releaseBody: 'Unstable build of the development branch, at commit ${{ github.sha }}, for testing. Run the bare executable for your OS, or the AppImage on Linux, from any folder: nothing to install.'
           releaseDraft: false
           prerelease: true
-          releaseAssetNamePattern: '[name]_[version]_unstable_[platform]_[arch][setup][ext]'
+          releaseAssetNamePattern: '[mainBinaryName]_[version]_unstable_[platform]_[arch][setup][ext]'
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
           # latest.json, for the update detection to come.

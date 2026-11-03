@@ -39,7 +39,7 @@ In dev the executable is `src-tauri/target/debug/portable-music-player`, so the 
 - `publish-stable.yml`, when Quality Assurance passes on a push to `master` (`workflow_run`, so it builds and tags the commit QA tested): a draft release tagged `v<version>`;
 - `publish-unstable.yml`, on every push to `development`, without waiting for Quality Assurance: a pre-release tagged `v<version>-unstable.<run id>.<run attempt>`, with `unstable` in every file name.
 
-Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key.
+Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key. Signing requires the matching public key in `plugins.updater.pubkey` of `tauri.conf.json`, even before the app uses the updater plugin: without it, bundling fails with `plugins > updater doesn't exist`.
 
 ## Architecture
 

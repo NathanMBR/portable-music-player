@@ -1,5 +1,5 @@
 import type { Decorator } from '@storybook/react-vite'
-import { NotificationArea } from '../features/notifications/NotificationArea'
+import { NotificationArea } from '../features/notifications/NotificationArea/NotificationArea'
 
 /**
  * The app shell renders the notification area, so stories of a component that raises

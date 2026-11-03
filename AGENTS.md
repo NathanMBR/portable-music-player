@@ -57,22 +57,25 @@ src/
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
-  components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice), and
-                        buttonStyles.ts: the looks and states every button shares
+  components/           feature-agnostic UI built on Headless UI
+    <Component>/        one folder per component (Button, IconButton, Notice): <Component>.tsx and
+                        every <Component>.* file that belongs to it, like its stories
+    buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
     types.ts            data shapes returned by Rust (mirror the Rust structs)
     <feature>Api.ts     the only place that calls invoke() for the feature
     <feature>Store.ts   Zustand store: state + actions
     *.ts                pure helpers (sorting, formatting)
-    *.tsx               feature components
     *.test.ts           unit tests of the module next to them
-    *.stories.tsx       stories of the component next to them: its documentation and component tests
+    <Component>/        one folder per feature component, like those of components/
+      <Component>.tsx
+      <Component>.stories.tsx  its stories: its documentation and component tests
   docs/                 Storybook MDX pages (Introduction, Design tokens)
   testing/              helpers shared by tests and stories (mockCommands, resetStores, shownNotifications,
                         withNotificationArea, unit test setup)
 ```
 
-- Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
+- Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
 - Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`.
 - Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
 - Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.

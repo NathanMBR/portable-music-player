@@ -50,13 +50,14 @@ as the queue.
 ## Where the code lives
 
 - `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`), built on
-  Headless UI and styled with Tailwind. `buttonStyles.ts` holds the looks and states every button
-  shares: the `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
+  Headless UI and styled with Tailwind, each in a folder of its own with its stories.
+  `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
+  `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
 - `src/features/notifications/`: the notification area and `notify.ts`, the only module that calls
   Sonner, the toast library behind the notifications.
 - `src/features/<feature>/`: everything one feature owns. Its types mirror the Rust structs,
   `<feature>Api.ts` is the only file that calls Rust, `<feature>Store.ts` is its Zustand store, and
-  its components sit next to their stories.
+  each of its components sits in a folder of its own with its stories.
 
 ## How data flows
 

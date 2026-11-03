@@ -1,0 +1,78 @@
+# Tauri's official publish workflow (https://v2.tauri.app/distribute/pipelines/github/): every push
+# to development builds the Linux and Windows releases into an unstable pre-release. macOS isn't a
+# target of the player. The run's id and attempt make its tag and title unique, so builds of the
+# same version don't land in one release, and "unstable" in every file name keeps a downloaded
+# build from passing for a stable one.
+name: 'publish unstable'
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Ubuntu with WebKitGTK 4.1, so the Linux build runs on as many systems as
+        # possible: a build only runs where glibc is as new as the one it was built with.
+        platform: ['ubuntu-22.04', 'windows-latest']
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # GStreamer's base and good plugins play MP3 in WebKitGTK. The AppImage bundles the ones
+      # installed here (bundleMediaFramework in tauri.conf.json).
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: setup node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # The frontend is built by tauri build, through beforeBuildCommand.
+      - name: install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the updater artifacts, without which no updater JSON is uploaded.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: 'v__VERSION__-unstable.${{ github.run_id }}.${{ github.run_attempt }}'
+          releaseName: 'Portable Music Player v__VERSION__ unstable ${{ github.run_id }}.${{ github.run_attempt }}'
+          releaseBody: 'Unstable build of the development branch, at commit ${{ github.sha }}, for testing. Run the bare executable for your OS, or the AppImage on Linux, from any folder: nothing to install.'
+          releaseDraft: false
+          prerelease: true
+          releaseAssetNamePattern: '[name]_[version]_unstable_[platform]_[arch][setup][ext]'
+          # The bare executables are the player's portable builds.
+          uploadPlainBinary: true
+          # latest.json, for the update detection to come.
+          uploadUpdaterJson: true
+          # Updater artifacts are made only here, where the signing key is: a local tauri build has
+          # none to sign them with.
+          args: --config '{"bundle":{"createUpdaterArtifacts":true}}'

@@ -1,8 +1,8 @@
 # Tauri's official publish workflow (https://v2.tauri.app/distribute/pipelines/github/): every push
 # to development builds the Linux and Windows releases into an unstable pre-release. macOS isn't a
-# target of the player. The run's id and attempt make its tag and title unique, so builds of the
-# same version don't land in one release, and "unstable" in every file name keeps a downloaded
-# build from passing for a stable one.
+# target of the player. The run's id and attempt make its tag, title and file names unique, so
+# builds of the same version don't land in one release or overwrite each other when downloaded,
+# and "unstable" in every file name keeps a downloaded build from passing for a stable one.
 name: 'publish unstable'
 
 on:
@@ -68,7 +68,7 @@ jobs:
           releaseBody: 'Unstable build of the development branch, at commit ${{ github.sha }}, for testing. Run the bare executable for your OS, or the AppImage on Linux, from any folder: nothing to install.'
           releaseDraft: false
           prerelease: true
-          releaseAssetNamePattern: '[mainBinaryName]_[version]_unstable_[platform]_[arch][setup][ext]'
+          releaseAssetNamePattern: '[mainBinaryName]_[version]_unstable_[platform]_[arch][setup]_${{ github.run_id }}_${{ github.run_attempt }}[ext]'
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
           # latest.json, for the update detection to come.

@@ -1,15 +1,20 @@
 # Tauri's official publish workflow (https://v2.tauri.app/distribute/pipelines/github/): every push
-# to master builds the Linux and Windows releases into a stable release, kept as a draft until it's
-# published by hand. macOS isn't a target of the player.
+# to master that passes Quality Assurance builds the Linux and Windows releases into a stable
+# release, kept as a draft until it's published by hand. macOS isn't a target of the player.
 name: 'publish stable'
 
+# Starts when Quality Assurance finishes on master, and builds only if it passed. A workflow_run
+# runs from master's newest commit, so the build checks out and tags the commit QA tested instead.
 on:
-  push:
+  workflow_run:
+    workflows: ['Quality Assurance']
+    types: [completed]
     branches:
       - master
 
 jobs:
   publish-tauri:
+    if: github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
     strategy:
@@ -22,6 +27,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # GStreamer's base and good plugins play MP3 in WebKitGTK. The AppImage bundles the ones
       # installed here (bundleMediaFramework in tauri.conf.json).
@@ -66,6 +73,7 @@ jobs:
           releaseBody: 'Run the bare executable for your OS, or the AppImage on Linux, from any folder, like a flash drive: nothing to install. The Windows installers are attached too.'
           releaseDraft: true
           prerelease: false
+          releaseCommitish: ${{ github.event.workflow_run.head_sha }}
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
           # latest.json, for the update detection to come.

@@ -36,8 +36,8 @@ cargo check --manifest-path src-tauri/Cargo.toml
 `pnpm test:report` runs `test/generate_test_report.sh`: Vitest writes a single-file HTML report to `private/test-report/typescript/index.html` (the `test-report` mode in `vite.config.ts`, through `@vitest/ui`), and nextest writes a JUnit report of the Rust tests, copied to `private/test-report/rust/junit.xml` (the `report` profile in `src-tauri/.config/nextest.toml`). Both suites always run, so one failing still reports the other. It needs cargo-nextest once per machine: `cargo install cargo-nextest --locked`.
 
 In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` folder is `src-tauri/target/debug/Songs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test:ts` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed. Two workflows, each a copy of Tauri's official publish workflow, build the Linux (`ubuntu-22.04`) and Windows (`windows-latest`) releases: the bare executables, the AppImage, the Windows installers and the updater's `latest.json`. They differ only in their trigger and release settings, so a change to the build goes in both:
-- `publish-stable.yml`, on every push to `master`: a draft release tagged `v<version>`;
-- `publish-unstable.yml`, on every push to `development`: a pre-release tagged `v<version>-unstable.<run id>.<run attempt>`, with `unstable` in every file name.
+- `publish-stable.yml`, when Quality Assurance passes on a push to `master` (`workflow_run`, so it builds and tags the commit QA tested): a draft release tagged `v<version>`;
+- `publish-unstable.yml`, on every push to `development`, without waiting for Quality Assurance: a pre-release tagged `v<version>-unstable.<run id>.<run attempt>`, with `unstable` in every file name.
 
 Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key.
 

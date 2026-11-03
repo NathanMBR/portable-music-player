@@ -196,6 +196,8 @@ Features and fixes are developed test first. A test states a rule the system mus
 
 **Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit.
 
+**NEVER, under ANY circumstance, undo work to make commits.** Don't revert, rewrite or hold back part of a file's changes, or stage a made-up version of it, so that a commit gets only one change's lines. Changes that overlap in a file can go in the same commit. When changes overlap, commit first the ones that overlap least, and put each shared file in the commit of a change it belongs to.
+
 **Run the tests when you finish a task**, to check that everything still works. Only run the tests of the regions of the code you changed; there's no need to run tests for unaffected areas.
 - For TypeScript, pass the changed folders or files to Vitest, e.g. `pnpm exec vitest run src/features/playback`. Run `pnpm test:rs` only when `src-tauri/` changed.
 - Code that others build on counts as changed for them too: a change to `src/components/`, a store, `src/index.css` or `src/testing/` also runs the tests of the code that uses it.

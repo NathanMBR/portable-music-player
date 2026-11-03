@@ -61,8 +61,8 @@ export const Paused: Story = {
 }
 
 /**
- * What the app shows until real audio arrives: the song's length is unknown, so the bar stays
- * empty and the remaining time is dashes.
+ * While the song's audio loads, its length is unknown: the bar stays empty and disabled, and the
+ * remaining time is dashes.
  */
 export const UnknownLength: Story = {
   beforeEach: () => {
@@ -102,7 +102,7 @@ export const WideWindow: Story = {
   play: async ({ canvas }) => {
     const controls = canvas.getByRole('button', { name: 'Shuffle' }).parentElement
     const progress = canvas.getByText(secondTrack.title).parentElement
-    const volume = canvas.getByRole('slider', { name: 'Volume' }).parentElement
+    const volume = canvas.getByRole('button', { name: 'Mute' }).parentElement
     if (!controls || !progress || !volume) throw new Error('The player lost one of its parts')
     const controlsBox = controls.getBoundingClientRect()
     const progressBox = progress.getBoundingClientRect()
@@ -137,6 +137,35 @@ export const SkipsSongs: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Previous song' }))
     await expect(canvas.getByText(secondTrack.title)).toBeVisible()
+  }
+}
+
+/**
+ * Past a song's first 3 seconds, "Previous song" starts it over, even on the first song of the
+ * queue without repeat, where there's no song before it.
+ */
+export const RestartsTheSong: Story = {
+  beforeEach: () => {
+    loadSession({ track: firstTrack, elapsedSeconds: 83 })
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Previous song' }))
+
+    await expect(canvas.getByText(firstTrack.title)).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Elapsed time 00:00' })).toBeVisible()
+  }
+}
+
+/**
+ * In the first 3 seconds of the first song of the queue, without repeat, there's nothing to go
+ * back to: "Previous song" is disabled.
+ */
+export const StartOfTheFirstSong: Story = {
+  beforeEach: () => {
+    loadSession({ track: firstTrack, elapsedSeconds: 2 })
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('button', { name: 'Previous song' })).toBeDisabled()
   }
 }
 

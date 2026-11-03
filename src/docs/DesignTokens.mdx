@@ -33,12 +33,12 @@ variants.
   />
   <ColorItem
     title="rule"
-    subtitle="Dividers, outlines, hover backgrounds and the empty part of the progress bar"
+    subtitle="Dividers, outlines, hover backgrounds and the empty part of sliders"
     colors={{ Light: '#d9dfee', Dark: '#27305c' }}
   />
   <ColorItem
     title="pen"
-    subtitle="Accent: main buttons, the current category, focus outlines, toggles and the switch when on, the progress bar"
+    subtitle="Accent: main buttons, the current category, focus outlines, toggles and the switch when on, the filled part of sliders"
     colors={{ Light: '#2c46d1', Dark: '#8fa2ff' }}
   />
   <ColorItem
@@ -97,20 +97,20 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   - `filled`: `pen` with `paper` on it, `data-hover:bg-pen/90`. The one main action on screen,
     like "Try again" or play and pause in the audio player.
 - **Focus:** every interactive element shows `data-focus:outline-2 data-focus:outline-offset-2
-  data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard. The volume slider uses
-  `outline-offset-4`, so the ring clears its thumb. It also hides the ring after a click, because
-  Headless UI rings inputs on any focus, like text fields.
+  data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard. Sliders use
+  `outline-offset-4`, so the ring clears their thumb. They also hide the ring after a click,
+  because Headless UI rings inputs on any focus, like text fields.
 - **Active:** whatever is on right now, like a pressed toggle (shuffle, repeat), the playing
   song's button or the current category, shows `pen` on a pen tint (`bg-pen/15 text-pen`,
   `bg-pen/20` on hover; `ACTIVE_CLASSES`). The pen color alone would barely differ from the faded
   icons on the light paper. Toggles also set `aria-pressed`, and the current category
   `aria-current="page"`.
-- **Disabled:** a button that can't act right now fades with `data-disabled:opacity-40`
+- **Disabled:** a button or slider that can't act right now fades with `data-disabled:opacity-40`
   (`DISABLED_CLASSES`).
-- **Cursors:** buttons show a pointer and disabled ones show `not-allowed` (base styles in
-  `src/index.css`).
-- **Sliders:** the volume slider draws its own track, like the progress bar: `pen` up to the value
-  and `rule` after it, with a `pen` thumb that stays inside the track, so at full volume it covers
-  the end.
+- **Cursors:** buttons show a pointer, and disabled buttons and sliders show `not-allowed` (base
+  styles in `src/index.css`).
+- **Sliders:** `Slider`, behind the volume and the song's position, draws its own track: `pen` up
+  to the value and `rule` after it, with a `pen` thumb that stays inside the track, so at the
+  maximum it covers the end.
 - **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
   `motion-reduce:`).

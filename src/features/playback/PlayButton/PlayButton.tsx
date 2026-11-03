@@ -13,8 +13,7 @@ type PlayButtonProps = {
 /**
  * Round button at the start of a song's row. Clicking it plays the song in the audio player, with
  * the song's list as the queue, and switches the icon to pause, taking it away from any other
- * song. Clicking it again pauses the song, and once more resumes it. No audio plays yet: the button
- * only changes the playback state.
+ * song. Clicking it again pauses the song, and once more resumes it.
  *
  * @summary Play and pause button of one song
  */

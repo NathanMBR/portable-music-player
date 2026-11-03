@@ -21,9 +21,3 @@ export const remainingSeconds = (elapsedSeconds: number, durationSeconds: number
   durationSeconds === null
     ? null
     : Math.max(0, Math.floor(durationSeconds) - Math.floor(elapsedSeconds))
-
-/** How much of the song has played, from 0 to 1: how far the progress bar is filled. */
-export const progressFraction = (elapsedSeconds: number, durationSeconds: number | null) => {
-  if (durationSeconds === null || durationSeconds <= 0) return 0
-  return Math.min(1, Math.max(0, elapsedSeconds / durationSeconds))
-}

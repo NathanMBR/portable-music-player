@@ -6,7 +6,7 @@ import { PlaybackControls } from './PlaybackControls'
 
 const meta = {
   component: PlaybackControls,
-  args: { isPlaying: true, hasPreviousSong: true, hasNextSong: true }
+  args: { isPlaying: true, canGoBack: true, hasNextSong: true }
 } satisfies Meta<typeof PlaybackControls>
 
 export default meta

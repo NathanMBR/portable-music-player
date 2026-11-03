@@ -29,9 +29,10 @@ category changes. It holds shuffle, previous, play or pause, stop, next and repe
 song's title above its progress bar in the middle, and the speaker and volume on the right. The
 progress stops growing at a set width, so in wide windows the spaces around it widen instead.
 Clicking the speaker mutes, and clicking it again brings the volume back. The views end above its
-space, and while it's open notifications pop up above it, both sized by the `player` token. No
-audio plays yet: the player shows the playback store's state, and a song's length stays unknown
-(`--:--`) until real audio loads it.
+space, and while it's open notifications pop up above it, both sized by the `player` token. The
+progress bar is a slider: clicking or dragging it jumps within the song. Past a song's first 3
+seconds, previous starts it over. A song's length shows as `--:--` while its audio loads, and when
+the last song ends without repeat, it stays in the player, paused at its start.
 
 The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
 the side menu included. Notifications pop up there, close by themselves after a few seconds or
@@ -49,8 +50,8 @@ as the queue.
 
 ## Where the code lives
 
-- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`), built on
-  Headless UI and styled with Tailwind, each in a folder of its own with its stories.
+- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`, `Slider`),
+  built on Headless UI and styled with Tailwind, each in a folder of its own with its stories.
   `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
   `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
 - `src/features/notifications/`: the notification area and `notify.ts`, the only module that calls
@@ -72,6 +73,16 @@ why. Raising the same failure again replaces the notification on screen instead 
 The view itself never shows red text: when a failure leaves it with nothing to show, like a failed
 scan, it shows a calm `Notice` with what to do next.
 
+Songs play through one more loop. `songAudio.ts`, connected once from `main.tsx`, is the only
+module that touches the audio. It follows the playback store's song, play state, position and
+volume, and reports the song's length, progress and end back to the store, which decides what plays
+next. To load a song it asks Rust for the song's file as raw bytes (`read_song`) and plays them from
+memory, through an object URL: the Linux webview can't stream audio from Tauri's own file URLs. A
+song that can't play raises "Couldn't play" with its title, and the player pauses on it. Before
+loading, it asks the webview whether it can play MP3 at all: on Linux, a webview missing
+GStreamer's plugins freezes the app instead of reporting an error, so the player stops there and
+says what to install.
+
 ## How the stories run without Tauri
 
 Storybook runs the UI in a plain browser, where there is no Rust side. Three pieces make the stories
@@ -88,6 +99,9 @@ work anyway:
 - **One frame per story on Docs pages.** The stores are shared by everything on a page, so stories
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.
+
+Stories never connect the audio (`songAudio.ts`), so they're silent: the player shows whatever
+progress and length the story puts in the store.
 
 The **theme** toolbar switches `data-theme` on `<html>` between `light` and `dark`, like the app's
 own toggle does.

@@ -12,6 +12,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             library::load_music_library,
             library::open_songs_folder,
+            library::read_song,
             settings::load_settings,
             settings::save_settings
         ])

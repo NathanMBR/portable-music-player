@@ -58,8 +58,8 @@ src/
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
   components/           feature-agnostic UI built on Headless UI
-    <Component>/        one folder per component (Button, IconButton, Notice): <Component>.tsx and
-                        every <Component>.* file that belongs to it, like its stories
+    <Component>/        one folder per component (Button, IconButton, Notice, Slider): <Component>.tsx
+                        and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
     types.ts            data shapes returned by Rust (mirror the Rust structs)
@@ -84,7 +84,10 @@ src/
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
 - Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Views keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`overflow-y-auto` on `main`, with `px-gutter`, so the scrollbar runs along the window's edge). The header and the scroll area both reserve the scrollbar's width (`[scrollbar-gutter:stable]`), so they line up.
-- Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, the space kept for it at the bottom of the window even while it's hidden (`pb-player`), and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it. No audio plays yet: the player shows the playback store's state.
+- Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, the space kept for it at the bottom of the window even while it's hidden (`pb-player`), and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it.
+  - The audio plays from `src/features/playback/songAudio.ts`, the only module that touches it. `main.tsx` connects it once to an `Audio` element, which then follows the playback store (song, play state, position, volume) and reports the song's length, progress and end back to it. Stories never connect it, so they stay silent.
+  - Songs play from memory: `read_song` (`library.rs`) finds a track's file from its relative path and sends the whole file as raw bytes (`tauri::ipc::Response`), and `songAudio.ts` plays them from an object URL, freed when the song changes. The frontend never handles absolute paths. Tauri's asset protocol (`convertFileSrc`) can't be used for audio: WebKitGTK's media backend can't stream from a custom URI scheme, and `play()` fails with `NotSupportedError`. A CSP added later must allow `blob:` as a media source.
+  - Before loading a song, `songAudio.ts` checks `canPlayType('audio/mpeg')` and, if it's empty, notifies what to install instead. WebKitGTK freezes the whole app, with no `error` event, as soon as it gets a source that GStreamer lacks the plugins (`appsink`, `autoaudiosink`, an MP3 decoder) to play.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 
@@ -109,7 +112,7 @@ These follow from the project goal and are easy to get wrong:
 - Both executables share the same folder and the same JSON files, so data formats must be OS-agnostic. Store music paths **relative to the executable folder** (the drive letter or mount point changes between machines and OSes), and normalize path separators.
 - The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` is `"all"`). An AppImage works too: it runs the executable from a temporary read-only mount, so `root_dir()` uses the folder of the AppImage file (`APPIMAGE`) while the executable is inside that mount (`APPDIR`). Programs started from an AppImage inherit both variables, so outside the mount they're ignored.
 - Each OS executable has to be built on (or cross-compiled for) that OS. Development here happens in WSL2, which produces the Linux binary.
-- Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk.
+- Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk plus GStreamer's good plugins (`gstreamer1.0-plugins-good`), which decode MP3 for the webview.
 - Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/features/library/sortTracks.ts`).
 - Don't canonicalize paths shown to the user: on Windows, `canonicalize` adds a `\\?\` prefix.
 

@@ -6,6 +6,7 @@ import {
   findPreviousTrack,
   nextRepeatMode,
   type RepeatMode,
+  restartsOnPrevious,
   shuffle
 } from './playOrder'
 
@@ -96,5 +97,14 @@ describe('findPreviousTrack', () => {
     for (const repeatMode of REPEAT_ON) {
       expect(findPreviousTrack(queue, firstTrack, repeatMode)).toBe(fourthTrack)
     }
+  })
+})
+
+describe('restartsOnPrevious', () => {
+  it('starts the current song over only past its first 3 seconds', () => {
+    expect(restartsOnPrevious(0)).toBe(false)
+    expect(restartsOnPrevious(3)).toBe(false)
+    expect(restartsOnPrevious(3.25)).toBe(true)
+    expect(restartsOnPrevious(83)).toBe(true)
   })
 })

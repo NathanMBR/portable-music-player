@@ -14,8 +14,11 @@ import type { RepeatMode } from '../playOrder'
 type PlaybackControlsProps = {
   /** Whether the song plays: the main button then pauses it, otherwise it plays it. */
   isPlaying: boolean
-  /** `false` on the first song of the queue while repeat is off, which disables "Previous song". */
-  hasPreviousSong: boolean
+  /**
+   * `false` in the first 3 seconds of the first song of the queue while repeat is off, which
+   * disables "Previous song". Past those seconds it starts the song over.
+   */
+  canGoBack: boolean
   /** `false` on the last song of the queue while repeat is off, which disables "Next song". */
   hasNextSong: boolean
 }
@@ -64,16 +67,13 @@ const RepeatButton = () => {
 
 /**
  * The left end of the audio player: shuffle, previous song, play or pause, stop, next song and
- * repeat. Stop hides the player. Previous and next are disabled at the ends of the queue while
- * repeat is off. Repeat cycles from off to all to one, and repeat one adds a small 1 to its icon.
+ * repeat. Stop hides the player. Past a song's first 3 seconds, previous starts it over instead.
+ * Previous and next are disabled at the ends of the queue while repeat is off. Repeat cycles from
+ * off to all to one, and repeat one adds a small 1 to its icon.
  *
  * @summary Transport buttons of the audio player
  */
-export const PlaybackControls = ({
-  isPlaying,
-  hasPreviousSong,
-  hasNextSong
-}: PlaybackControlsProps) => {
+export const PlaybackControls = ({ isPlaying, canGoBack, hasNextSong }: PlaybackControlsProps) => {
   const togglePlaying = usePlaybackStore(state => state.togglePlaying)
   const stop = usePlaybackStore(state => state.stop)
   const playPrevious = usePlaybackStore(state => state.playPrevious)
@@ -85,7 +85,7 @@ export const PlaybackControls = ({
       <IconButton
         icon={BackwardIcon}
         label="Previous song"
-        isDisabled={!hasPreviousSong}
+        isDisabled={!canGoBack}
         onClick={playPrevious}
       />
       <IconButton

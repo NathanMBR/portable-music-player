@@ -1,9 +1,11 @@
 use std::{
+    ffi::OsStr,
     fs, io,
     path::{Path, PathBuf},
 };
 
 use serde::{Serialize, Serializer};
+use tauri::ipc::Response;
 
 use crate::portable;
 
@@ -29,6 +31,12 @@ pub enum LibraryError {
     ReadFolder { path: PathBuf, source: io::Error },
     #[error("Couldn't open the Songs folder: {0}")]
     OpenFolder(tauri_plugin_opener::Error),
+    #[error("{path} isn't a song of the Songs folder")]
+    NotASong { path: String },
+    #[error("Couldn't find {path}: it may have been moved, renamed or deleted")]
+    SongMissing { path: String },
+    #[error("Couldn't read {path}: {source}")]
+    ReadSong { path: String, source: io::Error },
 }
 
 impl Serialize for LibraryError {
@@ -49,6 +57,14 @@ pub async fn open_songs_folder() -> Result<(), LibraryError> {
     tauri_plugin_opener::open_path(&songs_dir, None::<&str>).map_err(LibraryError::OpenFolder)
 }
 
+/// The whole file of a song, sent as raw bytes rather than JSON. The webview plays it from memory:
+/// WebKitGTK can't stream media from a custom URI scheme like Tauri's asset protocol.
+#[tauri::command]
+pub async fn read_song(path: String) -> Result<Response, LibraryError> {
+    let root = portable::root_dir().map_err(LibraryError::RootDir)?;
+    read_song_in(&root, &path).map(Response::new)
+}
+
 fn ensure_songs_dir() -> Result<PathBuf, LibraryError> {
     ensure_songs_dir_in(&portable::root_dir().map_err(LibraryError::RootDir)?)
 }
@@ -61,6 +77,43 @@ fn ensure_songs_dir_in(root: &Path) -> Result<PathBuf, LibraryError> {
         source,
     })?;
     Ok(songs_dir)
+}
+
+/// The file of the song a `Track::path` points to, inside `root`'s Songs folder: the reverse of
+/// `track_from`. Anything but a song's plain file name is refused, so the webview can't read other
+/// files through it.
+fn find_song_in(root: &Path, track_path: &str) -> Result<PathBuf, LibraryError> {
+    let not_a_song = || LibraryError::NotASong {
+        path: track_path.to_owned(),
+    };
+    let file_name = track_path
+        .strip_prefix(SONGS_FOLDER_NAME)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .filter(|name| is_plain_file_name(name))
+        .ok_or_else(not_a_song)?;
+    let song = root.join(SONGS_FOLDER_NAME).join(file_name);
+    if !has_mp3_name(&song) {
+        return Err(not_a_song());
+    }
+    if !song.is_file() {
+        return Err(LibraryError::SongMissing {
+            path: track_path.to_owned(),
+        });
+    }
+    Ok(song)
+}
+
+fn read_song_in(root: &Path, track_path: &str) -> Result<Vec<u8>, LibraryError> {
+    let song = find_song_in(root, track_path)?;
+    fs::read(song).map_err(|source| LibraryError::ReadSong {
+        path: track_path.to_owned(),
+        source,
+    })
+}
+
+/// `\` is checked on every OS: it's a separator on Windows, where it could climb out of the folder.
+fn is_plain_file_name(name: &str) -> bool {
+    !name.contains(['/', '\\']) && Path::new(name).file_name() == Some(OsStr::new(name))
 }
 
 fn find_tracks(songs_dir: &Path) -> Result<Vec<Track>, LibraryError> {
@@ -226,6 +279,103 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&error).unwrap(),
             serde_json::json!("Couldn't read the Songs folder at Songs: permission denied")
+        );
+    }
+
+    #[test]
+    fn finds_the_file_of_a_song_in_the_songs_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        fs::write(songs_dir.join("Dead Man On Display.mp3"), b"").unwrap();
+
+        let song = find_song_in(root.path(), "Songs/Dead Man On Display.mp3").unwrap();
+
+        assert_eq!(song, songs_dir.join("Dead Man On Display.mp3"));
+    }
+
+    #[test]
+    fn refuses_paths_outside_the_songs_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        fs::create_dir(songs_dir.join("Live")).unwrap();
+        fs::write(root.path().join("Stand Away.mp3"), b"").unwrap();
+        fs::write(songs_dir.join("Live").join("Stand Away.mp3"), b"").unwrap();
+        let absolute_path = songs_dir.join("Live").join("Stand Away.mp3");
+
+        for path in [
+            "Stand Away.mp3",
+            "../Stand Away.mp3",
+            "Songs/../Stand Away.mp3",
+            "Songs/Live/Stand Away.mp3",
+            "Songs\\..\\Stand Away.mp3",
+            "Songs/..",
+            "Songs/",
+            &absolute_path.to_string_lossy(),
+        ] {
+            assert!(
+                matches!(
+                    find_song_in(root.path(), path),
+                    Err(LibraryError::NotASong { .. })
+                ),
+                "{path} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn refuses_files_that_are_not_songs() {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        for file_name in ["Here In The Now.txt", "._Here In The Now.mp3"] {
+            fs::write(songs_dir.join(file_name), b"").unwrap();
+
+            assert!(
+                matches!(
+                    find_song_in(root.path(), &format!("Songs/{file_name}")),
+                    Err(LibraryError::NotASong { .. })
+                ),
+                "{file_name} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn reads_the_bytes_of_a_song() {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        fs::write(
+            songs_dir.join("Evil Warning.mp3"),
+            b"ID3 and the frames of a song",
+        )
+        .unwrap();
+
+        let bytes = read_song_in(root.path(), "Songs/Evil Warning.mp3").unwrap();
+
+        assert_eq!(bytes, b"ID3 and the frames of a song");
+    }
+
+    #[test]
+    fn reports_a_song_that_is_gone() {
+        let root = tempfile::tempdir().unwrap();
+        ensure_songs_dir_in(root.path()).unwrap();
+
+        assert!(matches!(
+            find_song_in(root.path(), "Songs/Unholy Wars.mp3"),
+            Err(LibraryError::SongMissing { .. })
+        ));
+    }
+
+    #[test]
+    fn serializes_a_missing_song_as_its_message() {
+        let error = LibraryError::SongMissing {
+            path: "Songs/The Shaman.mp3".into(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&error).unwrap(),
+            serde_json::json!(
+                "Couldn't find Songs/The Shaman.mp3: it may have been moved, renamed or deleted"
+            )
         );
     }
 }

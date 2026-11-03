@@ -5,13 +5,14 @@ import {
   findNextTrack,
   findPreviousTrack,
   nextRepeatMode,
-  type RepeatMode
+  type RepeatMode,
+  restartsOnPrevious
 } from './playOrder'
 
 /** What the time left of the progress bar shows. */
 export type ShownTime = 'elapsed' | 'remaining'
 
-/** The song loaded in the player and the queue it was played from. No audio plays yet. */
+/** The song loaded in the player and the queue it was played from. */
 export type PlaybackSession = {
   /** The current song: a single one, so only one song plays at a time. */
   track: Track
@@ -21,7 +22,7 @@ export type PlaybackSession = {
   playOrder: Track[]
   isPlaying: boolean
   elapsedSeconds: number
-  /** `null` until the song's audio is loaded. */
+  /** `null` until the song's audio has loaded its length. */
   durationSeconds: number | null
 }
 
@@ -42,6 +43,11 @@ type PlaybackStore = {
   stop: () => void
   playNext: () => void
   playPrevious: () => void
+  finishSong: () => void
+  reportProgress: (elapsedSeconds: number) => void
+  reportDuration: (durationSeconds: number | null) => void
+  seek: (seconds: number) => void
+  pause: () => void
   cycleRepeatMode: () => void
   toggleShuffle: () => void
   setVolume: (volume: number) => void
@@ -58,19 +64,29 @@ const OTHER_SHOWN_TIME: Record<ShownTime, ShownTime> = {
 }
 
 // A song that starts plays from its beginning, and its length is unknown until its audio loads.
-const PLAYING_FROM_THE_START = {
+// The same song starting over keeps its length: its audio is already loaded, so none would arrive.
+const startFromTheBeginning = (session: PlaybackSession, track: Track): PlaybackSession => ({
+  ...session,
+  track,
   isPlaying: true,
   elapsedSeconds: 0,
-  durationSeconds: null
-} as const
+  durationSeconds: track.path === session.track.path ? session.durationSeconds : null
+})
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
+  const updateSession = (change: (session: PlaybackSession) => Partial<PlaybackSession>) => {
+    const { session } = get()
+    if (session) set({ session: { ...session, ...change(session) } })
+  }
+
   const skipTo = (findTrack: TrackFinder) => {
     const { session, repeatMode } = get()
     if (!session) return
 
     const track = findTrack(session.playOrder, session.track, repeatMode)
-    if (track) set({ session: { ...session, track, ...PLAYING_FROM_THE_START } })
+    if (track) set({ session: startFromTheBeginning(session, track) })
   }
 
   return {
@@ -82,15 +98,53 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     shownTime: 'elapsed',
     playTrack: (track, queue) => {
       const playOrder = createPlayOrder(queue, track, get().isShuffled)
-      set({ session: { track, queue, playOrder, ...PLAYING_FROM_THE_START } })
+      set({
+        session: {
+          track,
+          queue,
+          playOrder,
+          isPlaying: true,
+          elapsedSeconds: 0,
+          durationSeconds: null
+        }
+      })
     },
-    togglePlaying: () => {
-      const { session } = get()
-      if (session) set({ session: { ...session, isPlaying: !session.isPlaying } })
-    },
+    togglePlaying: () => updateSession(session => ({ isPlaying: !session.isPlaying })),
     stop: () => set({ session: null }),
     playNext: () => skipTo(findNextTrack),
-    playPrevious: () => skipTo(findPreviousTrack),
+    playPrevious: () => {
+      const { session } = get()
+      if (session && restartsOnPrevious(session.elapsedSeconds)) {
+        set({ session: startFromTheBeginning(session, session.track) })
+      } else {
+        skipTo(findPreviousTrack)
+      }
+    },
+    finishSong: () => {
+      const { session, repeatMode } = get()
+      if (!session) return
+
+      const nextTrack =
+        repeatMode === 'one'
+          ? session.track
+          : findNextTrack(session.playOrder, session.track, repeatMode)
+      // Without a next song, the last one stays in the player, ready to play again from its start.
+      set({
+        session: nextTrack
+          ? startFromTheBeginning(session, nextTrack)
+          : { ...session, isPlaying: false, elapsedSeconds: 0 }
+      })
+    },
+    reportProgress: elapsedSeconds => updateSession(() => ({ elapsedSeconds })),
+    reportDuration: durationSeconds => updateSession(() => ({ durationSeconds })),
+    seek: seconds => {
+      const { session } = get()
+      // There's nowhere to jump to before the song's audio has loaded its length.
+      if (!session || session.durationSeconds === null) return
+
+      set({ session: { ...session, elapsedSeconds: clamp(seconds, 0, session.durationSeconds) } })
+    },
+    pause: () => updateSession(() => ({ isPlaying: false })),
     cycleRepeatMode: () => set(state => ({ repeatMode: nextRepeatMode(state.repeatMode) })),
     toggleShuffle: () => {
       const { session, isShuffled } = get()

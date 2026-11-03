@@ -1,12 +1,8 @@
 import { Button } from '@headlessui/react'
 import { FOCUS_CLASSES } from '../../../components/buttonStyles'
+import { Slider } from '../../../components/Slider/Slider'
 import { type ShownTime, usePlaybackStore } from '../playbackStore'
-import {
-  formatCountdown,
-  formatPlaybackTime,
-  progressFraction,
-  remainingSeconds
-} from '../playbackTime'
+import { formatCountdown, formatPlaybackTime, remainingSeconds } from '../playbackTime'
 
 type SongProgressProps = {
   /** How far into the song playback is. */
@@ -25,19 +21,20 @@ const SWITCH_HINTS: Record<ShownTime, string> = {
   remaining: 'Show elapsed time'
 }
 
-const toPercentage = (fraction: number) => `${fraction * 100}%`
-
 /**
  * The middle of the audio player: a bar that fills as the song plays, with the elapsed time on its
- * left and the remaining time on its right, both as `mm:ss`. Clicking the left time switches it to
- * the time left, counted down as `-mm:ss`, and back. Until the song's length is known, the bar
- * stays empty and the remaining time shows dashes.
+ * left and the remaining time on its right, both as `mm:ss`. The bar is a slider: clicking or
+ * dragging it jumps within the song, and so do the arrow keys, Page Up and Down, Home and End.
+ * Clicking the left time switches it to the time left, counted down as `-mm:ss`, and back. Until
+ * the song's length is known, the bar stays empty and disabled, and the remaining time shows
+ * dashes.
  *
- * @summary Progress bar of the playing song, with its times
+ * @summary Seekable progress bar of the playing song, with its times
  */
 export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressProps) => {
   const shownTime = usePlaybackStore(state => state.shownTime)
   const toggleShownTime = usePlaybackStore(state => state.toggleShownTime)
+  const seek = usePlaybackStore(state => state.seek)
   const timeLeft = remainingSeconds(elapsedSeconds, durationSeconds)
   const isLengthKnown = durationSeconds !== null
   const leftTime =
@@ -53,22 +50,18 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
         <span className="sr-only">{SHOWN_TIME_NAMES[shownTime]} </span>
         {leftTime}
       </Button>
-      <div
-        role="progressbar"
-        aria-label="Song progress"
-        aria-valuemin={0}
-        aria-valuemax={isLengthKnown ? Math.floor(durationSeconds) : undefined}
-        aria-valuenow={isLengthKnown ? Math.floor(elapsedSeconds) : undefined}
-        aria-valuetext={
-          isLengthKnown
-            ? `${formatPlaybackTime(elapsedSeconds)} of ${formatPlaybackTime(durationSeconds)}`
-            : undefined
-        }
-        className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-rule"
-      >
-        <div
-          className="h-full rounded-full bg-pen"
-          style={{ width: toPercentage(progressFraction(elapsedSeconds, durationSeconds)) }}
+      <div className="min-w-0 flex-1">
+        <Slider
+          label="Song position"
+          value={elapsedSeconds}
+          max={durationSeconds ?? 0}
+          valueText={
+            isLengthKnown
+              ? `${formatPlaybackTime(elapsedSeconds)} of ${formatPlaybackTime(durationSeconds)}`
+              : 'Length unknown'
+          }
+          isDisabled={!isLengthKnown}
+          onChange={seek}
         />
       </div>
       <span className="w-14 shrink-0">

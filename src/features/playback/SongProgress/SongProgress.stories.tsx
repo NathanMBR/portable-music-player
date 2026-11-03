@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, fireEvent } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import type { Track } from '../../library/types'
+import { usePlaybackStore } from '../playbackStore'
 import { SongProgress } from './SongProgress'
 
 const meta = {
@@ -25,8 +27,8 @@ type Story = StoryObj<typeof meta>
  */
 export const Midway: Story = {
   play: async ({ canvas }) => {
-    const bar = canvas.getByRole('progressbar', { name: 'Song progress' })
-    await expect(bar).toHaveAttribute('aria-valuenow', '83')
+    const bar = canvas.getByRole('slider', { name: 'Song position' })
+    await expect(bar).toBeEnabled()
     await expect(bar).toHaveAttribute('aria-valuetext', '01:23 of 04:30')
     await expect(canvas.getByRole('button', { name: 'Elapsed time 01:23' })).toBeVisible()
     await expect(canvas.getByText('03:07')).toBeVisible()
@@ -34,14 +36,14 @@ export const Midway: Story = {
 }
 
 /**
- * What every song shows until real audio arrives: its length is unknown, so the bar stays empty
- * and the remaining time is dashes.
+ * While a song's audio loads, its length is unknown: the bar stays empty and disabled, since there
+ * is nowhere to jump to yet, and the remaining time is dashes.
  */
 export const UnknownLength: Story = {
   args: { elapsedSeconds: 0, durationSeconds: null },
   play: async ({ canvas }) => {
-    const bar = canvas.getByRole('progressbar', { name: 'Song progress' })
-    await expect(bar).not.toHaveAttribute('aria-valuenow')
+    const bar = canvas.getByRole('slider', { name: 'Song position' })
+    await expect(bar).toBeDisabled()
     await expect(canvas.getByRole('button', { name: 'Elapsed time 00:00' })).toBeVisible()
     await expect(canvas.getByText('--:--')).toBeVisible()
   }
@@ -56,5 +58,30 @@ export const TogglesToRemainingTime: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Remaining time -03:07' }))
     await expect(canvas.getByRole('button', { name: 'Elapsed time 01:23' })).toBeVisible()
+  }
+}
+
+/** Clicking or dragging the bar jumps within the song: the player's position moves there. */
+export const SeeksWithinTheSong: Story = {
+  parameters: renderInOwnFrame(80),
+  beforeEach: () => {
+    const track: Track = { path: 'Songs/Waiting Silence.mp3', title: 'Waiting Silence' }
+    usePlaybackStore.setState({
+      session: {
+        track,
+        queue: [track],
+        playOrder: [track],
+        isPlaying: true,
+        elapsedSeconds: 83,
+        durationSeconds: 270
+      }
+    })
+  },
+  play: async ({ canvas }) => {
+    fireEvent.change(canvas.getByRole('slider', { name: 'Song position' }), {
+      target: { value: '200' }
+    })
+
+    await expect(usePlaybackStore.getState().session?.elapsedSeconds).toBe(200)
   }
 }

@@ -63,29 +63,3 @@ export const ChangesTheVolume: Story = {
     await expect(slider).toHaveAttribute('aria-valuetext', '40%')
   }
 }
-
-/** Clicking the slider moves the volume without a focus ring, which only keyboard users need. */
-export const ClickedWithoutFocusRing: Story = {
-  play: async ({ canvas, userEvent }) => {
-    const slider = canvas.getByRole('slider', { name: 'Volume' })
-
-    await userEvent.click(slider)
-
-    await expect(slider).toHaveFocus()
-    await expect(getComputedStyle(slider).outlineStyle).toBe('none')
-  }
-}
-
-/** Reaching the slider with Tab rings it in pen, so keyboard users see where they are. */
-export const FocusedFromTheKeyboard: Story = {
-  play: async ({ canvas, userEvent }) => {
-    const slider = canvas.getByRole('slider', { name: 'Volume' })
-
-    // The speaker button comes first.
-    await userEvent.tab()
-    await userEvent.tab()
-
-    await expect(slider).toHaveFocus()
-    await expect(getComputedStyle(slider).outlineStyle).toBe('solid')
-  }
-}

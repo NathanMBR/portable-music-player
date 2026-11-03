@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  formatCountdown,
-  formatPlaybackTime,
-  progressFraction,
-  remainingSeconds
-} from './playbackTime'
+import { formatCountdown, formatPlaybackTime, remainingSeconds } from './playbackTime'
 
 describe('formatPlaybackTime', () => {
   it('pads minutes and seconds to two digits', () => {
@@ -47,20 +42,5 @@ describe('remainingSeconds', () => {
 
   it('never goes below zero', () => {
     expect(remainingSeconds(275, 270)).toBe(0)
-  })
-})
-
-describe('progressFraction', () => {
-  it('is the share of the song already played', () => {
-    expect(progressFraction(67.5, 270)).toBe(0.25)
-  })
-
-  it('is zero while the length is unknown', () => {
-    expect(progressFraction(83, null)).toBe(0)
-  })
-
-  it('stays between zero and one', () => {
-    expect(progressFraction(275, 270)).toBe(1)
-    expect(progressFraction(0, 0)).toBe(0)
   })
 })

@@ -58,3 +58,10 @@ export const findNextTrack = (playOrder: Track[], current: Track, repeatMode: Re
 /** The song before `current`, mirroring `findNextTrack`. */
 export const findPreviousTrack = (playOrder: Track[], current: Track, repeatMode: RepeatMode) =>
   findTrackOneStepAway(playOrder, current, -1, repeatMode)
+
+// Like most players, "Previous song" past a song's first seconds starts it over: going back to
+// the start of the current song is wanted far more often than the song before it.
+const RESTART_AFTER_SECONDS = 3
+
+/** Whether "Previous song" starts the current song over instead of going to the one before. */
+export const restartsOnPrevious = (elapsedSeconds: number) => elapsedSeconds > RESTART_AFTER_SECONDS

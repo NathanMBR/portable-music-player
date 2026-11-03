@@ -10,6 +10,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Songs sorted alphabetically
 - Open the `Songs` folder
 - Scan the library again
+- Audio player with shuffle, repeat, volume and seeking
 - Side menu with the categories
 - Dark theme
 - Error notifications in the bottom-right corner

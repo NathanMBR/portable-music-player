@@ -131,9 +131,10 @@ describe('playNext and playPrevious', () => {
     playback().playNext()
     expect(session()).toMatchObject({ track: fourthTrack, elapsedSeconds: 83 })
 
-    loadSession({ track: firstTrack })
+    // Within its first seconds, so Previous goes back instead of starting the song over.
+    loadSession({ track: firstTrack, elapsedSeconds: 2 })
     playback().playPrevious()
-    expect(session()).toMatchObject({ track: firstTrack, elapsedSeconds: 83 })
+    expect(session()).toMatchObject({ track: firstTrack, elapsedSeconds: 2 })
   })
 
   it('wrap around the queue with repeat on', () => {
@@ -145,6 +146,151 @@ describe('playNext and playPrevious', () => {
 
     playback().playPrevious()
     expect(session()?.track).toBe(fourthTrack)
+  })
+
+  it('keep the known length of a song that plays again, alone in its queue with repeat all', () => {
+    usePlaybackStore.setState({ repeatMode: 'all' })
+    loadSession({ track: firstTrack, queue: [firstTrack], playOrder: [firstTrack] })
+
+    playback().playNext()
+
+    expect(session()).toMatchObject({ track: firstTrack, elapsedSeconds: 0, durationSeconds: 270 })
+  })
+})
+
+describe('playPrevious', () => {
+  it('starts the current song over past its first 3 seconds, keeping its known length', () => {
+    loadSession({ track: thirdTrack, elapsedSeconds: 83, isPlaying: false })
+
+    playback().playPrevious()
+
+    expect(session()).toMatchObject({
+      track: thirdTrack,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: 270
+    })
+  })
+
+  it('goes to the previous song within the first 3 seconds', () => {
+    loadSession({ track: thirdTrack, elapsedSeconds: 2 })
+
+    playback().playPrevious()
+
+    expect(session()).toMatchObject({
+      track: secondTrack,
+      elapsedSeconds: 0,
+      durationSeconds: null
+    })
+  })
+})
+
+describe('finishSong', () => {
+  it('plays the next song from its start', () => {
+    loadSession({ track: secondTrack, elapsedSeconds: 270 })
+
+    playback().finishSong()
+
+    expect(session()).toMatchObject({
+      track: thirdTrack,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: null
+    })
+  })
+
+  it('goes on to the first song after the last one with repeat all', () => {
+    usePlaybackStore.setState({ repeatMode: 'all' })
+    loadSession({ track: fourthTrack, elapsedSeconds: 270 })
+
+    playback().finishSong()
+
+    expect(session()?.track).toBe(firstTrack)
+  })
+
+  it('plays the same song again with repeat one, keeping its known length', () => {
+    usePlaybackStore.setState({ repeatMode: 'one' })
+    loadSession({ track: secondTrack, elapsedSeconds: 270 })
+
+    playback().finishSong()
+
+    expect(session()).toMatchObject({
+      track: secondTrack,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: 270
+    })
+  })
+
+  it('stays on the last song without repeat, paused and back at its start', () => {
+    loadSession({ track: fourthTrack, elapsedSeconds: 270 })
+
+    playback().finishSong()
+
+    expect(session()).toMatchObject({
+      track: fourthTrack,
+      isPlaying: false,
+      elapsedSeconds: 0,
+      durationSeconds: 270
+    })
+  })
+})
+
+describe('reportProgress and reportDuration', () => {
+  it('keep the time and the length the audio reports', () => {
+    loadSession({ elapsedSeconds: 0, durationSeconds: null })
+
+    playback().reportDuration(270)
+    playback().reportProgress(12.5)
+
+    expect(session()).toMatchObject({ elapsedSeconds: 12.5, durationSeconds: 270 })
+  })
+
+  it('are ignored without a song in the player', () => {
+    playback().reportDuration(270)
+    playback().reportProgress(12.5)
+
+    expect(session()).toBeNull()
+  })
+})
+
+describe('seek', () => {
+  it('moves the position within the song', () => {
+    loadSession({ elapsedSeconds: 83 })
+
+    playback().seek(200)
+
+    expect(session()?.elapsedSeconds).toBe(200)
+  })
+
+  it('keeps the position between the start and the end of the song', () => {
+    loadSession({ elapsedSeconds: 83, durationSeconds: 270 })
+
+    playback().seek(-5)
+    expect(session()?.elapsedSeconds).toBe(0)
+
+    playback().seek(300)
+    expect(session()?.elapsedSeconds).toBe(270)
+  })
+
+  it('is ignored while the length of the song is unknown', () => {
+    loadSession({ elapsedSeconds: 0, durationSeconds: null })
+
+    playback().seek(200)
+
+    expect(session()?.elapsedSeconds).toBe(0)
+  })
+})
+
+describe('pause', () => {
+  it('pauses the song, and leaves a paused one paused', () => {
+    loadSession({ isPlaying: true })
+
+    playback().pause()
+    expect(session()?.isPlaying).toBe(false)
+
+    playback().pause()
+    expect(session()?.isPlaying).toBe(false)
   })
 })
 

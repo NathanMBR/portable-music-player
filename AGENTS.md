@@ -193,7 +193,10 @@ Features and fixes are developed test first. A test states a rule the system mus
 
 **Always run `pnpm lint` before every commit**, and stage any fixes it applies as part of that commit.
 
-**Run `pnpm test` when you finish a task**, to check that everything still works. There's no need to run it again before committing: the CI workflow runs the tests on every push.
+**Run the tests when you finish a task**, to check that everything still works. Only run the tests of the regions of the code you changed; there's no need to run tests for unaffected areas.
+- For TypeScript, pass the changed folders or files to Vitest, e.g. `pnpm exec vitest run src/features/playback`. Run `pnpm test:rs` only when `src-tauri/` changed.
+- Code that others build on counts as changed for them too: a change to `src/components/`, a store, `src/index.css` or `src/testing/` also runs the tests of the code that uses it.
+- There's no need to run them again before committing: the CI workflow runs every test on every push.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../testing/storyParameters'
+import { PLAYER_HEIGHT } from '../playback/constants'
 import { DISMISS_LABEL } from './constants'
 import { NotificationArea } from './NotificationArea'
 import { notify, notifyError } from './notify'
@@ -49,6 +50,17 @@ export const Stacked: Story = {
       "Couldn't open the Songs folder",
       "Couldn't open the Songs folder: no application can open folders"
     )
+    notifyError("Couldn't save the theme", SAVE_ERROR)
+  }
+}
+
+/**
+ * With room kept free at the bottom of the window, like the audio player's height while it's
+ * open, notifications pop up above that room.
+ */
+export const RaisedForThePlayer: Story = {
+  args: { bottomClearance: PLAYER_HEIGHT },
+  beforeEach: () => {
     notifyError("Couldn't save the theme", SAVE_ERROR)
   }
 }

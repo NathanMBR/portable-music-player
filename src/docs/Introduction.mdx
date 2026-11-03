@@ -14,13 +14,24 @@ This Storybook is the detailed documentation of the player's interface. Every co
 
 ## The app shell
 
-`App` lays the window out in three columns:
+`App` fills the window with the view of the current category. `App` maps each category id to its
+view (`viewByCategory`), so the navigation feature never imports the views it switches between.
 
-- **Left:** the menu button, in a column of its own, so views never include it and nothing scrolls
-  under it.
-- **Middle:** the view of the current category. `App` maps each category id to its view
-  (`viewByCategory`), so the navigation feature never imports the views it switches between.
-- **Right:** an empty column as wide as the left one, which keeps the view's side margins equal.
+- **Margins:** the view keeps equal side margins, sized by the `gutter` token (`px-gutter`). The
+  menu button sits in the left one, so views never include it and nothing scrolls under it.
+- **Scrolling:** the window itself never scrolls. A view keeps its header in place and scrolls
+  only the content below it, with the scrollbar along the window's right edge. The content always
+  ends above the player's space, which stays kept while the player is hidden.
+
+The **audio player** (`AudioPlayer`) slides up along the bottom of the window when a song is played,
+and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the
+category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
+song's title above its progress bar in the middle, and the speaker and volume on the right. The
+progress stops growing at a set width, so in wide windows the spaces around it widen instead.
+Clicking the speaker mutes, and clicking it again brings the volume back. The views end above its
+space, and while it's open notifications pop up above it, both sized by the `player` token. No
+audio plays yet: the player shows the playback store's state, and a song's length stays unknown
+(`--:--`) until real audio loads it.
 
 The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
 the side menu included. Notifications pop up there, close by themselves after a few seconds or
@@ -31,14 +42,16 @@ categories from `src/features/navigation/categories.ts` and holds the theme togg
 category switches the view and closes the drawer. Adding a category takes one entry in `CATEGORIES`
 and one view in `viewByCategory`.
 
-The only category so far is **Songs** (`LibraryView`): a sticky header with the song count, then the
+The only category so far is **Songs** (`LibraryView`): a header with the song count, which stays in place while the list scrolls, then the
 song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
-scan. Each song starts with a `PlayButton`; the playback store holds the one song that is playing.
+scan. Each song starts with a `PlayButton`, which plays it in the audio player with the whole list
+as the queue.
 
 ## Where the code lives
 
 - `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`), built on
-  Headless UI and styled with Tailwind.
+  Headless UI and styled with Tailwind. `buttonStyles.ts` holds the looks and states every button
+  shares: the `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
 - `src/features/notifications/`: the notification area and `notify.ts`, the only module that calls
   Sonner, the toast library behind the notifications.
 - `src/features/<feature>/`: everything one feature owns. Its types mirror the Rust structs,

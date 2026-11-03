@@ -1,7 +1,14 @@
 import { Button } from '@headlessui/react'
 import type { ComponentType } from 'react'
+import {
+  ACTIVE_CLASSES,
+  type ButtonVariant,
+  DISABLED_CLASSES,
+  FOCUS_CLASSES,
+  VARIANT_CLASSES
+} from './buttonStyles'
 
-type IconButtonShape = 'circle' | 'square'
+type IconButtonShape = 'circle' | 'square' | 'disc'
 
 type IconButtonProps = {
   /** Heroicon drawn inside the button, usually from `@heroicons/react/20/solid`. */
@@ -11,23 +18,39 @@ type IconButtonProps = {
   /** Runs when the button is clicked or pressed from the keyboard. */
   onClick: () => void
   /**
-   * `circle` is the quiet button of view headers. `square` is the outlined button of the app's
-   * left column (open and close menu).
+   * The button's geometry. `circle` is the round button of headers, song rows and the audio
+   * player. `square` is the button of the app's left column (open and close menu). `disc` is a
+   * larger circle, for the main action of a group, like play and pause in the audio player.
    */
   shape?: IconButtonShape
+  /**
+   * The button's look (`buttonStyles.ts`): `quiet` until hovered, `outlined` with a thin border,
+   * or `filled` with pen, like play and pause in the audio player.
+   */
+  variant?: ButtonVariant
+  /**
+   * Makes the button a toggle, on when `true`: it takes the active look, a pen icon on a pen tint,
+   * and screen readers hear it pressed, like shuffle or a playing song. Leave it out for buttons
+   * that aren't toggles.
+   */
+  isPressed?: boolean
+  /** Fades the button and ignores clicks, like "Next song" on the last song without repeat. */
+  isDisabled?: boolean
   /** Spins the icon while its action runs, e.g. during a library scan. */
   isBusy?: boolean
 }
 
-const classesByShape: Record<IconButtonShape, string> = {
-  circle: 'rounded-full p-2 text-ink-faded data-hover:text-ink',
-  square: 'inline-flex size-10 items-center justify-center rounded-lg border border-rule text-ink'
+const SHAPE_CLASSES: Record<IconButtonShape, string> = {
+  circle: 'rounded-full p-2',
+  square: 'inline-flex size-10 items-center justify-center rounded-lg',
+  disc: 'rounded-full p-2.5'
 }
 
 /**
  * Button that shows only an icon. Its `label` is both the accessible name and the hover tooltip,
- * so the icon never has to explain itself. The spin of `isBusy` stops for users who prefer
- * reduced motion.
+ * so the icon never has to explain itself. Its geometry (`shape`) and its look (`variant`) are
+ * chosen apart. It can be a toggle (`isPressed`) or disabled. The spin of `isBusy` stops for users
+ * who prefer reduced motion.
  *
  * @summary Icon-only button with an accessible label and tooltip
  */
@@ -36,13 +59,18 @@ export const IconButton = ({
   label,
   onClick,
   shape = 'circle',
+  variant = 'quiet',
+  isPressed,
+  isDisabled = false,
   isBusy = false
 }: IconButtonProps) => (
   <Button
     aria-label={label}
+    aria-pressed={isPressed}
     title={label}
+    disabled={isDisabled}
     onClick={onClick}
-    className={`${classesByShape[shape]} data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-pen data-hover:bg-rule/60`}
+    className={`${SHAPE_CLASSES[shape]} ${isPressed ? ACTIVE_CLASSES : VARIANT_CLASSES[variant]} ${DISABLED_CLASSES} ${FOCUS_CLASSES}`}
   >
     <Icon className={isBusy ? 'size-5 motion-safe:animate-spin' : 'size-5'} />
   </Button>

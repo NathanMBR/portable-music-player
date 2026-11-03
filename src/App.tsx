@@ -5,6 +5,9 @@ import { MenuButton } from './features/navigation/MenuButton'
 import { useNavigationStore } from './features/navigation/navigationStore'
 import { SideMenu } from './features/navigation/SideMenu'
 import { NotificationArea } from './features/notifications/NotificationArea'
+import { AudioPlayer } from './features/playback/AudioPlayer'
+import { PLAYER_HEIGHT } from './features/playback/constants'
+import { usePlaybackStore } from './features/playback/playbackStore'
 
 // Kept here, where the features meet, so the navigation feature never imports the views it
 // switches between.
@@ -13,31 +16,33 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
 }
 
 /**
- * The page shell: the side menu, the menu button's column on the left, the current category's
- * view, an empty column on the right that keeps the view's margins equal, and the notification
- * area in the bottom-right corner.
+ * The page shell: the side menu, the current category's view filling the window, with the menu
+ * button in its left margin, the audio player along the bottom while a song is loaded, and the
+ * notification area in the bottom-right corner. The window never scrolls: the view scrolls its own
+ * content, which always ends above the player's space. The player sits outside the views, so a
+ * song keeps playing when the category changes.
  *
  * @summary App shell
  */
 export const App = () => {
   const currentCategory = useNavigationStore(state => state.currentCategory)
+  const isPlayerOpen = usePlaybackStore(state => state.session !== null)
   const CurrentView = viewByCategory[currentCategory]
 
   return (
     <>
       <SideMenu />
-      <div className="flex gap-4 px-6">
-        {/* The menu button has a column of its own, so nothing ever sits under it. An empty
-            column of the same width on the right keeps the view's margins equal on both sides. */}
-        <div className="sticky top-0 w-10 shrink-0 self-start pt-8">
+      {/* The window never scrolls: views scroll their own content, which ends above the player's
+          space. The space stays kept while the player is hidden, so nothing moves when it opens. */}
+      <div className="relative h-dvh pb-player">
+        {/* The menu button sits in the views' left margin, so nothing ever sits under it. */}
+        <div className="absolute top-8 left-6">
           <MenuButton />
         </div>
-        <div className="min-w-0 flex-1">
-          <CurrentView />
-        </div>
-        <div aria-hidden="true" className="w-10 shrink-0" />
+        <CurrentView />
       </div>
-      <NotificationArea />
+      <AudioPlayer />
+      <NotificationArea bottomClearance={isPlayerOpen ? PLAYER_HEIGHT : undefined} />
     </>
   )
 }

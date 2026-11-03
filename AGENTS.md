@@ -57,7 +57,8 @@ src/
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
-  components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice)
+  components/           feature-agnostic UI built on Headless UI (Button, IconButton, Notice), and
+                        buttonStyles.ts: the looks and states every button shares
   features/<feature>/   everything one feature owns
     types.ts            data shapes returned by Rust (mirror the Rust structs)
     <feature>Api.ts     the only place that calls invoke() for the feature
@@ -73,11 +74,14 @@ src/
 
 - Components are `PascalCase.tsx`; other modules are `camelCase.ts`.
 - Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`.
+- Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
 - Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
-- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in a column of its own, so views never include it and nothing sits under it. An empty column of the same width on the right keeps the view's side margins equal. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
+- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Views keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
+- Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`overflow-y-auto` on `main`, with `px-gutter`, so the scrollbar runs along the window's edge). The header and the scroll area both reserve the scrollbar's width (`[scrollbar-gutter:stable]`), so they line up.
+- Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, the space kept for it at the bottom of the window even while it's hidden (`pb-player`), and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it. No audio plays yet: the player shows the playback store's state.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 

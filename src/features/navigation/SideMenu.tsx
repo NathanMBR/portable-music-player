@@ -29,7 +29,13 @@ export const SideMenu = () => {
         className="fixed inset-y-0 left-0 flex w-72 flex-col border-r border-rule bg-paper px-6 pt-8 pb-6 transition duration-200 ease-out data-closed:-translate-x-full motion-reduce:transition-none"
       >
         <div className="flex items-start gap-3">
-          <IconButton icon={XMarkIcon} label="Close menu" shape="square" onClick={closeMenu} />
+          <IconButton
+            icon={XMarkIcon}
+            label="Close menu"
+            shape="square"
+            variant="outlined"
+            onClick={closeMenu}
+          />
           {/* Same type as the page title. The trailing spaces keep the accessible name "Portable Music Player". */}
           <DialogTitle className="text-lg leading-tight font-extrabold tracking-tight text-ink font-stretch-expanded">
             {APP_TITLE_LINES.map(line => (

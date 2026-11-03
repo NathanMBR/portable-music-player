@@ -13,6 +13,14 @@
   --color-pen: #2c46d1;
   --color-correction: #c0362c;
   --color-shade: #1a2463;
+
+  /* The audio player's height (h-player). The space kept for it at the bottom of the window
+     (pb-player) and the notifications' bottom offset use it too, so nothing hides behind it. */
+  --spacing-player: 4.5rem;
+
+  /* The views' side margins (px-gutter): the menu button sits in the left one, with room around it,
+     and the right one mirrors it. The songs' scrollbar runs along its outer edge. */
+  --spacing-gutter: 5rem;
 }
 
 /* data-theme is set before the first paint by index.html and later by the theme toggle. */

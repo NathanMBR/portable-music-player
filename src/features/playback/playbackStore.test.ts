@@ -1,33 +1,255 @@
 import { describe, expect, it } from 'vitest'
-import { usePlaybackStore } from './playbackStore'
+import type { Track } from '../library/types'
+import { type PlaybackSession, usePlaybackStore } from './playbackStore'
 
-const firstTrackPath = 'Songs/A Monster in Her Eyes.mp3'
-const secondTrackPath = 'Songs/Deep Blue.mp3'
+const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
 
-describe('playbackStore', () => {
-  it('starts with no song playing', () => {
-    expect(usePlaybackStore.getState().playingTrackPath).toBeNull()
+const firstTrack = trackTitled('Petrified Eyes')
+const secondTrack = trackTitled('A Monster in Her Eyes')
+const thirdTrack = trackTitled('Viderunt Te Aquae')
+const fourthTrack = trackTitled('Sprouts of Time')
+const queue = [firstTrack, secondTrack, thirdTrack, fourthTrack]
+
+const playback = () => usePlaybackStore.getState()
+const session = () => usePlaybackStore.getState().session
+
+const sortedTitles = (tracks: Track[] | undefined) => tracks?.map(track => track.title).sort()
+
+/** A song that has been playing for a while, from the queue in list order unless overridden. */
+const loadSession = (overrides: Partial<PlaybackSession>) => {
+  usePlaybackStore.setState({
+    session: {
+      track: secondTrack,
+      queue,
+      playOrder: queue,
+      isPlaying: true,
+      elapsedSeconds: 83,
+      durationSeconds: 270,
+      ...overrides
+    }
+  })
+}
+
+describe('playTrack', () => {
+  it('starts with no song, so the player is hidden', () => {
+    expect(session()).toBeNull()
   })
 
-  it('plays the toggled song', () => {
-    usePlaybackStore.getState().togglePlayback(firstTrackPath)
+  it('plays the chosen song from its start, with the list it was played from as the queue', () => {
+    playback().playTrack(secondTrack, queue)
 
-    expect(usePlaybackStore.getState().playingTrackPath).toBe(firstTrackPath)
+    expect(session()).toEqual({
+      track: secondTrack,
+      queue,
+      playOrder: queue,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: null
+    })
   })
 
-  it('plays only one song at a time', () => {
-    usePlaybackStore.getState().togglePlayback(firstTrackPath)
+  it('starts a shuffled order with the chosen song while shuffle is on', () => {
+    usePlaybackStore.setState({ isShuffled: true })
 
-    usePlaybackStore.getState().togglePlayback(secondTrackPath)
+    playback().playTrack(thirdTrack, queue)
 
-    expect(usePlaybackStore.getState().playingTrackPath).toBe(secondTrackPath)
+    expect(session()?.playOrder[0]).toBe(thirdTrack)
+    expect(sortedTitles(session()?.playOrder)).toEqual(sortedTitles(queue))
+  })
+})
+
+describe('togglePlaying', () => {
+  it('pauses the playing song, then resumes it', () => {
+    playback().playTrack(firstTrack, queue)
+
+    playback().togglePlaying()
+    expect(session()?.isPlaying).toBe(false)
+
+    playback().togglePlaying()
+    expect(session()?.isPlaying).toBe(true)
+  })
+})
+
+describe('stop', () => {
+  it('hides the player and forgets the song and its queue', () => {
+    loadSession({})
+
+    playback().stop()
+
+    expect(session()).toBeNull()
   })
 
-  it('stops the playing song when it is toggled again', () => {
-    usePlaybackStore.getState().togglePlayback(firstTrackPath)
+  it('keeps repeat, shuffle, volume and the shown time for the next song', () => {
+    const preferences = {
+      repeatMode: 'one',
+      isShuffled: true,
+      volume: 0.4,
+      shownTime: 'remaining'
+    } as const
+    usePlaybackStore.setState(preferences)
+    loadSession({})
 
-    usePlaybackStore.getState().togglePlayback(firstTrackPath)
+    playback().stop()
 
-    expect(usePlaybackStore.getState().playingTrackPath).toBeNull()
+    expect(playback()).toMatchObject(preferences)
+  })
+})
+
+describe('playNext and playPrevious', () => {
+  it('play the next and the previous song from their start', () => {
+    loadSession({ track: secondTrack })
+
+    playback().playNext()
+    expect(session()).toMatchObject({ track: thirdTrack, elapsedSeconds: 0, durationSeconds: null })
+
+    playback().playPrevious()
+    playback().playPrevious()
+    expect(session()?.track).toBe(firstTrack)
+  })
+
+  it('play the new song even when the current one is paused', () => {
+    loadSession({ track: secondTrack, isPlaying: false })
+
+    playback().playNext()
+
+    expect(session()).toMatchObject({ track: thirdTrack, isPlaying: true })
+  })
+
+  it('follow the play order, which shuffle may have changed', () => {
+    loadSession({
+      track: firstTrack,
+      playOrder: [firstTrack, fourthTrack, secondTrack, thirdTrack]
+    })
+
+    playback().playNext()
+
+    expect(session()?.track).toBe(fourthTrack)
+  })
+
+  it('stay on the song at either end of the queue without repeat', () => {
+    loadSession({ track: fourthTrack })
+    playback().playNext()
+    expect(session()).toMatchObject({ track: fourthTrack, elapsedSeconds: 83 })
+
+    loadSession({ track: firstTrack })
+    playback().playPrevious()
+    expect(session()).toMatchObject({ track: firstTrack, elapsedSeconds: 83 })
+  })
+
+  it('wrap around the queue with repeat on', () => {
+    usePlaybackStore.setState({ repeatMode: 'all' })
+    loadSession({ track: fourthTrack })
+
+    playback().playNext()
+    expect(session()?.track).toBe(firstTrack)
+
+    playback().playPrevious()
+    expect(session()?.track).toBe(fourthTrack)
+  })
+})
+
+describe('cycleRepeatMode', () => {
+  it('cycles from off to all to one, then back to off', () => {
+    expect(playback().repeatMode).toBe('off')
+
+    playback().cycleRepeatMode()
+    expect(playback().repeatMode).toBe('all')
+
+    playback().cycleRepeatMode()
+    expect(playback().repeatMode).toBe('one')
+
+    playback().cycleRepeatMode()
+    expect(playback().repeatMode).toBe('off')
+  })
+})
+
+describe('toggleShuffle', () => {
+  it('keeps the current song and plays the rest of the queue after it in random order', () => {
+    loadSession({ track: thirdTrack })
+
+    playback().toggleShuffle()
+
+    expect(playback().isShuffled).toBe(true)
+    expect(session()?.track).toBe(thirdTrack)
+    expect(session()?.playOrder[0]).toBe(thirdTrack)
+    expect(sortedTitles(session()?.playOrder)).toEqual(sortedTitles(queue))
+  })
+
+  it('returns to the order of the queue when turned off, going on from the current song', () => {
+    usePlaybackStore.setState({ isShuffled: true })
+    loadSession({
+      track: thirdTrack,
+      playOrder: [thirdTrack, firstTrack, fourthTrack, secondTrack]
+    })
+
+    playback().toggleShuffle()
+    expect(playback().isShuffled).toBe(false)
+    expect(session()?.playOrder).toEqual(queue)
+
+    playback().playNext()
+    expect(session()?.track).toBe(fourthTrack)
+  })
+
+  it('can be turned on before any song plays', () => {
+    playback().toggleShuffle()
+
+    expect(playback().isShuffled).toBe(true)
+    expect(session()).toBeNull()
+  })
+})
+
+describe('setVolume', () => {
+  it('starts at full volume and takes the chosen one', () => {
+    expect(playback().volume).toBe(1)
+
+    playback().setVolume(0.4)
+
+    expect(playback().volume).toBe(0.4)
+  })
+})
+
+describe('toggleMute', () => {
+  it('silences the volume, then brings back the one it had', () => {
+    playback().setVolume(0.4)
+
+    playback().toggleMute()
+    expect(playback().volume).toBe(0)
+
+    playback().toggleMute()
+    expect(playback().volume).toBe(0.4)
+  })
+
+  it('brings back full volume when the slider was moved down to silent', () => {
+    playback().setVolume(0.4)
+    playback().toggleMute()
+    playback().toggleMute()
+    playback().setVolume(0)
+
+    playback().toggleMute()
+
+    expect(playback().volume).toBe(1)
+  })
+
+  it('silences a volume moved by the slider after muting, not the one from before', () => {
+    playback().setVolume(0.4)
+    playback().toggleMute()
+    playback().setVolume(0.7)
+
+    playback().toggleMute()
+    playback().toggleMute()
+
+    expect(playback().volume).toBe(0.7)
+  })
+})
+
+describe('toggleShownTime', () => {
+  it('switches the time left of the progress bar between elapsed and remaining', () => {
+    expect(playback().shownTime).toBe('elapsed')
+
+    playback().toggleShownTime()
+    expect(playback().shownTime).toBe('remaining')
+
+    playback().toggleShownTime()
+    expect(playback().shownTime).toBe('elapsed')
   })
 })

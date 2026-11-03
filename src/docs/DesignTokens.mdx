@@ -23,7 +23,7 @@ variants.
   />
   <ColorItem
     title="ink"
-    subtitle="Main text, icons and the strong rule under headers"
+    subtitle="Main text, icons, the strong rule under headers and the thin one above the audio player"
     colors={{ Light: '#1a2463', Dark: '#e4e8f7' }}
   />
   <ColorItem
@@ -33,12 +33,12 @@ variants.
   />
   <ColorItem
     title="rule"
-    subtitle="Dividers, outlines and hover backgrounds"
+    subtitle="Dividers, outlines, hover backgrounds and the empty part of the progress bar"
     colors={{ Light: '#d9dfee', Dark: '#27305c' }}
   />
   <ColorItem
     title="pen"
-    subtitle="Accent: main buttons, the current category, focus outlines, the switch when on"
+    subtitle="Accent: main buttons, the current category, focus outlines, toggles and the switch when on, the progress bar"
     colors={{ Light: '#2c46d1', Dark: '#8fa2ff' }}
   />
   <ColorItem
@@ -59,6 +59,17 @@ variants.
 dimming it. Overlays use `shade` with an opacity (the side menu's backdrop is `bg-shade/30`), which
 stays dark in both themes.
 
+## Sizes
+
+- **`player`** (`--spacing-player: 4.5rem` in `src/index.css`) is the audio player's height
+  (`h-player`). The space kept for it at the bottom of the window (`pb-player`), even while it's
+  hidden, and the notifications' bottom offset while it's open use it too, so nothing hides
+  behind the player.
+- **`gutter`** (`--spacing-gutter: 5rem`) is the views' side margins (`px-gutter`). The menu
+  button sits in the left one, and the songs' scrollbar runs along the outer edge of the right one.
+  The header and the list both reserve the scrollbar's width (`scrollbar-gutter: stable`), so they
+  end at the same place.
+
 ## Type
 
 The only typeface is **Archivo Variable**, bundled with the app through
@@ -67,18 +78,39 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
 
 - **Titles** are `font-extrabold tracking-tight font-stretch-expanded`: the Songs header
   (`text-4xl`) and the app's name in the side menu (`text-lg`).
-- **Song rows** are `font-stretch-semi-condensed`, so long titles fit before they are cut.
+- **Song rows** and the audio player's title are `font-stretch-semi-condensed`, so long titles fit
+  before they are cut.
+- **Playback times** are `tabular-nums`, so the digits don't shift as they count.
 - **Body text** keeps the default width.
 
 ## Interaction states
 
 - Headless UI exposes component states as data attributes. Style them with `data-hover:`,
   `data-focus:`, `data-checked:` and `data-disabled:`, never with `:hover` or `:focus`.
+- **Shared classes:** button looks and states live in `src/components/buttonStyles.ts`, so the
+  same situation looks the same in every component. Components own only their geometry (padding,
+  size, radius).
+- **Looks:** buttons take a `variant`, named by how it looks:
+  - `quiet`: a faded label or icon, with `data-hover:bg-rule/60` and full ink on hover. Header,
+    song row and audio player buttons.
+  - `outlined`: a thin `rule` border around ink, with `data-hover:bg-rule/60`. The menu buttons.
+  - `filled`: `pen` with `paper` on it, `data-hover:bg-pen/90`. The one main action on screen,
+    like "Try again" or play and pause in the audio player.
 - **Focus:** every interactive element shows `data-focus:outline-2 data-focus:outline-offset-2
-  data-focus:outline-pen`.
-- **Hover:** quiet buttons get `data-hover:bg-rule/60`. Pen-filled buttons get
-  `data-hover:bg-pen/90`.
+  data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard. The volume slider uses
+  `outline-offset-4`, so the ring clears its thumb. It also hides the ring after a click, because
+  Headless UI rings inputs on any focus, like text fields.
+- **Active:** whatever is on right now, like a pressed toggle (shuffle, repeat), the playing
+  song's button or the current category, shows `pen` on a pen tint (`bg-pen/15 text-pen`,
+  `bg-pen/20` on hover; `ACTIVE_CLASSES`). The pen color alone would barely differ from the faded
+  icons on the light paper. Toggles also set `aria-pressed`, and the current category
+  `aria-current="page"`.
+- **Disabled:** a button that can't act right now fades with `data-disabled:opacity-40`
+  (`DISABLED_CLASSES`).
 - **Cursors:** buttons show a pointer and disabled ones show `not-allowed` (base styles in
   `src/index.css`).
+- **Sliders:** the volume slider draws its own track, like the progress bar: `pen` up to the value
+  and `rule` after it, with a `pen` thumb that stays inside the track, so at full volume it covers
+  the end.
 - **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
   `motion-reduce:`).

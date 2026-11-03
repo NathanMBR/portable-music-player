@@ -10,12 +10,25 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The main action of a notice, like retrying a failed scan. Clicking it runs `onClick`. */
+/**
+ * The `filled` look, for the main action of a notice, like retrying a failed scan. Clicking it runs
+ * `onClick`.
+ */
 export const Default: Story = {
   play: async ({ args, canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
     await expect(args.onClick).toHaveBeenCalledOnce()
   }
+}
+
+/** A `quiet` text button, for a secondary action next to a filled one. */
+export const Quiet: Story = {
+  args: { children: 'Dismiss', variant: 'quiet' }
+}
+
+/** An `outlined` text button, for a secondary action that should still read as a button. */
+export const Outlined: Story = {
+  args: { children: 'Open folder', variant: 'outlined' }
 }
 
 /** Proves the app's Tailwind theme loaded in Storybook: the button is filled with `pen`. */

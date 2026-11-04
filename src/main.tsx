@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { useLibraryStore } from './features/library/libraryStore'
 import { connectSongAudio } from './features/playback/songAudio'
+import { connectWindowTitle } from './features/playback/windowTitle'
 import { useSettingsStore } from './features/settings/settingsStore'
 import './index.css'
 
@@ -11,6 +12,7 @@ import './index.css'
 void useSettingsStore.getState().restoreSettings()
 void useLibraryStore.getState().scanLibrary()
 connectSongAudio(new Audio())
+connectWindowTitle()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

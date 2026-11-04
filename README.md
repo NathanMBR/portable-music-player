@@ -11,6 +11,8 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Open the `Songs` folder
 - Scan the library again
 - Audio player with shuffle, repeat, volume and seeking
+- Volume from the mouse wheel
+- Window title names the song in the player
 - Side menu with the categories
 - Dark theme
 - Error notifications in the bottom-right corner

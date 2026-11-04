@@ -28,7 +28,8 @@ and away when it's stopped. `App` renders it outside the views, so a song keeps 
 category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
 song's title above its progress bar in the middle, and the speaker and volume on the right. The
 progress stops growing at a set width, so in wide windows the spaces around it widen instead.
-Clicking the speaker mutes, and clicking it again brings the volume back. The views end above its
+Clicking the speaker mutes, and clicking it again brings the volume back, and the mouse wheel over
+the volume turns it up or down by 5%. The views end above its
 space, and while it's open notifications pop up above it, both sized by the `player` token. The
 progress bar is a slider: clicking or dragging it jumps within the song. Past a song's first 3
 seconds, previous starts it over. A song's length shows as `--:--` while its audio loads, and when
@@ -83,6 +84,9 @@ loading, it asks the webview whether it can play MP3 at all: on Linux, a webview
 GStreamer's plugins freezes the app instead of reporting an error, so the player stops there and
 says what to install.
 
+`windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the
+player, playing or paused, and after the app once it's stopped.
+
 ## How the stories run without Tauri
 
 Storybook runs the UI in a plain browser, where there is no Rust side. Three pieces make the stories
@@ -100,8 +104,8 @@ work anyway:
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.
 
-Stories never connect the audio (`songAudio.ts`), so they're silent: the player shows whatever
-progress and length the story puts in the store.
+Stories never connect the audio (`songAudio.ts`) or the window title (`windowTitle.ts`), so
+they're silent: the player shows whatever progress and length the story puts in the store.
 
 The **theme** toolbar switches `data-theme` on `<html>` between `light` and `dark`, like the app's
 own toggle does.

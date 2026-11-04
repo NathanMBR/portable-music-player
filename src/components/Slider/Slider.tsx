@@ -1,5 +1,5 @@
 import { Input } from '@headlessui/react'
-import { useState } from 'react'
+import { useState, type WheelEvent } from 'react'
 import { DISABLED_CLASSES } from '../buttonStyles'
 
 type SliderProps = {
@@ -15,6 +15,8 @@ type SliderProps = {
   onChange: (value: number) => void
   /** Fades the slider and ignores input, like the song's position while its length is unknown. */
   isDisabled?: boolean
+  /** How far one turn of the mouse wheel over the slider moves it. Without it, the wheel doesn't. */
+  wheelStep?: number
 }
 
 // The browser's own slider leaves the end of its track uncovered at the maximum, so the track and
@@ -31,6 +33,8 @@ const KEYBOARD_FOCUS_CLASSES =
 // mouse doesn't need a ring. outline-none also hides the browser's own ring in that case.
 const POINTER_FOCUS_CLASSES = 'outline-none'
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+
 const toPercent = (value: number, max: number) => (max > 0 ? (value / max) * 100 : 0)
 
 // The track is pen up to the value and rule after it.
@@ -40,9 +44,9 @@ const trackFill = (percent: number) =>
 /**
  * A slider in the app's look: its track is pen up to the value and rule after it, with a pen thumb
  * that stays inside the track. Dragging, clicking and the keyboard (arrows, Page Up and Down, Home,
- * End) move it. Reached from the keyboard it shows a focus ring, wider than other controls' so it
- * clears the thumb; clicked with the mouse it doesn't. It fills its container's width, so the
- * parent sets how wide it is.
+ * End) move it, and so does the mouse wheel over it when given a `wheelStep`. Reached from the
+ * keyboard it shows a focus ring, wider than other controls' so it clears the thumb; clicked with
+ * the mouse it doesn't. It fills its container's width, so the parent sets how wide it is.
  *
  * @summary Slider with a drawn track and a keyboard-only focus ring
  */
@@ -52,9 +56,17 @@ export const Slider = ({
   max,
   valueText,
   onChange,
-  isDisabled = false
+  isDisabled = false,
+  wheelStep
 }: SliderProps) => {
   const [isFocusedByPointer, setIsFocusedByPointer] = useState(false)
+
+  // Wheeling up raises the value, like turning a knob. A turn that only scrolls sideways is no move.
+  const moveWithWheel = (event: WheelEvent<HTMLInputElement>) => {
+    if (!wheelStep || isDisabled || event.deltaY === 0) return
+    const movedValue = clamp(value + (event.deltaY < 0 ? wheelStep : -wheelStep), 0, max)
+    if (movedValue !== value) onChange(movedValue)
+  }
 
   return (
     <Input
@@ -66,6 +78,7 @@ export const Slider = ({
       aria-label={label}
       aria-valuetext={valueText}
       onChange={event => onChange(Number(event.target.value))}
+      onWheel={moveWithWheel}
       onPointerDown={() => setIsFocusedByPointer(true)}
       onBlur={() => setIsFocusedByPointer(false)}
       style={{ background: trackFill(toPercent(value, max)) }}

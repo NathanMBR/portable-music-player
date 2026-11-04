@@ -64,3 +64,36 @@ export const FocusedFromTheKeyboard: Story = {
     await expect(getComputedStyle(slider).outlineStyle).toBe('solid')
   }
 }
+
+/** With a `wheelStep`, the mouse wheel over the slider moves it: up raises it, down lowers it. */
+export const MovesWithTheWheel: Story = {
+  args: { wheelStep: 5 },
+  play: async ({ args, canvas }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.wheel(slider, { deltaY: -100 })
+    await expect(args.onChange).toHaveBeenLastCalledWith(45)
+
+    fireEvent.wheel(slider, { deltaY: 100 })
+    await expect(args.onChange).toHaveBeenLastCalledWith(35)
+  }
+}
+
+/** The wheel stops the slider at its ends instead of carrying it past them. */
+export const StopsAtTheEndsWithTheWheel: Story = {
+  args: { value: 98, valueText: '98%', wheelStep: 5 },
+  play: async ({ args, canvas }) => {
+    fireEvent.wheel(canvas.getByRole('slider', { name: 'Volume' }), { deltaY: -100 })
+
+    await expect(args.onChange).toHaveBeenCalledWith(100)
+  }
+}
+
+/** Without a `wheelStep`, the wheel leaves the slider where it is. */
+export const IgnoresTheWheelWithoutAStep: Story = {
+  play: async ({ args, canvas }) => {
+    fireEvent.wheel(canvas.getByRole('slider', { name: 'Volume' }), { deltaY: -100 })
+
+    await expect(args.onChange).not.toHaveBeenCalled()
+  }
+}

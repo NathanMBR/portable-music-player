@@ -63,3 +63,20 @@ export const ChangesTheVolume: Story = {
     await expect(slider).toHaveAttribute('aria-valuetext', '40%')
   }
 }
+
+/** The mouse wheel over the slider turns the volume up or down by 5%. */
+export const ChangesTheVolumeWithTheWheel: Story = {
+  beforeEach: () => {
+    usePlaybackStore.setState({ volume: 0.6 })
+  },
+  play: async ({ canvas }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.wheel(slider, { deltaY: 100 })
+    await expect(usePlaybackStore.getState().volume).toBe(0.55)
+
+    fireEvent.wheel(slider, { deltaY: -100 })
+    fireEvent.wheel(slider, { deltaY: -100 })
+    await expect(slider).toHaveAttribute('aria-valuetext', '65%')
+  }
+}

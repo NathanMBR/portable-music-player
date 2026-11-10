@@ -1,8 +1,8 @@
 import type { InvokeArgs } from '@tauri-apps/api/core'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { failingCommand, mockCommands } from '../../testing/mockCommands'
+import { type CommandHandler, failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
-import type { Track } from '../library/types'
+import type { SongSource, Track } from '../library/types'
 import { usePlaybackStore } from './playbackStore'
 import { connectSongAudio, type ObjectUrls, type SongAudio } from './songAudio'
 
@@ -94,6 +94,25 @@ const bytesOf = (track: Track) => `the bytes of ${track.path}`
 const readSong = (args?: InvokeArgs) =>
   new TextEncoder().encode(`the bytes of ${requestedPath(args)}`).buffer
 
+/** A track's URL on the song server, which these tests make up from its path. */
+const streamUrlOf = (path: string) => `http://127.0.0.1:41234/token/${encodeURIComponent(path)}`
+
+const streamSource = (args?: InvokeArgs): SongSource => ({
+  kind: 'stream',
+  url: streamUrlOf(requestedPath(args))
+})
+
+const memorySource = (): SongSource => ({ kind: 'memory' })
+
+/** Rust's answers where songs play from memory (Windows): their whole file, from `read_song`. */
+const songsFromMemory: Record<string, CommandHandler> = {
+  song_source: memorySource,
+  read_song: readSong
+}
+
+/** Rust's answers where songs stream from the song server (Linux). */
+const streamedSongs: Record<string, CommandHandler> = { song_source: streamSource }
+
 const playback = () => usePlaybackStore.getState()
 const session = () => usePlaybackStore.getState().session
 
@@ -115,6 +134,9 @@ const settle = () => new Promise(resolve => setTimeout(resolve))
 const waitUntilPlaying = (connected: ConnectedAudio, track: Track) =>
   vi.waitFor(async () => expect(await playedBytes(connected)).toBe(bytesOf(track)))
 
+const waitUntilStreaming = ({ audio }: ConnectedAudio, track: Track) =>
+  vi.waitFor(() => expect(audio.src).toBe(streamUrlOf(track.path)))
+
 /** Starts `track` from the queue and waits for its audio to load. */
 const startPlaying = async (connected: ConnectedAudio, track: Track) => {
   playback().playTrack(track, queue)
@@ -122,8 +144,42 @@ const startPlaying = async (connected: ConnectedAudio, track: Track) => {
 }
 
 describe('connectSongAudio', () => {
+  it('streams a song from the address Rust serves it at', async () => {
+    const readSongFromRust = vi.fn(readSong)
+    mockCommands({ ...streamedSongs, read_song: readSongFromRust })
+    const connected = connectAudio()
+
+    playback().playTrack(firstTrack, queue)
+
+    await waitUntilStreaming(connected, firstTrack)
+    expect(connected.audio.paused).toBe(false)
+    expect(readSongFromRust).not.toHaveBeenCalled()
+    expect(connected.objectUrls.live.size).toBe(0)
+  })
+
+  it('streams only the newest song when songs start faster than Rust answers', async () => {
+    const answers = new Map<string, () => void>()
+    mockCommands({
+      song_source: args =>
+        new Promise(resolve => {
+          answers.set(requestedPath(args), () => resolve(streamSource(args)))
+        })
+    })
+    const connected = connectAudio()
+    playback().playTrack(firstTrack, queue)
+    playback().playTrack(secondTrack, queue)
+    await vi.waitFor(() => expect(answers.size).toBe(2))
+
+    answers.get(secondTrack.path)?.()
+    await waitUntilStreaming(connected, secondTrack)
+    answers.get(firstTrack.path)?.()
+    await settle()
+
+    expect(connected.audio.src).toBe(streamUrlOf(secondTrack.path))
+  })
+
   it('plays a song that starts from the bytes Rust reads from its file', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
 
     await startPlaying(connected, secondTrack)
@@ -133,7 +189,7 @@ describe('connectSongAudio', () => {
   })
 
   it("lets go of a song's bytes when another one starts, and of the last one on Stop", async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     await startPlaying(connected, firstTrack)
 
@@ -145,7 +201,7 @@ describe('connectSongAudio', () => {
   })
 
   it('pauses and resumes with the player', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -167,7 +223,7 @@ describe('connectSongAudio', () => {
   })
 
   it('reports the length of the song and how far it has played', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -179,7 +235,7 @@ describe('connectSongAudio', () => {
   })
 
   it('jumps to the position chosen in the player', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -192,7 +248,7 @@ describe('connectSongAudio', () => {
   })
 
   it("doesn't pull the audio back to the time it last reported", async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -206,7 +262,7 @@ describe('connectSongAudio', () => {
   })
 
   it('goes on to the next song when one ends', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -218,7 +274,7 @@ describe('connectSongAudio', () => {
   })
 
   it('starts the song over when it ends with repeat one', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     usePlaybackStore.setState({ repeatMode: 'one' })
@@ -233,7 +289,7 @@ describe('connectSongAudio', () => {
   })
 
   it('stops the audio when the player is stopped', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
@@ -246,6 +302,7 @@ describe('connectSongAudio', () => {
   it('plays only the newest song when songs start faster than Rust reads them', async () => {
     const answers = new Map<string, () => void>()
     mockCommands({
+      song_source: memorySource,
       read_song: args =>
         new Promise(resolve => {
           answers.set(requestedPath(args), () => resolve(readSong(args)))
@@ -267,7 +324,7 @@ describe('connectSongAudio', () => {
 
   it("notifies and pauses when Rust can't find the song, and tries again on Play", async () => {
     const reason = `Couldn't find ${thirdTrack.path}: it may have been moved, renamed or deleted`
-    mockCommands({ read_song: failingCommand(reason) })
+    mockCommands({ song_source: failingCommand(reason) })
     const connected = connectAudio()
 
     playback().playTrack(thirdTrack, queue)
@@ -279,7 +336,7 @@ describe('connectSongAudio', () => {
     )
     expect(session()?.isPlaying).toBe(false)
 
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     playback().togglePlaying()
 
     await waitUntilPlaying(connected, thirdTrack)
@@ -287,7 +344,7 @@ describe('connectSongAudio', () => {
   })
 
   it("notifies and pauses when the audio can't play the file", async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, secondTrack)
@@ -306,8 +363,9 @@ describe('connectSongAudio', () => {
 
   it("refuses to play when this computer can't play MP3 files, and says what to install", async () => {
     const track = trackTitled('Rebirth')
+    const songSourceFromRust = vi.fn(memorySource)
     const readSongFromRust = vi.fn(readSong)
-    mockCommands({ read_song: readSongFromRust })
+    mockCommands({ song_source: songSourceFromRust, read_song: readSongFromRust })
     const audio = new FakeAudio()
     audio.canPlayType = () => ''
     connectAudio(audio)
@@ -324,12 +382,13 @@ describe('connectSongAudio', () => {
       }
     ])
     expect(session()?.isPlaying).toBe(false)
+    expect(songSourceFromRust).not.toHaveBeenCalled()
     expect(readSongFromRust).not.toHaveBeenCalled()
     expect(audio.src).toBe('')
   })
 
   it('notifies and pauses when the webview refuses to play', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const audio = new FakeAudio()
     audio.play = () => Promise.reject(new DOMException('Autoplay is blocked', 'NotAllowedError'))
     connectAudio(audio)
@@ -345,7 +404,7 @@ describe('connectSongAudio', () => {
   })
 
   it('ignores a play request that a newer song or a pause cut short', async () => {
-    mockCommands({ read_song: readSong })
+    mockCommands(songsFromMemory)
     const audio = new FakeAudio()
     audio.play = () => Promise.reject(new DOMException('Interrupted by a new load', 'AbortError'))
     const connected = connectAudio(audio)

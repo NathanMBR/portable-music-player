@@ -77,12 +77,14 @@ scan, it shows a calm `Notice` with what to do next.
 Songs play through one more loop. `songAudio.ts`, connected once from `main.tsx`, is the only
 module that touches the audio. It follows the playback store's song, play state, position and
 volume, and reports the song's length, progress and end back to the store, which decides what plays
-next. To load a song it asks Rust for the song's file as raw bytes (`read_song`) and plays them from
-memory, through an object URL: the Linux webview can't stream audio from Tauri's own file URLs. A
-song that can't play raises "Couldn't play" with its title, and the player pauses on it. Before
-loading, it asks the webview whether it can play MP3 at all: on Linux, a webview missing
-GStreamer's plugins freezes the app instead of reporting an error, so the player stops there and
-says what to install.
+next. To load a song it asks Rust where the song plays from (`song_source`). On Linux the song
+streams from a small HTTP server that Rust runs for this computer only, because the Linux webview
+skips ahead in large songs played from memory. On Windows Rust sends the song's file as raw bytes
+(`read_song`), and the audio plays them from memory, through an object URL. Neither webview can
+stream audio from Tauri's own file URLs. A song that can't play raises "Couldn't play" with its
+title, and the player pauses on it. Before loading, it asks the webview whether it can play MP3 at
+all: on Linux, a webview missing GStreamer's plugins freezes the app instead of reporting an error,
+so the player stops there and says what to install.
 
 `windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the
 player, playing or paused, and after the app once it's stopped.

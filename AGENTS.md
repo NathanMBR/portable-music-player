@@ -90,7 +90,10 @@ src/
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`overflow-y-auto` on `main`, with `px-gutter`, so the scrollbar runs along the window's edge). The header and the scroll area both reserve the scrollbar's width (`[scrollbar-gutter:stable]`), so they line up.
 - Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, the space kept for it at the bottom of the window even while it's hidden (`pb-player`), and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it.
   - The audio plays from `src/features/playback/songAudio.ts`, the only module that touches it. `main.tsx` connects it once to an `Audio` element, which then follows the playback store (song, play state, position, volume) and reports the song's length, progress and end back to it. Stories never connect it, so they stay silent.
-  - Songs play from memory: `read_song` (`library.rs`) finds a track's file from its relative path and sends the whole file as raw bytes (`tauri::ipc::Response`), and `songAudio.ts` plays them from an object URL, freed when the song changes. The frontend never handles absolute paths. Tauri's asset protocol (`convertFileSrc`) can't be used for audio: WebKitGTK's media backend can't stream from a custom URI scheme, and `play()` fails with `NotSupportedError`. A CSP added later must allow `blob:` as a media source.
+  - Where songs play from depends on the OS, and Rust decides: `song_source` (`library.rs`) finds a track's file from its relative path and answers `stream` on Linux or `memory` on Windows (`STREAMS_SONGS`). The frontend never handles absolute paths.
+    - On Linux they stream from `song_server.rs`, a small HTTP server on `127.0.0.1`, started with the first song: a random port, a random token in every URL, Range requests for seeking, and only the MP3s of the Songs folder. Blob URLs can't be used there: WebKitGTK 2.48+ plays `blob:` media through a 2 MB ring buffer that skips ahead in larger files while the timer keeps counting.
+    - On Windows `read_song` sends the whole file as raw bytes (`tauri::ipc::Response`), and `songAudio.ts` plays them from an object URL, freed when the song changes. WebView2 plays those fine, and the song server would run into its planned Local Network Access checks on requests to `127.0.0.1`.
+    - Tauri's asset protocol (`convertFileSrc`) can't be used for audio: WebKitGTK's media backend can't stream from a custom URI scheme, and `play()` fails with `NotSupportedError`. A CSP added later must allow `blob:` and `http://127.0.0.1:*` as media sources.
   - `windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the player (`setTitle`, allowed by `core:window:allow-set-title` in the capabilities), and after the app while there is none. It sets the title only when it changes, since the store changes a few times a second while a song plays.
   - Before loading a song, `songAudio.ts` checks `canPlayType('audio/mpeg')` and, if it's empty, notifies what to install instead. WebKitGTK freezes the whole app, with no `error` event, as soon as it gets a source that GStreamer lacks the plugins (`appsink`, `autoaudiosink`, an MP3 decoder) to play.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
@@ -103,6 +106,11 @@ src/
   - The window starts hidden (`"visible": false` in `tauri.conf.json`). `show()` reads the saved size from the plugin's file, shrinks it to fit the current screen, centers it, and only then shows the window, so it never visibly jumps.
   - The plugin's own restore is skipped because on Linux it applies the size asynchronously, too late for centering. For the same reason Tauri's `center()` can't be used: GTK reports a 0×0 outer size until the window is first drawn.
 - One module per feature (e.g. `library.rs`) holding its constants, data structs, commands and error enum.
+- `song_server.rs`: the HTTP server that streams songs to the Linux webview, on `std::net` with no HTTP crate.
+  - It answers one request per connection, each on its own thread, since sending a song takes as long as the webview takes to read it.
+  - Every request goes through `library::find_song_in`, the same check as `song_source`, so the server reaches no other file.
+  - Its threads must never panic: the release build aborts on panic, which would kill the app. A failed write only means the webview let go of the song.
+  - Responses carry `Cache-Control: no-store`, so the webview doesn't copy songs into its cache on the computer.
 - `settings.rs`: user settings in `settings.json` next to the executable.
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added.
   - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
@@ -147,7 +155,7 @@ These follow from the project goal and are easy to get wrong:
 
 | Layer | Where | Runs with |
 |---|---|---|
-| Rust: file system, data formats, window sizing | `#[cfg(test)] mod tests` at the bottom of the module | `pnpm test:rs` |
+| Rust: file system, data formats, window sizing, the song server | `#[cfg(test)] mod tests` at the bottom of the module | `pnpm test:rs` |
 | Frontend logic: helpers and stores | `*.test.ts` next to the module | Vitest `unit` project (jsdom) |
 | Components: rendering, interactions, accessibility | stories and their `play` functions | Vitest `storybook` project (headless Chromium) |
 

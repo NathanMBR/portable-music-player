@@ -1,4 +1,4 @@
-import { readSong } from '../library/libraryApi'
+import { readSong, songSource } from '../library/libraryApi'
 import type { Track } from '../library/types'
 import { notifyError } from '../notifications/notify'
 import { type PlaybackSession, usePlaybackStore } from './playbackStore'
@@ -23,8 +23,11 @@ export type SongAudio = Pick<
 /** The song the audio holds: still being read by Rust, ready to play, or failed to load. */
 type LoadedSong = { path: string; status: 'reading' | 'ready' | 'failed' }
 
-/** The browser's object URLs, through which the audio plays a song's bytes from memory. */
+/** The webview's object URLs, through which the audio plays a song's bytes from memory (Windows). */
 export type ObjectUrls = Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>
+
+/** What the audio needs to play a song: the URL it streams from, or the bytes of its file. */
+type PlayableSong = { url: string } | { bytes: ArrayBuffer }
 
 type FollowedState = { session: PlaybackSession | null; volume: number }
 
@@ -57,12 +60,22 @@ const isCutShort = (error: unknown) => error instanceof DOMException && error.na
 
 const playback = () => usePlaybackStore.getState()
 
+// Rust says where a song plays from on this OS. Songs that play from memory need their bytes too.
+const fetchPlayableSong = async (track: Track): Promise<PlayableSong> => {
+  const source = await songSource(track.path)
+  return source.kind === 'stream' ? { url: source.url } : { bytes: await readSong(track.path) }
+}
+
 /**
  * Plays the playback store's songs through `audio`, for as long as the app runs, and reports their
  * length, progress and end back to the store. The store is the source of truth: the audio follows
- * its song, play state, position and volume. Each song plays from memory, through an object URL of
- * the bytes Rust reads: WebKitGTK can't stream media from a custom URI scheme like Tauri's asset
- * protocol. Returns a function that stops following the store.
+ * its song, play state, position and volume.
+ *
+ * Rust decides where each song plays from (`song_source`). On Linux it streams from the song
+ * server Rust runs on this computer, since WebKitGTK skips ahead in songs over 2 MiB played from
+ * memory. On Windows it plays from memory, through an object URL of the bytes Rust reads. Neither
+ * webview can play media from a custom URI scheme like Tauri's asset protocol. Returns a function
+ * that stops following the store.
  */
 export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL) => {
   let loadedSong: LoadedSong | null = null
@@ -89,7 +102,8 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     }
   }
 
-  // Stops the audio at once, so the old song sends no more progress, and frees its bytes.
+  // Stops the audio at once, so the old song sends no more progress, and lets go of its stream or
+  // frees its bytes.
   const releaseSource = () => {
     audio.pause()
     audio.removeAttribute('src')
@@ -102,6 +116,13 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   // freezes the whole app instead of failing with an error.
   const canPlaySongs = () => audio.canPlayType(SONG_TYPE) !== ''
 
+  // Made only for the song that is still current, so no stale song's bytes are left unfreed.
+  const addressOf = (song: PlayableSong) => {
+    if ('url' in song) return song.url
+    objectUrl = objectUrls.createObjectURL(new Blob([song.bytes], { type: SONG_TYPE }))
+    return objectUrl
+  }
+
   const load = async (track: Track) => {
     releaseSource()
     const song: LoadedSong = { path: track.path, status: 'reading' }
@@ -112,12 +133,11 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
       return
     }
     try {
-      const bytes = await readSong(track.path)
-      // Another song started, or the player was stopped, while Rust was reading this one.
+      const playableSong = await fetchPlayableSong(track)
+      // Another song started, or the player was stopped, while Rust was answering for this one.
       if (loadedSong !== song) return
 
-      objectUrl = objectUrls.createObjectURL(new Blob([bytes], { type: SONG_TYPE }))
-      audio.src = objectUrl
+      audio.src = addressOf(playableSong)
       song.status = 'ready'
       followPlaying(playback().session?.isPlaying ?? false)
     } catch (error) {

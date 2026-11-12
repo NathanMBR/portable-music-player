@@ -4,7 +4,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 
 ## Features
 
-- Runs from a flash drive on Linux and Windows, without installation
+- Can run without installation on Windows and Linux
 - Keeps all its data next to the executable
 - Songs library from the `Songs` folder
 - Songs sorted alphabetically

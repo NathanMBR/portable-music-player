@@ -14,8 +14,9 @@
   --color-correction: #c0362c;
   --color-shade: #1a2463;
 
-  /* The audio player's height (h-player). The space kept for it at the bottom of the window
-     (pb-player) and the notifications' bottom offset use it too, so nothing hides behind it. */
+  /* The audio player's height (h-player). The space kept for it at the bottom of the window while
+     it's open (pb-player) and the notifications' bottom offset use it too, so nothing hides
+     behind it. */
   --spacing-player: 4.5rem;
 
   /* The views' side margins (px-gutter): the menu button sits in the left one, with room around it,

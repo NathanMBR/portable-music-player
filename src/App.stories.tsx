@@ -184,9 +184,9 @@ export const NotifiesAboveThePlayer: Story = {
 }
 
 /**
- * A list too long for the window scrolls on its own, from under the header down to the player's
- * space. The space stays kept while the player is hidden, so the list ends at the same place when
- * a song starts, and the scrollbar runs along the window's right edge.
+ * A list too long for the window scrolls on its own, from under the header down to the window's
+ * bottom edge, with the scrollbar along its right edge. While a song is in the player, the list
+ * ends above the player instead, and it reaches the bottom edge again once the player is stopped.
  */
 export const ScrollsOnlyTheSongs: Story = {
   beforeEach: () => {
@@ -203,12 +203,20 @@ export const ScrollsOnlyTheSongs: Story = {
     await expect(songs.scrollHeight).toBeGreaterThan(songs.clientHeight)
     await expect(songsBox.top).toBe(canvas.getByRole('banner').getBoundingClientRect().bottom)
     await expect(songsBox.right).toBe(window?.innerWidth)
+    await expect(songsBox.bottom).toBe(window?.innerHeight)
 
     await userEvent.click(canvas.getByRole('button', { name: 'Play Lease of Life' }))
 
     const player = await canvas.findByRole('region', { name: 'Player' })
-    // The player slides up, so its place is checked once it has settled.
-    await waitFor(() => expect(player.getBoundingClientRect().top).toBe(songsBox.bottom))
-    await expect(songs.getBoundingClientRect().bottom).toBe(songsBox.bottom)
+    // The player slides up, so its place is checked once it has settled at the bottom edge.
+    await waitFor(() => {
+      const playerBox = player.getBoundingClientRect()
+      expect(playerBox.bottom).toBe(window?.innerHeight)
+      expect(songs.getBoundingClientRect().bottom).toBe(playerBox.top)
+    })
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Stop' }))
+
+    await waitFor(() => expect(songs.getBoundingClientRect().bottom).toBe(window?.innerHeight))
   }
 }

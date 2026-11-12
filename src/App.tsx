@@ -19,8 +19,8 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
  * The page shell: the side menu, the current category's view filling the window, with the menu
  * button in its left margin, the audio player along the bottom while a song is loaded, and the
  * notification area in the bottom-right corner. The window never scrolls: the view scrolls its own
- * content, which always ends above the player's space. The player sits outside the views, so a
- * song keeps playing when the category changes.
+ * content, which reaches the window's bottom edge, or ends above the player while it's open. The
+ * player sits outside the views, so a song keeps playing when the category changes.
  *
  * @summary App shell
  */
@@ -32,9 +32,11 @@ export const App = () => {
   return (
     <>
       <SideMenu />
-      {/* The window never scrolls: views scroll their own content, which ends above the player's
-          space. The space stays kept while the player is hidden, so nothing moves when it opens. */}
-      <div className="relative h-dvh pb-player">
+      {/* The window never scrolls: views scroll their own content. The player's space opens and
+          closes as it slides, so the content ends above the player only while it's there. */}
+      <div
+        className={`relative h-dvh transition-[padding] duration-300 ease-out motion-reduce:transition-none ${isPlayerOpen ? 'pb-player' : ''}`}
+      >
         {/* The menu button sits in the views' left margin, so nothing ever sits under it. */}
         <div className="absolute top-8 left-6">
           <MenuButton />

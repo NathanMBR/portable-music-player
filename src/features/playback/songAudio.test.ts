@@ -458,6 +458,14 @@ describe("the progress between the audio's reports", () => {
     expect(audio.currentTime).toBe(10)
   })
 
+  it('moves on every tenth of a second, so the bar fills smoothly', async () => {
+    await streamWithClockMovingAt(trackTitled('Paradise'), 10)
+
+    vi.advanceTimersByTime(100)
+
+    expect(session()?.elapsedSeconds).toBeCloseTo(10.1)
+  })
+
   it("waits for the audio's clock to move again after a jump", async () => {
     const audio = await streamWithClockMovingAt(trackTitled('Streets of Tomorrow'), 10)
     playback().seek(100)

@@ -12,6 +12,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Scan the library again
 - Audio player with shuffle, repeat, volume and seeking
 - Volume from the mouse wheel
+- Seeking from the arrow keys
 - Window title names the song in the player
 - Side menu with the categories
 - Dark theme

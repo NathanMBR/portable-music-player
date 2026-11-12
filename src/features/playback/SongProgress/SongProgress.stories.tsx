@@ -36,6 +36,14 @@ export const Midway: Story = {
   }
 }
 
+/** The bar moves in tenths of a second, so it fills smoothly, even on short songs. */
+export const MovesInTenthsOfASecond: Story = {
+  args: { elapsedSeconds: 83.46 },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('slider', { name: 'Song position' })).toHaveValue('83.5')
+  }
+}
+
 /**
  * While a song's audio loads, its length is unknown: the bar stays empty and disabled, since there
  * is nowhere to jump to yet, and the length is dashes.
@@ -88,5 +96,32 @@ export const SeeksWithinTheSong: Story = {
     })
 
     await expect(usePlaybackStore.getState().session?.elapsedSeconds).toBe(200)
+  }
+}
+
+/** On the bar, the arrow keys jump five seconds: right and up forward, left and down back. */
+export const JumpsFiveSecondsWithTheArrowKeys: Story = {
+  parameters: renderInOwnFrame(80),
+  beforeEach: () => {
+    const track: Track = { path: 'Songs/Wuthering Heights.mp3', title: 'Wuthering Heights' }
+    usePlaybackStore.setState({
+      session: {
+        track,
+        queue: [track],
+        playOrder: [track],
+        isPlaying: true,
+        elapsedSeconds: 83,
+        durationSeconds: 270
+      }
+    })
+  },
+  play: async ({ canvas, userEvent }) => {
+    const elapsedSeconds = () => usePlaybackStore.getState().session?.elapsedSeconds
+    canvas.getByRole('slider', { name: 'Song position' }).focus()
+
+    await userEvent.keyboard('{ArrowRight}')
+    await expect(elapsedSeconds()).toBe(88)
+    await userEvent.keyboard('{ArrowLeft}')
+    await expect(elapsedSeconds()).toBe(78)
   }
 }

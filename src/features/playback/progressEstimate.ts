@@ -1,3 +1,5 @@
+import { MS_PER_SECOND } from './constants'
+
 /** A position in the song, and the moment it held, in `performance.now()` milliseconds. */
 export type TimedPosition = { seconds: number; atMs: number }
 
@@ -14,8 +16,6 @@ export type ProgressClock = {
 // On Linux the audio's clock was seen holding still for up to 9 s, then catching up, while the
 // song played on. Further ahead of it than this, the audio itself must have stopped.
 const MAX_LEAD_SECONDS = 10
-
-const MS_PER_SECOND = 1000
 
 const runOn = (anchor: TimedPosition, atMs: number) =>
   anchor.seconds + (atMs - anchor.atMs) / MS_PER_SECOND

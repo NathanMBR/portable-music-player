@@ -1,6 +1,7 @@
 import { readSong, songSource } from '../library/libraryApi'
 import type { Track } from '../library/types'
 import { notifyError } from '../notifications/notify'
+import { MS_PER_SECOND, POSITION_STEP_SECONDS } from './constants'
 import { type PlaybackSession, usePlaybackStore } from './playbackStore'
 import { anchorAfterReport, estimateProgress, type TimedPosition } from './progressEstimate'
 
@@ -52,8 +53,9 @@ const MEDIA_ERROR_REASONS: Record<number, string> = {
 
 const UNKNOWN_MEDIA_ERROR = "The file couldn't be played."
 
-// As often as the webview reports the audio's position while it plays.
-const PROGRESS_TICK_MS = 250
+// One step of the song's position at a time, more often than the webview's reports (every 250 ms),
+// so the progress bar fills smoothly.
+const PROGRESS_TICK_MS = POSITION_STEP_SECONDS * MS_PER_SECOND
 
 const describeMediaError = (error: MediaError | null) =>
   (error && MEDIA_ERROR_REASONS[error.code]) ?? UNKNOWN_MEDIA_ERROR

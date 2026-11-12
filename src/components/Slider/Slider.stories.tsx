@@ -32,6 +32,17 @@ export const NearTheEnd: Story = {
 }
 
 /**
+ * With a `step`, the thumb stops on the step nearest the value, and the pen ends under it, like the
+ * song's position, which moves in tenths of a second.
+ */
+export const StopsOnItsStep: Story = {
+  args: { label: 'Song position', value: 12.34, max: 30, step: 0.1, valueText: '00:12 of 00:30' },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('slider', { name: 'Song position' })).toHaveValue('12.3')
+  }
+}
+
+/**
  * A slider that can't move right now fades and ignores input, like the song's position while its
  * length is still unknown.
  */
@@ -94,6 +105,38 @@ export const StopsAtTheEndsWithTheWheel: Story = {
   args: { value: 98, valueText: '98%', wheelStep: 5 },
   play: async ({ args, canvas }) => {
     fireEvent.wheel(canvas.getByRole('slider', { name: 'Volume' }), { deltaY: -100 })
+
+    await expect(args.onChange).toHaveBeenCalledWith(100)
+  }
+}
+
+/**
+ * With an `arrowKeyStep`, each arrow key moves the slider that far: right and up raise it, left
+ * and down lower it.
+ */
+export const MovesWithTheArrowKeys: Story = {
+  args: { arrowKeyStep: 5 },
+  play: async ({ args, userEvent }) => {
+    await userEvent.tab()
+
+    await userEvent.keyboard('{ArrowRight}')
+    await expect(args.onChange).toHaveBeenLastCalledWith(45)
+    await userEvent.keyboard('{ArrowLeft}')
+    await expect(args.onChange).toHaveBeenLastCalledWith(35)
+    await userEvent.keyboard('{ArrowUp}')
+    await expect(args.onChange).toHaveBeenLastCalledWith(45)
+    await userEvent.keyboard('{ArrowDown}')
+    await expect(args.onChange).toHaveBeenLastCalledWith(35)
+  }
+}
+
+/** The arrow keys stop the slider at its ends instead of carrying it past them. */
+export const StopsAtTheEndsWithTheArrowKeys: Story = {
+  args: { value: 98, valueText: '98%', arrowKeyStep: 5 },
+  play: async ({ args, userEvent }) => {
+    await userEvent.tab()
+
+    await userEvent.keyboard('{ArrowRight}')
 
     await expect(args.onChange).toHaveBeenCalledWith(100)
   }

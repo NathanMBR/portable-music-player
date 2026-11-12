@@ -119,6 +119,7 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   to the thumb's center and `rule` after it, with a `pen` thumb that stays inside the track, so at
   the maximum it covers the end. The browser moves that center half a thumb in from each end of
   the track, so the `pen` part ends there too (`fillEnd` in `src/components/sliderFill.ts`) and
-  meets the thumb at every value.
+  meets the thumb at every value. The thumb stops on the slider's `step` (tenths of a second for
+  the song's position), and the `pen` part is drawn from that same step (`snapToStep`).
 - **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
   `motion-reduce:`).

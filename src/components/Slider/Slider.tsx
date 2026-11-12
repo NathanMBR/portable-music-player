@@ -1,7 +1,8 @@
 import { Input } from '@headlessui/react'
-import { useState, type WheelEvent } from 'react'
+import { type KeyboardEvent, useState, type WheelEvent } from 'react'
 import { DISABLED_CLASSES } from '../buttonStyles'
 import { type FillEnd, fillEnd } from '../sliderFill'
+import { snapToStep } from '../sliderStep'
 
 type SliderProps = {
   /** Accessible name, since the slider shows no text of its own. */
@@ -10,6 +11,8 @@ type SliderProps = {
   value: number
   /** The value at the right end of the track. */
   max: number
+  /** The smallest move the slider makes, and what its thumb stops on. Whole units without it. */
+  step?: number
   /** What screen readers hear for the value, like "40%" or "01:23 of 04:30". */
   valueText: string
   /** Runs with the new value when the slider is dragged, clicked or moved from the keyboard. */
@@ -18,6 +21,19 @@ type SliderProps = {
   isDisabled?: boolean
   /** How far one turn of the mouse wheel over the slider moves it. Without it, the wheel doesn't. */
   wheelStep?: number
+  /** How far one press of an arrow key moves it. Without it, an arrow moves it one `step`. */
+  arrowKeyStep?: number
+}
+
+// What browsers move a slider by when it doesn't say.
+const BROWSER_STEP = 1
+
+// Right and up raise the value, left and down lower it, like the browser's own slider.
+const ARROW_KEY_DIRECTIONS: Partial<Record<string, number>> = {
+  ArrowRight: 1,
+  ArrowUp: 1,
+  ArrowLeft: -1,
+  ArrowDown: -1
 }
 
 // The browser's own slider leaves the end of its track uncovered at the maximum, so the track and
@@ -46,10 +62,12 @@ const trackFill = ({ trackPercent, thumbWidths }: FillEnd) => {
 /**
  * A slider in the app's look: its track is pen up to the thumb's center and rule after it, with a
  * pen thumb that stays inside the track, so the pen meets the thumb at every value, ends included.
- * Dragging, clicking and the keyboard (arrows, Page Up and Down, Home, End) move it, and so does
- * the mouse wheel over it when given a `wheelStep`. Reached from the keyboard it shows a focus
- * ring, wider than other controls' so it clears the thumb; clicked with the mouse it doesn't. It
- * fills its container's width, so the parent sets how wide it is.
+ * It moves in whole units, or in `step`s when given, and its thumb stops on the step nearest the
+ * value. Dragging, clicking and the keyboard (arrows, Page Up and Down, Home, End) move it; the
+ * arrows move it one step, or `arrowKeyStep` when given. The mouse wheel over it moves it too when
+ * given a `wheelStep`. Reached from the keyboard it shows a focus ring, wider than other controls'
+ * so it clears the thumb; clicked with the mouse it doesn't. It fills its container's width, so
+ * the parent sets how wide it is.
  *
  * @summary Slider with a drawn track and a keyboard-only focus ring
  */
@@ -57,18 +75,34 @@ export const Slider = ({
   label,
   value,
   max,
+  step = BROWSER_STEP,
   valueText,
   onChange,
   isDisabled = false,
-  wheelStep
+  wheelStep,
+  arrowKeyStep
 }: SliderProps) => {
   const [isFocusedByPointer, setIsFocusedByPointer] = useState(false)
+  const shownValue = snapToStep(value, step)
+
+  const moveBy = (change: number) => {
+    if (isDisabled) return
+    const movedValue = clamp(value + change, 0, max)
+    if (movedValue !== value) onChange(movedValue)
+  }
 
   // Wheeling up raises the value, like turning a knob. A turn that only scrolls sideways is no move.
   const moveWithWheel = (event: WheelEvent<HTMLInputElement>) => {
-    if (!wheelStep || isDisabled || event.deltaY === 0) return
-    const movedValue = clamp(value + (event.deltaY < 0 ? wheelStep : -wheelStep), 0, max)
-    if (movedValue !== value) onChange(movedValue)
+    if (!wheelStep || event.deltaY === 0) return
+    moveBy(event.deltaY < 0 ? wheelStep : -wheelStep)
+  }
+
+  // Taken over from the browser, which would move the slider one step.
+  const moveWithArrowKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    const direction = ARROW_KEY_DIRECTIONS[event.key]
+    if (!arrowKeyStep || direction === undefined) return
+    event.preventDefault()
+    moveBy(direction * arrowKeyStep)
   }
 
   return (
@@ -76,15 +110,17 @@ export const Slider = ({
       type="range"
       min={0}
       max={max}
-      value={value}
+      step={step}
+      value={shownValue}
       disabled={isDisabled}
       aria-label={label}
       aria-valuetext={valueText}
       onChange={event => onChange(Number(event.target.value))}
       onWheel={moveWithWheel}
+      onKeyDown={moveWithArrowKey}
       onPointerDown={() => setIsFocusedByPointer(true)}
       onBlur={() => setIsFocusedByPointer(false)}
-      style={{ background: trackFill(fillEnd(value, max)) }}
+      style={{ background: trackFill(fillEnd(shownValue, max)) }}
       className={`${SLIDER_CLASSES} ${DISABLED_CLASSES} ${isFocusedByPointer ? POINTER_FOCUS_CLASSES : KEYBOARD_FOCUS_CLASSES}`}
     />
   )

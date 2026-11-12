@@ -1,6 +1,7 @@
 import { Button } from '@headlessui/react'
 import { FOCUS_CLASSES } from '../../../components/buttonStyles'
 import { Slider } from '../../../components/Slider/Slider'
+import { POSITION_STEP_SECONDS } from '../constants'
 import { type ShownTime, usePlaybackStore } from '../playbackStore'
 import { formatCountdown, formatPlaybackTime, remainingSeconds } from '../playbackTime'
 
@@ -23,12 +24,17 @@ const SWITCH_HINTS: Record<ShownTime, string> = {
 
 const SONG_LENGTH_NAME = 'Song length'
 
+// The bar moves in tenths of a second, but a press of an arrow key skips a few seconds, like in
+// most players.
+const ARROW_KEY_STEP_SECONDS = 5
+
 /**
- * The middle of the audio player: a bar that fills as the song plays, with the elapsed time on its
- * left and the song's length on its right, both as `mm:ss`. The bar is a slider: clicking or
- * dragging it jumps within the song, and so do the arrow keys, Page Up and Down, Home and End.
- * Clicking the left time switches it to the time left, counted down as `-mm:ss`, and back. Until
- * the song's length is known, the bar stays empty and disabled, and the length shows dashes.
+ * The middle of the audio player: a bar that fills as the song plays, in tenths of a second, with
+ * the elapsed time on its left and the song's length on its right, both as `mm:ss`. The bar is a
+ * slider: clicking or dragging it jumps within the song, and so do the keyboard's arrows (5
+ * seconds a press), Page Up and Down (a tenth of the song), Home and End. Clicking the left time
+ * switches it to the time left, counted down as `-mm:ss`, and back. Until the song's length is
+ * known, the bar stays empty and disabled, and the length shows dashes.
  *
  * @summary Seekable progress bar of the playing song, with its times
  */
@@ -57,6 +63,8 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
           label="Song position"
           value={elapsedSeconds}
           max={durationSeconds ?? 0}
+          step={POSITION_STEP_SECONDS}
+          arrowKeyStep={ARROW_KEY_STEP_SECONDS}
           valueText={
             isLengthKnown
               ? `${formatPlaybackTime(elapsedSeconds)} of ${formatPlaybackTime(durationSeconds)}`

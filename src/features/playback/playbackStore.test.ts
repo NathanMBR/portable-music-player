@@ -282,6 +282,24 @@ describe('seek', () => {
   })
 })
 
+describe('play', () => {
+  it('plays the paused song, and leaves a playing one playing', () => {
+    loadSession({ isPlaying: false })
+
+    playback().play()
+    expect(session()?.isPlaying).toBe(true)
+
+    playback().play()
+    expect(session()?.isPlaying).toBe(true)
+  })
+
+  it('is ignored without a song in the player', () => {
+    playback().play()
+
+    expect(session()).toBeNull()
+  })
+})
+
 describe('pause', () => {
   it('pauses the song, and leaves a paused one paused', () => {
     loadSession({ isPlaying: true })

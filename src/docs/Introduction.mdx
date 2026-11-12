@@ -93,6 +93,13 @@ so the player stops there and says what to install.
 `windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the
 player, playing or paused, and after the app once it's stopped.
 
+`mediaSession.ts`, connected once from `main.tsx` too, hands the song in the player to the system
+through the webview's media session, so the keyboard's media keys and the system's media controls
+play, pause, stop, skip and seek it. WebView2 passes it on to Windows' media controls, and
+WebKitGTK to MPRIS on Linux. It gives the song's title and play state only when they change, and
+leaves the position to the webview, which reads it from the audio. Webviews without a media
+session, like WebKitGTK before 2.46, simply don't get one.
+
 ## How the stories run without Tauri
 
 Storybook runs the UI in a plain browser, where there is no Rust side. Three pieces make the stories
@@ -110,8 +117,9 @@ work anyway:
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.
 
-Stories never connect the audio (`songAudio.ts`) or the window title (`windowTitle.ts`), so
-they're silent: the player shows whatever progress and length the story puts in the store.
+Stories never connect the audio (`songAudio.ts`), the window title (`windowTitle.ts`) or the media
+session (`mediaSession.ts`), so they're silent: the player shows whatever progress and length the
+story puts in the store.
 
 The **theme** toolbar switches `data-theme` on `<html>` between `light` and `dark`, like the app's
 own toggle does.

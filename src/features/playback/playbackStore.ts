@@ -47,6 +47,7 @@ type PlaybackStore = {
   reportProgress: (elapsedSeconds: number) => void
   reportDuration: (durationSeconds: number | null) => void
   seek: (seconds: number) => void
+  play: () => void
   pause: () => void
   cycleRepeatMode: () => void
   toggleShuffle: () => void
@@ -144,6 +145,7 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
 
       set({ session: { ...session, elapsedSeconds: clamp(seconds, 0, session.durationSeconds) } })
     },
+    play: () => updateSession(() => ({ isPlaying: true })),
     pause: () => updateSession(() => ({ isPlaying: false })),
     cycleRepeatMode: () => set(state => ({ repeatMode: nextRepeatMode(state.repeatMode) })),
     toggleShuffle: () => {

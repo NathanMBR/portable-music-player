@@ -2,6 +2,7 @@ import { readSong, songSource } from '../library/libraryApi'
 import type { Track } from '../library/types'
 import { notifyError } from '../notifications/notify'
 import { type PlaybackSession, usePlaybackStore } from './playbackStore'
+import { anchorAfterReport, estimateProgress, type TimedPosition } from './progressEstimate'
 
 /** The parts of an `<audio>` element the player uses, so unit tests can stand in for one. */
 export type SongAudio = Pick<
@@ -51,6 +52,9 @@ const MEDIA_ERROR_REASONS: Record<number, string> = {
 
 const UNKNOWN_MEDIA_ERROR = "The file couldn't be played."
 
+// As often as the webview reports the audio's position while it plays.
+const PROGRESS_TICK_MS = 250
+
 const describeMediaError = (error: MediaError | null) =>
   (error && MEDIA_ERROR_REASONS[error.code]) ?? UNKNOWN_MEDIA_ERROR
 
@@ -71,11 +75,15 @@ const fetchPlayableSong = async (track: Track): Promise<PlayableSong> => {
  * length, progress and end back to the store. The store is the source of truth: the audio follows
  * its song, play state, position and volume.
  *
+ * On Linux the audio's clock can hold still for seconds and then catch up while the song plays on.
+ * So once that clock is seen moving, the progress runs on with the wall clock between the audio's
+ * reports (`progressEstimate.ts`), and stops whenever the audio pauses, waits for data or jumps.
+ *
  * Rust decides where each song plays from (`song_source`). On Linux it streams from the song
  * server Rust runs on this computer, since WebKitGTK skips ahead in songs over 2 MiB played from
  * memory. On Windows it plays from memory, through an object URL of the bytes Rust reads. Neither
  * webview can play media from a custom URI scheme like Tauri's asset protocol. Returns a function
- * that stops following the store.
+ * that stops following the store and the audio's clock.
  */
 export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL) => {
   let loadedSong: LoadedSong | null = null
@@ -84,6 +92,46 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   // The position the audio and the store last agreed on. When the store's differs, something other
   // than the audio moved it, like a seek or a song starting over, and the audio jumps there.
   let agreedSeconds = 0
+  // The audio's last report, and where the progress runs on from while its clock moves.
+  let lastReport: TimedPosition | null = null
+  let anchor: TimedPosition | null = null
+  let ticker: ReturnType<typeof setInterval> | null = null
+
+  const knownLength = () => (Number.isFinite(audio.duration) ? audio.duration : null)
+
+  // Agreed before the store hears it, so the progress shown never makes the audio jump.
+  const showProgress = (seconds: number) => {
+    agreedSeconds = seconds
+    playback().reportProgress(seconds)
+  }
+
+  const showEstimate = () => {
+    if (!anchor || !lastReport) return
+    const clock = { anchor, reportedSeconds: lastReport.seconds, durationSeconds: knownLength() }
+    showProgress(estimateProgress(clock, performance.now()))
+  }
+
+  const runOnFrom = (report: TimedPosition) => {
+    anchor = anchorAfterReport(anchor, report)
+    ticker ??= setInterval(showEstimate, PROGRESS_TICK_MS)
+  }
+
+  const stopRunningOn = () => {
+    if (ticker !== null) clearInterval(ticker)
+    ticker = null
+    anchor = null
+    lastReport = null
+  }
+
+  const followReport = () => {
+    const report = { seconds: audio.currentTime, atMs: performance.now() }
+    const isClockMoving =
+      !audio.paused && lastReport !== null && report.seconds > lastReport.seconds
+    lastReport = report
+    if (isClockMoving) runOnFrom(report)
+    if (anchor) showEstimate()
+    else showProgress(report.seconds)
+  }
 
   const fail = (track: Track, reason: unknown) => {
     if (loadedSong) loadedSong.status = 'failed'
@@ -105,6 +153,7 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   // Stops the audio at once, so the old song sends no more progress, and lets go of its stream or
   // frees its bytes.
   const releaseSource = () => {
+    stopRunningOn()
     audio.pause()
     audio.removeAttribute('src')
     audio.load()
@@ -145,7 +194,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     }
   }
 
+  // The audio's clock starts over from where it lands, once it has read data from there.
   const jumpTo = (seconds: number) => {
+    stopRunningOn()
     agreedSeconds = seconds
     audio.currentTime = seconds
   }
@@ -170,14 +221,10 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     followPlaying(session.isPlaying)
   }
 
-  audio.addEventListener('timeupdate', () => {
-    // Agreed before the store hears it, so a report never makes the audio jump.
-    agreedSeconds = audio.currentTime
-    playback().reportProgress(audio.currentTime)
-  })
-  audio.addEventListener('durationchange', () => {
-    playback().reportDuration(Number.isFinite(audio.duration) ? audio.duration : null)
-  })
+  audio.addEventListener('timeupdate', followReport)
+  // Whenever the audio stops playing on, so does the progress, until its clock moves again.
+  for (const stop of ['pause', 'waiting', 'ended']) audio.addEventListener(stop, stopRunningOn)
+  audio.addEventListener('durationchange', () => playback().reportDuration(knownLength()))
   audio.addEventListener('ended', () => playback().finishSong())
   audio.addEventListener('error', () => {
     const track = playback().session?.track
@@ -185,5 +232,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   })
 
   followStore(playback())
-  return usePlaybackStore.subscribe(followStore)
+  const stopFollowingStore = usePlaybackStore.subscribe(followStore)
+  return () => {
+    stopFollowingStore()
+    stopRunningOn()
+  }
 }

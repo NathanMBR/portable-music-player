@@ -33,7 +33,9 @@ class FakeAudio extends EventTarget implements SongAudio {
   }
 
   pause() {
+    if (this.paused) return
     this.paused = true
+    this.dispatchEvent(new Event('pause'))
   }
 
   load() {
@@ -61,6 +63,11 @@ class FakeAudio extends EventTarget implements SongAudio {
   end() {
     this.paused = true
     this.dispatchEvent(new Event('ended'))
+  }
+
+  /** Runs out of data to play, like the element does while the file arrives too slowly. */
+  runOutOfData() {
+    this.dispatchEvent(new Event('waiting'))
   }
 
   failWith(code: number) {
@@ -141,6 +148,30 @@ const waitUntilStreaming = ({ audio }: ConnectedAudio, track: Track) =>
 const startPlaying = async (connected: ConnectedAudio, track: Track) => {
   playback().playTrack(track, queue)
   await waitUntilPlaying(connected, track)
+}
+
+// How often the webview reports where the audio is while it plays.
+const REPORT_INTERVAL_MS = 250
+
+/**
+ * Streams `track` on a fake clock, and has its audio report twice, a report apart, the second time
+ * from `seconds`: its clock is seen moving.
+ */
+const streamWithClockMovingAt = async (track: Track, seconds: number) => {
+  vi.useFakeTimers()
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+  mockCommands(streamedSongs)
+  const connected = connectAudio()
+  playback().playTrack(track, [track])
+  await waitUntilStreaming(connected, track)
+  const { audio } = connected
+  audio.loadLength(270)
+  audio.playTo(seconds - REPORT_INTERVAL_MS / 1000)
+  vi.advanceTimersByTime(REPORT_INTERVAL_MS)
+  audio.playTo(seconds)
+  return audio
 }
 
 describe('connectSongAudio', () => {
@@ -414,5 +445,53 @@ describe('connectSongAudio', () => {
 
     expect(shownNotifications()).toEqual([])
     expect(session()?.isPlaying).toBe(true)
+  })
+})
+
+describe("the progress between the audio's reports", () => {
+  it("runs on with the clock while the audio's clock holds still", async () => {
+    const audio = await streamWithClockMovingAt(trackTitled('Angels and Demons'), 10)
+
+    vi.advanceTimersByTime(3000)
+
+    expect(session()?.elapsedSeconds).toBeCloseTo(13)
+    expect(audio.currentTime).toBe(10)
+  })
+
+  it("waits for the audio's clock to move again after a jump", async () => {
+    const audio = await streamWithClockMovingAt(trackTitled('Streets of Tomorrow'), 10)
+    playback().seek(100)
+    // The webview reports the new position before it plays from there.
+    audio.playTo(100)
+
+    vi.advanceTimersByTime(2000)
+
+    expect(session()?.elapsedSeconds).toBe(100)
+  })
+
+  it('stops running on when the audio pauses', async () => {
+    await streamWithClockMovingAt(trackTitled('Here In The Now'), 10)
+    playback().togglePlaying()
+
+    vi.advanceTimersByTime(2000)
+
+    expect(session()?.elapsedSeconds).toBe(10)
+  })
+
+  it('stops running on while the audio waits for data', async () => {
+    const audio = await streamWithClockMovingAt(trackTitled('Make Believe'), 10)
+    audio.runOutOfData()
+
+    vi.advanceTimersByTime(2000)
+
+    expect(session()?.elapsedSeconds).toBe(10)
+  })
+
+  it('leaves no clock running once the player stops', async () => {
+    await streamWithClockMovingAt(trackTitled('Millennium Sun'), 10)
+
+    playback().stop()
+
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

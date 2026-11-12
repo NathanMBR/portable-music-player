@@ -20,14 +20,16 @@ view (`viewByCategory`), so the navigation feature never imports the views it sw
 - **Margins:** the view keeps equal side margins, sized by the `gutter` token (`px-gutter`). The
   menu button sits in the left one, so views never include it and nothing scrolls under it.
 - **Scrolling:** the window itself never scrolls. A view keeps its header in place and scrolls
-  only the content below it, with the scrollbar along the window's right edge. The content always
-  ends above the player's space, which stays kept while the player is hidden.
+  only the content below it, with the scrollbar along the window's right edge. The content reaches
+  the window's bottom edge, or ends above the player while it's open.
 
 The **audio player** (`AudioPlayer`) slides up along the bottom of the window when a song is played,
 and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the
 category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
-song's title above its progress bar in the middle, and the speaker and volume on the right. The
-progress stops growing at a set width, so in wide windows the spaces around it widen instead.
+song's title above its progress bar in the middle, and the speaker and volume on the right. The bar
+has the elapsed time on its left, which a click turns into the time left counted down, and the
+song's length on its right. The progress stops growing at a set width, so in wide windows the
+spaces around it widen instead.
 Clicking the speaker mutes, and clicking it again brings the volume back, and the mouse wheel over
 the volume turns it up or down by 5%. The views end above its
 space, and while it's open notifications pop up above it, both sized by the `player` token. The
@@ -77,7 +79,8 @@ scan, it shows a calm `Notice` with what to do next.
 Songs play through one more loop. `songAudio.ts`, connected once from `main.tsx`, is the only
 module that touches the audio. It follows the playback store's song, play state, position and
 volume, and reports the song's length, progress and end back to the store, which decides what plays
-next. To load a song it asks Rust where the song plays from (`song_source`). On Linux the song
+next. Between the audio's own reports the progress runs on with the clock, because on Linux the
+audio's clock can hold still for seconds while the song plays on. To load a song it asks Rust where the song plays from (`song_source`). On Linux the song
 streams from a small HTTP server that Rust runs for this computer only, because the Linux webview
 skips ahead in large songs played from memory. On Windows Rust sends the song's file as raw bytes
 (`read_song`), and the audio plays them from memory, through an object URL. Neither webview can

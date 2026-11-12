@@ -64,7 +64,9 @@ export default defineConfig(({ mode }) => ({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            // Playwright hides scrollbars by default, so they take no room. The webviews draw them,
+            // and the stories check what the songs' scrollbar does to the layout.
+            provider: playwright({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } }),
             instances: [
               {
                 browser: 'chromium'

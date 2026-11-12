@@ -20,8 +20,12 @@
   --spacing-player: 4.5rem;
 
   /* The views' side margins (px-gutter): the menu button sits in the left one, with room around it,
-     and the right one mirrors it. The songs' scrollbar runs along its outer edge. */
+     and the right one mirrors it. The songs' scrollbar sits in the right one, beside the songs. */
   --spacing-gutter: 5rem;
+
+  /* The width of every scrollbar, which the base styles below draw in the app's look: as thin as
+     the sliders' track (h-1.5). */
+  --spacing-scrollbar: 0.375rem;
 }
 
 /* data-theme is set before the first paint by index.html and later by the theme toggle. */
@@ -57,5 +61,36 @@
   input:disabled,
   [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
+  }
+
+  /* Every scrollbar in the app's look, like the sliders: a rounded rule track with a faded thumb
+     that turns ink when hovered and pen while dragged. Scrollbars have no data attributes, so the
+     states are :hover and :active. WebKitGTK and WebView2 both draw these -webkit- parts, and
+     WebView2 would ignore them if scrollbar-color or scrollbar-width were ever set. */
+  ::-webkit-scrollbar {
+    @apply size-scrollbar;
+  }
+
+  /* It stops a little above the bottom of the scroll area, so it never touches the window's bottom
+     edge or the top of the player. */
+  ::-webkit-scrollbar-track {
+    @apply mb-2 rounded-full bg-rule;
+  }
+
+  /* A scrollbar with nothing to scroll is disabled: it keeps its room but shows nothing. */
+  ::-webkit-scrollbar-track:disabled {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-faded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    @apply bg-pen;
   }
 }

@@ -65,9 +65,10 @@ stays dark in both themes.
   (`h-player`). The space kept for it at the bottom of the window (`pb-player`) and the
   notifications' bottom offset use it too while it's open, so nothing hides behind the player.
 - **`gutter`** (`--spacing-gutter: 5rem`) is the views' side margins (`px-gutter`). The menu
-  button sits in the left one, and the songs' scrollbar runs along the outer edge of the right one.
-  The header and the list both reserve the scrollbar's width (`scrollbar-gutter: stable`), so they
-  end at the same place.
+  button sits in the left one, and the songs' scrollbar sits in the right one, beside the songs.
+  The header and the songs both keep the width between the margins, so they end at the same place.
+- **`scrollbar`** (`--spacing-scrollbar: 0.375rem`) is the width of every scrollbar, as thin as
+  the sliders' track.
 
 ## Type
 
@@ -108,6 +109,12 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   (`DISABLED_CLASSES`).
 - **Cursors:** buttons show a pointer, and disabled buttons and sliders show `not-allowed` (base
   styles in `src/index.css`).
+- **Scrollbars:** the app draws every scrollbar like its sliders, with the base styles in
+  `src/index.css`: a rounded `rule` track with an `ink-faded` thumb, which turns `ink` on hover
+  and `pen` while dragged. The track stops a little above the bottom of the scroll area, so it
+  never touches the window's edge or the player. With nothing to scroll, the scrollbar shows
+  nothing. Scrollbars have no data attributes, so these states are the one place that uses
+  `:hover` and `:active`.
 - **Sliders:** `Slider`, behind the volume and the song's position, draws its own track: `pen` up
   to the value and `rule` after it, with a `pen` thumb that stays inside the track, so at the
   maximum it covers the end.

@@ -20,8 +20,9 @@ view (`viewByCategory`), so the navigation feature never imports the views it sw
 - **Margins:** the view keeps equal side margins, sized by the `gutter` token (`px-gutter`). The
   menu button sits in the left one, so views never include it and nothing scrolls under it.
 - **Scrolling:** the window itself never scrolls. A view keeps its header in place and scrolls
-  only the content below it, with the scrollbar along the window's right edge. The content reaches
-  the window's bottom edge, or ends above the player while it's open.
+  only the content below it. The app draws its own scrollbar, in the right margin beside the
+  content, and the content keeps the width between the margins. The content reaches the window's
+  bottom edge, or ends above the player while it's open.
 
 The **audio player** (`AudioPlayer`) slides up along the bottom of the window when a song is played,
 and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the

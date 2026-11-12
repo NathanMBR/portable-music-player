@@ -89,9 +89,16 @@ type Story = StoryObj<typeof meta>
 
 /**
  * The whole window: the current category's view, with the menu button in its left margin and an
- * equal margin on the right.
+ * equal margin on the right. The songs keep that width when they all fit and nothing scrolls.
  */
-export const Default: Story = {}
+export const Default: Story = {
+  play: async ({ canvas, canvasElement }) => {
+    const windowWidth = canvasElement.ownerDocument.defaultView?.innerWidth ?? 0
+    const listBox = canvas.getByRole('list', { name: 'Songs' }).getBoundingClientRect()
+
+    await expect(windowWidth - listBox.right).toBe(listBox.left)
+  }
+}
 
 /** The menu button opens the side menu, and choosing a category closes it on that view. */
 export const NavigatesFromTheSideMenu: Story = {
@@ -183,10 +190,14 @@ export const NotifiesAboveThePlayer: Story = {
   }
 }
 
+// The app's own scrollbar, as thin as the sliders' track. The browser's own is wider.
+const SCROLLBAR_WIDTH = 6
+
 /**
  * A list too long for the window scrolls on its own, from under the header down to the window's
- * bottom edge, with the scrollbar along its right edge. While a song is in the player, the list
- * ends above the player instead, and it reaches the bottom edge again once the player is stopped.
+ * bottom edge. The songs keep the width between the two margins, and the app's own scrollbar sits
+ * in the right margin, beside them. While a song is in the player, the list ends above the player
+ * instead, and it reaches the bottom edge again once the player is stopped.
  */
 export const ScrollsOnlyTheSongs: Story = {
   beforeEach: () => {
@@ -195,15 +206,25 @@ export const ScrollsOnlyTheSongs: Story = {
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const window = canvasElement.ownerDocument.defaultView
+    const windowWidth = window?.innerWidth ?? 0
     const page = canvasElement.ownerDocument.documentElement
     const songs = canvas.getByRole('main')
     const songsBox = songs.getBoundingClientRect()
+    const listBox = canvas.getByRole('list', { name: 'Songs' }).getBoundingClientRect()
+    const headerBox = canvas.getByRole('banner').getBoundingClientRect()
+    const scrollbarWidth = songs.offsetWidth - songs.clientWidth
+    const scrollbarLeft = songsBox.right - scrollbarWidth
 
     await expect(page.scrollHeight).toBe(page.clientHeight)
     await expect(songs.scrollHeight).toBeGreaterThan(songs.clientHeight)
-    await expect(songsBox.top).toBe(canvas.getByRole('banner').getBoundingClientRect().bottom)
-    await expect(songsBox.right).toBe(window?.innerWidth)
+    await expect(songsBox.top).toBe(headerBox.bottom)
     await expect(songsBox.bottom).toBe(window?.innerHeight)
+
+    await expect(windowWidth - listBox.right).toBe(listBox.left)
+    await expect([headerBox.left, headerBox.right]).toEqual([listBox.left, listBox.right])
+    await expect(scrollbarWidth).toBe(SCROLLBAR_WIDTH)
+    await expect(scrollbarLeft).toBeGreaterThan(listBox.right)
+    await expect(scrollbarLeft - listBox.right).toBeLessThan(windowWidth - songsBox.right)
 
     await userEvent.click(canvas.getByRole('button', { name: 'Play Lease of Life' }))
 

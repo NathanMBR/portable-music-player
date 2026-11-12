@@ -21,13 +21,14 @@ const SWITCH_HINTS: Record<ShownTime, string> = {
   remaining: 'Show elapsed time'
 }
 
+const SONG_LENGTH_NAME = 'Song length'
+
 /**
  * The middle of the audio player: a bar that fills as the song plays, with the elapsed time on its
- * left and the remaining time on its right, both as `mm:ss`. The bar is a slider: clicking or
+ * left and the song's length on its right, both as `mm:ss`. The bar is a slider: clicking or
  * dragging it jumps within the song, and so do the arrow keys, Page Up and Down, Home and End.
  * Clicking the left time switches it to the time left, counted down as `-mm:ss`, and back. Until
- * the song's length is known, the bar stays empty and disabled, and the remaining time shows
- * dashes.
+ * the song's length is known, the bar stays empty and disabled, and the length shows dashes.
  *
  * @summary Seekable progress bar of the playing song, with its times
  */
@@ -35,10 +36,11 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
   const shownTime = usePlaybackStore(state => state.shownTime)
   const toggleShownTime = usePlaybackStore(state => state.toggleShownTime)
   const seek = usePlaybackStore(state => state.seek)
-  const timeLeft = remainingSeconds(elapsedSeconds, durationSeconds)
   const isLengthKnown = durationSeconds !== null
   const leftTime =
-    shownTime === 'elapsed' ? formatPlaybackTime(elapsedSeconds) : formatCountdown(timeLeft)
+    shownTime === 'elapsed'
+      ? formatPlaybackTime(elapsedSeconds)
+      : formatCountdown(remainingSeconds(elapsedSeconds, durationSeconds))
 
   return (
     <div className="flex items-center gap-3 text-sm text-ink-faded tabular-nums">
@@ -65,8 +67,8 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
         />
       </div>
       <span className="w-14 shrink-0">
-        <span className="sr-only">{SHOWN_TIME_NAMES.remaining} </span>
-        {formatPlaybackTime(timeLeft)}
+        <span className="sr-only">{SONG_LENGTH_NAME} </span>
+        {formatPlaybackTime(durationSeconds)}
       </span>
     </div>
   )

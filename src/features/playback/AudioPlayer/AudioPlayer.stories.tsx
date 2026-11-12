@@ -62,7 +62,7 @@ export const Paused: Story = {
 
 /**
  * While the song's audio loads, its length is unknown: the bar stays empty and disabled, and the
- * remaining time is dashes.
+ * length is dashes.
  */
 export const UnknownLength: Story = {
   beforeEach: () => {

@@ -16,7 +16,7 @@ export const formatPlaybackTime = (seconds: number | null) => {
 export const formatCountdown = (seconds: number | null) =>
   seconds === null ? UNKNOWN_TIME : `-${formatPlaybackTime(seconds)}`
 
-// Computed from whole seconds, so the elapsed and remaining times on screen add up to the length.
+// From whole seconds, so the elapsed time and the countdown add up to the length on screen.
 export const remainingSeconds = (elapsedSeconds: number, durationSeconds: number | null) =>
   durationSeconds === null
     ? null

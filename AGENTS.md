@@ -185,8 +185,10 @@ These follow from the project goal and are easy to get wrong:
   - tests call that function with a `tempfile::tempdir()`, never the real executable folder, and the folder is deleted even when a test fails.
 - Every struct and error sent to the frontend has a test pinning its JSON (`serde_json::to_value`), which must match the TypeScript type in the feature's `types.ts`.
 - `unwrap`/`expect` are fine in tests: a panic is how a Rust test fails.
-- **Example songs come from `test/get_mock_songs.sh`**, in stories, tests (frontend and Rust) and docs: titles, file names and paths alike. Never make up a song name.
-  - Run `test/get_mock_songs.sh <count>`, asking for as many songs as the example needs, and use the titles it prints (one per line, picked at random from `test/mock_songs.txt`). It repeats songs only when you ask for more than the file holds.
+- **Example songs come from `test/get_mock_songs.sh`**, in stories, tests (frontend and Rust) and docs: titles, artists, file names and paths alike. Never make up a song name or artist.
+  - Run `test/get_mock_songs.sh <count>`, asking for as many songs as the example needs, and use the songs it prints, picked at random from `test/mock_songs.csv`. It repeats songs only when you ask for more than the file holds.
+  - It prints one CSV record per line, `title,artist`, without a header. A field holding a comma, a double quote, or leading or trailing spaces comes enclosed in double quotes, with inner quotes doubled; take the field without them. The artist may be empty.
+  - `test/mock_songs.csv` follows RFC 4180 under a `title,artist` header, one song per line, quoting a field only when it needs it. Every song has a title, the artist may be empty, and no field holds a line break. The script rejects a malformed file, naming the line.
   - Example songs are the exception to "No duplication": never share them through a constant or helper module, and never reuse songs written elsewhere. Every time an example needs songs, run the script again and write the songs where they're used.
   - A test that needs a special title (lowercase, accents, numbers) adapts a drawn title, e.g. lowercases it or prefixes a track number, or draws more songs and keeps the ones that fit.
 - Name a test after the rule it checks: `rejects_hidden_and_non_mp3_names`, `it('compares numbers by value')`.

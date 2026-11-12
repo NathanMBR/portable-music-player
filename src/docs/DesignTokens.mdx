@@ -116,7 +116,9 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   nothing. Scrollbars have no data attributes, so these states are the one place that uses
   `:hover` and `:active`.
 - **Sliders:** `Slider`, behind the volume and the song's position, draws its own track: `pen` up
-  to the value and `rule` after it, with a `pen` thumb that stays inside the track, so at the
-  maximum it covers the end.
+  to the thumb's center and `rule` after it, with a `pen` thumb that stays inside the track, so at
+  the maximum it covers the end. The browser moves that center half a thumb in from each end of
+  the track, so the `pen` part ends there too (`fillEnd` in `src/components/sliderFill.ts`) and
+  meets the thumb at every value.
 - **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
   `motion-reduce:`).

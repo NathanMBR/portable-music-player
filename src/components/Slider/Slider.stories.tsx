@@ -21,6 +21,16 @@ type Story = StoryObj<typeof meta>
 /** Partway along: the track is pen up to the thumb and rule after it. */
 export const Default: Story = {}
 
+/** Near the start, like a song's first seconds: the pen still reaches the thumb, with no gap. */
+export const NearTheStart: Story = {
+  args: { value: 5, valueText: '5%' }
+}
+
+/** Near the end, like a song's last seconds: the pen stops at the thumb instead of running past. */
+export const NearTheEnd: Story = {
+  args: { value: 95, valueText: '95%' }
+}
+
 /**
  * A slider that can't move right now fades and ignores input, like the song's position while its
  * length is still unknown.

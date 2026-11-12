@@ -1,11 +1,11 @@
 [package]
 name = "portable-music-player"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A music player that can run without installation on Windows and Linux"
+authors = ["Nathan Murillo"]
+license = "MIT"
+repository = "https://github.com/NathanMBR/portable-music-player"
 edition = "2024"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary

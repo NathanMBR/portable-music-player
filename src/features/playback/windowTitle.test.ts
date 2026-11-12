@@ -7,8 +7,16 @@ import type { Track } from '../library/types'
 import { usePlaybackStore } from './playbackStore'
 import { connectWindowTitle } from './windowTitle'
 
-const lastingChild: Track = { path: 'Songs/Lasting Child.mp3', title: 'Lasting Child' }
-const makeBelieve: Track = { path: 'Songs/Make Believe.mp3', title: 'Make Believe' }
+const lastingChild: Track = {
+  path: 'Songs/Lasting Child.mp3',
+  title: 'Lasting Child',
+  artist: 'Angra'
+}
+const makeBelieve: Track = {
+  path: 'Songs/Make Believe.mp3',
+  title: 'Make Believe',
+  artist: 'Angra'
+}
 
 const playback = () => usePlaybackStore.getState()
 
@@ -65,6 +73,24 @@ describe('connectWindowTitle', () => {
       'Lasting Child — Portable Music Player',
       'Make Believe — Portable Music Player',
       'Portable Music Player'
+    ])
+  })
+
+  it("names the window after the song's tag title alone, not its file name or artist", async () => {
+    const bringEmBackAlive: Track = {
+      path: "Songs/05 Bring 'Em Back Alive.mp3",
+      title: "Bring 'Em Back Alive",
+      artist: 'Audioslave'
+    }
+    const titles = mockWindowTitle()
+    connect()
+
+    playback().playTrack(bringEmBackAlive, [bringEmBackAlive])
+    await settle()
+
+    expect(titles).toEqual([
+      'Portable Music Player',
+      "Bring 'Em Back Alive — Portable Music Player"
     ])
   })
 

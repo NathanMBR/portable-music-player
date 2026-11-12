@@ -5,8 +5,12 @@ import type { Track } from '../../library/types'
 import { usePlaybackStore } from '../playbackStore'
 import { PlayButton } from './PlayButton'
 
-const track: Track = { path: 'Songs/Vida Seca.mp3', title: 'Vida Seca' }
-const otherTrack: Track = { path: 'Songs/Extreme Dream.mp3', title: 'Extreme Dream' }
+const track: Track = { path: 'Songs/Vida Seca.mp3', title: 'Vida Seca', artist: 'Angra' }
+const otherTrack: Track = {
+  path: 'Songs/Extreme Dream.mp3',
+  title: 'Extreme Dream',
+  artist: 'Angra'
+}
 const queue = [track, otherTrack]
 
 const meta = {

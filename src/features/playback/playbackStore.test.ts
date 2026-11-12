@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import type { Track } from '../library/types'
 import { type PlaybackSession, usePlaybackStore } from './playbackStore'
 
-const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+const trackTitled = (title: string, artist: string): Track => ({
+  path: `Songs/${title}.mp3`,
+  title,
+  artist
+})
 
-const firstTrack = trackTitled('Petrified Eyes')
-const secondTrack = trackTitled('A Monster in Her Eyes')
-const thirdTrack = trackTitled('Viderunt Te Aquae')
-const fourthTrack = trackTitled('Sprouts of Time')
+const firstTrack = trackTitled('Petrified Eyes', 'Angra')
+const secondTrack = trackTitled('A Monster in Her Eyes', 'Angra')
+const thirdTrack = trackTitled('Viderunt Te Aquae', 'Angra')
+const fourthTrack = trackTitled('Sprouts of Time', 'Angra')
 const queue = [firstTrack, secondTrack, thirdTrack, fourthTrack]
 
 const playback = () => usePlaybackStore.getState()

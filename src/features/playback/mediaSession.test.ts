@@ -3,34 +3,50 @@ import type { Track } from '../library/types'
 import { connectMediaSession } from './mediaSession'
 import { usePlaybackStore } from './playbackStore'
 
-const waitingSilence: Track = { path: 'Songs/Waiting Silence.mp3', title: 'Waiting Silence' }
-const deepBlue: Track = { path: 'Songs/Deep Blue.mp3', title: 'Deep Blue' }
-const arisingThunder: Track = { path: 'Songs/Arising Thunder.mp3', title: 'Arising Thunder' }
+const waitingSilence: Track = {
+  path: 'Songs/Waiting Silence.mp3',
+  title: 'Waiting Silence',
+  artist: 'Angra'
+}
+const deepBlue: Track = { path: 'Songs/Deep Blue.mp3', title: 'Deep Blue', artist: 'Angra' }
+const arisingThunder: Track = {
+  path: 'Songs/Arising Thunder.mp3',
+  title: 'Arising Thunder',
+  artist: 'Angra'
+}
 
 const playback = () => usePlaybackStore.getState()
 const session = () => usePlaybackStore.getState().session
 
-/** Stands in for the webview's `MediaMetadata`, which jsdom lacks. */
+/**
+ * Stands in for the webview's `MediaMetadata`, which jsdom lacks. Like it, leaves blank what it
+ * isn't given.
+ */
 class FakeMediaMetadata {
   title: string
+  artist: string
 
   constructor(init: MediaMetadataInit = {}) {
     this.title = init.title ?? ''
+    this.artist = init.artist ?? ''
   }
 }
 
 /**
- * Stands in for `navigator.mediaSession`, which jsdom lacks. Keeps every song title and play state
- * the player hands over, and presses the OS's media controls through the handlers it was given.
+ * Stands in for `navigator.mediaSession`, which jsdom lacks. Keeps every song title, artist and
+ * play state the player hands over, and presses the OS's media controls through the handlers it
+ * was given.
  */
 const fakeMediaSession = () => {
   const shownTitles: (string | null)[] = []
+  const shownArtists: (string | null)[] = []
   const playbackStates: MediaSessionPlaybackState[] = []
   const handlers = new Map<MediaSessionAction, MediaSessionActionHandler>()
 
   const mediaSession = {
     set metadata(metadata: MediaMetadata | null) {
       shownTitles.push(metadata?.title ?? null)
+      shownArtists.push(metadata?.artist ?? null)
     },
     set playbackState(state: MediaSessionPlaybackState) {
       playbackStates.push(state)
@@ -52,7 +68,7 @@ const fakeMediaSession = () => {
     handler({ action, ...details })
   }
 
-  return { shownTitles, playbackStates, press }
+  return { shownTitles, shownArtists, playbackStates, press }
 }
 
 let disconnect = () => {}
@@ -85,6 +101,18 @@ describe('connectMediaSession', () => {
     playback().stop()
 
     expect(shownTitles).toEqual(['Waiting Silence', 'Deep Blue', null])
+  })
+
+  it("names the song's artist, and leaves it blank for a song without one", () => {
+    const battery: Track = { path: 'Songs/Battery.mp3', title: 'Battery', artist: 'Metallica' }
+    const paradise: Track = { path: 'Songs/Paradise.mp3', title: 'Paradise', artist: null }
+    const { shownArtists } = fakeMediaSession()
+    connect()
+
+    playback().playTrack(battery, [battery, paradise])
+    playback().playNext()
+
+    expect(shownArtists).toEqual(['Metallica', ''])
   })
 
   it('tells whether the song plays, is paused, or none is in the player', () => {

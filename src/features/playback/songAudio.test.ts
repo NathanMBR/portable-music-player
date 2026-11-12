@@ -6,11 +6,15 @@ import type { SongSource, Track } from '../library/types'
 import { usePlaybackStore } from './playbackStore'
 import { connectSongAudio, type ObjectUrls, type SongAudio } from './songAudio'
 
-const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+const trackTitled = (title: string, artist: string): Track => ({
+  path: `Songs/${title}.mp3`,
+  title,
+  artist
+})
 
-const firstTrack = trackTitled('Never Understand')
-const secondTrack = trackTitled('No Pain for the Dead')
-const thirdTrack = trackTitled('Cyclus Doloris')
+const firstTrack = trackTitled('Never Understand', 'Angra')
+const secondTrack = trackTitled('No Pain for the Dead', 'Angra')
+const thirdTrack = trackTitled('Cyclus Doloris', 'Angra')
 const queue = [firstTrack, secondTrack, thirdTrack]
 
 const MEDIA_ERR_DECODE = 3
@@ -393,7 +397,7 @@ describe('connectSongAudio', () => {
   })
 
   it("refuses to play when this computer can't play MP3 files, and says what to install", async () => {
-    const track = trackTitled('Rebirth')
+    const track = trackTitled('Rebirth', 'Angra')
     const songSourceFromRust = vi.fn(memorySource)
     const readSongFromRust = vi.fn(readSong)
     mockCommands({ song_source: songSourceFromRust, read_song: readSongFromRust })
@@ -450,7 +454,7 @@ describe('connectSongAudio', () => {
 
 describe("the progress between the audio's reports", () => {
   it("runs on with the clock while the audio's clock holds still", async () => {
-    const audio = await streamWithClockMovingAt(trackTitled('Angels and Demons'), 10)
+    const audio = await streamWithClockMovingAt(trackTitled('Angels and Demons', 'Angra'), 10)
 
     vi.advanceTimersByTime(3000)
 
@@ -459,7 +463,7 @@ describe("the progress between the audio's reports", () => {
   })
 
   it('moves on every tenth of a second, so the bar fills smoothly', async () => {
-    await streamWithClockMovingAt(trackTitled('Paradise'), 10)
+    await streamWithClockMovingAt(trackTitled('Paradise', 'Angra'), 10)
 
     vi.advanceTimersByTime(100)
 
@@ -467,7 +471,7 @@ describe("the progress between the audio's reports", () => {
   })
 
   it("waits for the audio's clock to move again after a jump", async () => {
-    const audio = await streamWithClockMovingAt(trackTitled('Streets of Tomorrow'), 10)
+    const audio = await streamWithClockMovingAt(trackTitled('Streets of Tomorrow', 'Angra'), 10)
     playback().seek(100)
     // The webview reports the new position before it plays from there.
     audio.playTo(100)
@@ -478,7 +482,7 @@ describe("the progress between the audio's reports", () => {
   })
 
   it('stops running on when the audio pauses', async () => {
-    await streamWithClockMovingAt(trackTitled('Here In The Now'), 10)
+    await streamWithClockMovingAt(trackTitled('Here In The Now', 'Angra'), 10)
     playback().togglePlaying()
 
     vi.advanceTimersByTime(2000)
@@ -487,7 +491,7 @@ describe("the progress between the audio's reports", () => {
   })
 
   it('stops running on while the audio waits for data', async () => {
-    const audio = await streamWithClockMovingAt(trackTitled('Make Believe'), 10)
+    const audio = await streamWithClockMovingAt(trackTitled('Make Believe', 'Angra'), 10)
     audio.runOutOfData()
 
     vi.advanceTimersByTime(2000)
@@ -496,7 +500,7 @@ describe("the progress between the audio's reports", () => {
   })
 
   it('leaves no clock running once the player stops', async () => {
-    await streamWithClockMovingAt(trackTitled('Millennium Sun'), 10)
+    await streamWithClockMovingAt(trackTitled('Millennium Sun', 'Angra'), 10)
 
     playback().stop()
 

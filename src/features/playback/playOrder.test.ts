@@ -10,12 +10,16 @@ import {
   shuffle
 } from './playOrder'
 
-const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+const trackTitled = (title: string, artist: string): Track => ({
+  path: `Songs/${title}.mp3`,
+  title,
+  artist
+})
 
-const firstTrack = trackTitled('The Temple of Hate')
-const secondTrack = trackTitled('Judgement Day')
-const thirdTrack = trackTitled('Deus Le Volt!')
-const fourthTrack = trackTitled('Lasting Child')
+const firstTrack = trackTitled('The Temple of Hate', 'Angra')
+const secondTrack = trackTitled('Judgement Day', 'Angra')
+const thirdTrack = trackTitled('Deus Le Volt!', 'Angra')
+const fourthTrack = trackTitled('Lasting Child', 'Angra')
 const queue = [firstTrack, secondTrack, thirdTrack, fourthTrack]
 
 const REPEAT_ON: RepeatMode[] = ['all', 'one']

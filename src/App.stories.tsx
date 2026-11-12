@@ -8,14 +8,18 @@ import { usePlaybackStore } from './features/playback/playbackStore'
 import { failingCommand, mockCommands } from './testing/mockCommands'
 import { renderInOwnFrame } from './testing/storyParameters'
 
-const playingTrack: Track = { path: 'Songs/Running Alone.mp3', title: 'Running Alone' }
+const playingTrack: Track = {
+  path: 'Songs/Running Alone.mp3',
+  title: 'Running Alone',
+  artist: 'Angra'
+}
 
 const TRACKS: Track[] = [
-  { path: 'Songs/In Excelsis.mp3', title: 'In Excelsis' },
-  { path: 'Songs/Ride Into The Storm.mp3', title: 'Ride Into The Storm' },
+  { path: 'Songs/In Excelsis.mp3', title: 'In Excelsis', artist: 'Angra' },
+  { path: 'Songs/Ride Into The Storm.mp3', title: 'Ride Into The Storm', artist: 'Angra' },
   playingTrack,
-  { path: 'Songs/Streets of Tomorrow.mp3', title: 'Streets of Tomorrow' },
-  { path: 'Songs/Unholy Wars.mp3', title: 'Unholy Wars' }
+  { path: 'Songs/Streets of Tomorrow.mp3', title: 'Streets of Tomorrow', artist: 'Angra' },
+  { path: 'Songs/Unholy Wars.mp3', title: 'Unholy Wars', artist: 'Angra' }
 ]
 
 // Enough songs to scroll past the bottom of the window.
@@ -50,7 +54,7 @@ const LONG_LIST: Track[] = [
   'Tide Of Changes',
   'Carry On',
   'Angels and Demons'
-].map(title => ({ path: `Songs/${title}.mp3`, title }))
+].map(title => ({ path: `Songs/${title}.mp3`, title, artist: 'Angra' }))
 
 const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"

@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { sortTracksByTitle } from './sortTracks'
 import type { Track } from './types'
 
-const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+const trackTitled = (title: string, artist: string): Track => ({
+  path: `Songs/${title}.mp3`,
+  title,
+  artist
+})
 
 const sortTitles = (titles: string[]) =>
-  sortTracksByTitle(titles.map(trackTitled)).map(track => track.title)
+  sortTracksByTitle(titles.map(title => trackTitled(title, 'Angra'))).map(track => track.title)
 
 describe('sortTracksByTitle', () => {
   it('ignores case, so lowercase titles are not pushed after every uppercase one', () => {
@@ -34,7 +38,7 @@ describe('sortTracksByTitle', () => {
   })
 
   it('leaves the given list untouched', () => {
-    const tracks = ['Waiting Silence', 'Mystery Machine'].map(trackTitled)
+    const tracks = ['Waiting Silence', 'Mystery Machine'].map(title => trackTitled(title, 'Angra'))
     sortTracksByTitle(tracks)
     expect(tracks.map(track => track.title)).toEqual(['Waiting Silence', 'Mystery Machine'])
   })

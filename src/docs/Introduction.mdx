@@ -50,7 +50,9 @@ and one view in `viewByCategory`.
 The only category so far is **Songs** (`LibraryView`): a header with the song count, which stays in place while the list scrolls, then the
 song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
 scan. Each song starts with a `PlayButton`, which plays it in the audio player with the whole list
-as the queue.
+as the queue. Then comes its title and, when its tags name one, its artist, past a middle dot. The
+dot and the artist are in a lighter ink (`ink-faded`) than the title, as in "Better than You ·
+Metallica".
 
 ## Where the code lives
 
@@ -70,6 +72,11 @@ A component reads its state from a Zustand store and calls the store's actions. 
 feature's `*Api.ts`, which uses Tauri's `invoke()` to run a Rust command. The Rust commands read
 and write the `Songs` folder and the `.json` files next to the executable, so everything stays on the
 flash drive.
+
+The library scan reads each song's tags in Rust, and only its tags, since the drive may be slow. A
+`Track`'s `title` is its title tag, or its file name without the extension when it has none, and
+its `artist` is the artist tag, else the album artist, else `null`. A song whose tags are missing or
+corrupt still shows up, under its file name.
 
 Rust errors reach the frontend as their message string. The store that caught one calls
 `notifyError(title, error)`: the title says what failed, and Rust's message, shown as it is, says
@@ -96,9 +103,9 @@ player, playing or paused, and after the app once it's stopped.
 `mediaSession.ts`, connected once from `main.tsx` too, hands the song in the player to the system
 through the webview's media session, so the keyboard's media keys and the system's media controls
 play, pause, stop, skip and seek it. WebView2 passes it on to Windows' media controls, and
-WebKitGTK to MPRIS on Linux. It gives the song's title and play state only when they change, and
-leaves the position to the webview, which reads it from the audio. Webviews without a media
-session, like WebKitGTK before 2.46, simply don't get one.
+WebKitGTK to MPRIS on Linux. It gives the song's title, artist and play state only when they
+change, and leaves the position to the webview, which reads it from the audio. Webviews without a
+media session, like WebKitGTK before 2.46, simply don't get one.
 
 ## How the stories run without Tauri
 

@@ -18,7 +18,9 @@ const ACTION_HANDLERS: [MediaSessionAction, MediaSessionActionHandler][] = [
   ['seekto', seekTo]
 ]
 
-const metadataFor = (track: Track | null) => track && new MediaMetadata({ title: track.title })
+// A song without an artist leaves it out, so the media session keeps its default: blank.
+const metadataFor = (track: Track | null) =>
+  track && new MediaMetadata({ title: track.title, artist: track.artist ?? undefined })
 
 const playbackStateOf = (session: PlaybackSession | null): MediaSessionPlaybackState => {
   if (!session) return 'none'

@@ -78,7 +78,11 @@ export const TogglesToRemainingTime: Story = {
 export const SeeksWithinTheSong: Story = {
   parameters: renderInOwnFrame(80),
   beforeEach: () => {
-    const track: Track = { path: 'Songs/Waiting Silence.mp3', title: 'Waiting Silence' }
+    const track: Track = {
+      path: 'Songs/Waiting Silence.mp3',
+      title: 'Waiting Silence',
+      artist: 'Angra'
+    }
     usePlaybackStore.setState({
       session: {
         track,
@@ -103,7 +107,11 @@ export const SeeksWithinTheSong: Story = {
 export const JumpsFiveSecondsWithTheArrowKeys: Story = {
   parameters: renderInOwnFrame(80),
   beforeEach: () => {
-    const track: Track = { path: 'Songs/Wuthering Heights.mp3', title: 'Wuthering Heights' }
+    const track: Track = {
+      path: 'Songs/Wuthering Heights.mp3',
+      title: 'Wuthering Heights',
+      artist: 'Angra'
+    }
     usePlaybackStore.setState({
       session: {
         track,

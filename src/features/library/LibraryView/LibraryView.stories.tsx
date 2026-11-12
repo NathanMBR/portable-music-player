@@ -7,11 +7,11 @@ import type { Track } from '../types'
 import { LibraryView } from './LibraryView'
 
 const TRACKS: Track[] = [
-  { path: 'Songs/Metal Icarus.mp3', title: 'Metal Icarus' },
-  { path: 'Songs/Millennium Sun.mp3', title: 'Millennium Sun' },
-  { path: 'Songs/No Pain for the Dead.mp3', title: 'No Pain for the Dead' },
-  { path: 'Songs/Nothing To Say.mp3', title: 'Nothing To Say' },
-  { path: 'Songs/The Temple of Hate.mp3', title: 'The Temple of Hate' }
+  { path: 'Songs/Metal Icarus.mp3', title: 'Metal Icarus', artist: 'Angra' },
+  { path: 'Songs/Millennium Sun.mp3', title: 'Millennium Sun', artist: 'Angra' },
+  { path: 'Songs/No Pain for the Dead.mp3', title: 'No Pain for the Dead', artist: 'Angra' },
+  { path: 'Songs/Nothing To Say.mp3', title: 'Nothing To Say', artist: 'Angra' },
+  { path: 'Songs/The Temple of Hate.mp3', title: 'The Temple of Hate', artist: 'Angra' }
 ]
 
 const meta = {

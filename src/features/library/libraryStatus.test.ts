@@ -4,7 +4,7 @@ import type { ScanOutcome } from './types'
 
 const loadedWith = (titles: string[]): ScanOutcome => ({
   kind: 'loaded',
-  tracks: titles.map(title => ({ path: `Songs/${title}.mp3`, title }))
+  tracks: titles.map(title => ({ path: `Songs/${title}.mp3`, title, artist: 'Angra' }))
 })
 
 describe('describeLibraryStatus', () => {

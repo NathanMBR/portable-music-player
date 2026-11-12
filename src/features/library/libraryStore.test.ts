@@ -4,7 +4,11 @@ import { shownNotifications } from '../../testing/notifications'
 import { useLibraryStore } from './libraryStore'
 import type { ScanOutcome, Track } from './types'
 
-const trackTitled = (title: string): Track => ({ path: `Songs/${title}.mp3`, title })
+const trackTitled = (title: string, artist: string): Track => ({
+  path: `Songs/${title}.mp3`,
+  title,
+  artist
+})
 
 const READ_ERROR =
   "Couldn't read the Songs folder at /media/usb/Songs: Permission denied (os error 13)"
@@ -15,8 +19,8 @@ describe('scanLibrary', () => {
   it('loads the songs from Rust, sorted by title', async () => {
     mockCommands({
       load_music_library: () => [
-        trackTitled('Silence and Distance'),
-        trackTitled('Generation Warriors')
+        trackTitled('Silence and Distance', 'Angra'),
+        trackTitled('Generation Warriors', 'Angra')
       ]
     })
 
@@ -26,7 +30,10 @@ describe('scanLibrary', () => {
       isScanning: false,
       lastScan: {
         kind: 'loaded',
-        tracks: [trackTitled('Generation Warriors'), trackTitled('Silence and Distance')]
+        tracks: [
+          trackTitled('Generation Warriors', 'Angra'),
+          trackTitled('Silence and Distance', 'Angra')
+        ]
       }
     })
   })
@@ -45,7 +52,7 @@ describe('scanLibrary', () => {
   it('keeps the previous result on screen while scanning again', async () => {
     const previousScan: ScanOutcome = {
       kind: 'loaded',
-      tracks: [trackTitled('Generation Warriors')]
+      tracks: [trackTitled('Generation Warriors', 'Angra')]
     }
     useLibraryStore.setState({ lastScan: previousScan })
     let answerScan: (tracks: Track[]) => void = () => undefined
@@ -59,11 +66,11 @@ describe('scanLibrary', () => {
     const scan = scanLibrary()
     expect(useLibraryStore.getState()).toMatchObject({ isScanning: true, lastScan: previousScan })
 
-    answerScan([trackTitled('Silence and Distance')])
+    answerScan([trackTitled('Silence and Distance', 'Angra')])
     await scan
     expect(useLibraryStore.getState()).toMatchObject({
       isScanning: false,
-      lastScan: { kind: 'loaded', tracks: [trackTitled('Silence and Distance')] }
+      lastScan: { kind: 'loaded', tracks: [trackTitled('Silence and Distance', 'Angra')] }
     })
   })
 

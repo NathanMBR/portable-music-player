@@ -5,9 +5,9 @@ import type { Track } from '../types'
 import { ScanFailure } from './ScanFailure'
 
 const TRACKS: Track[] = [
-  { path: 'Songs/Unfinished Allegro.mp3', title: 'Unfinished Allegro' },
-  { path: 'Songs/Extreme Dream.mp3', title: 'Extreme Dream' },
-  { path: 'Songs/Dead Man On Display.mp3', title: 'Dead Man On Display' }
+  { path: 'Songs/Unfinished Allegro.mp3', title: 'Unfinished Allegro', artist: 'Angra' },
+  { path: 'Songs/Extreme Dream.mp3', title: 'Extreme Dream', artist: 'Angra' },
+  { path: 'Songs/Dead Man On Display.mp3', title: 'Dead Man On Display', artist: 'Angra' }
 ]
 
 const loadMusicLibrary = fn(() => TRACKS)

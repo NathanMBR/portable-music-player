@@ -4,6 +4,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lofty::{
+    config::ParseOptions,
+    error::FileParseError,
+    file::TaggedFileExt,
+    probe::Probe,
+    tag::{ItemKey, Tag},
+};
 use serde::{Serialize, Serializer};
 use tauri::{State, ipc::Response};
 
@@ -15,6 +22,11 @@ const MP3_EXTENSION: &str = "mp3";
 /// blob URL, so there songs stream from the song server. Windows' webview (WebView2) plays them from
 /// memory fine, and its planned Local Network Access checks would ask before reaching a local server.
 const STREAMS_SONGS: bool = cfg!(target_os = "linux");
+/// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
+/// "band/orchestra").
+const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
+/// Between the artists of a song whose tag names several, like ID3v2.4's multi-value frames.
+const ARTIST_SEPARATOR: &str = ", ";
 
 /// Where the webview plays a song from. Mirrors `SongSource` in src/features/library/types.ts.
 #[derive(Debug, Serialize)]
@@ -32,7 +44,11 @@ pub struct Track {
     /// Relative to the root folder with `/` separators, so it stays valid when the drive is
     /// mounted elsewhere or opened on the other OS.
     path: String,
+    /// The title tag, or the file name without its extension when the song has none.
     title: String,
+    /// The artist tag, or the album artist when it's missing, with several artists joined by
+    /// `ARTIST_SEPARATOR`.
+    artist: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -180,11 +196,65 @@ fn find_tracks(songs_dir: &Path) -> Result<Vec<Track>, LibraryError> {
 
 fn track_from(file: &Path) -> Track {
     let file_name = file.file_name().unwrap_or_default().to_string_lossy();
-    let title = file.file_stem().unwrap_or_default().to_string_lossy();
+    // Bad tags never fail the scan: a song whose tags can't be read is listed under its file name.
+    let tags = read_song_tags(file).unwrap_or_default();
     Track {
         path: format!("{SONGS_FOLDER_NAME}/{file_name}"),
-        title: title.into_owned(),
+        title: tags.title.unwrap_or_else(|| title_from_file_name(file)),
+        artist: tags.artist,
     }
+}
+
+/// A song's title when its tags give none: its file name without the extension.
+fn title_from_file_name(file: &Path) -> String {
+    file.file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// What a song's tags say about it, trimmed, with blank values counted as missing.
+#[derive(Default)]
+struct SongTags {
+    title: Option<String>,
+    artist: Option<String>,
+}
+
+/// The scan reads every song from a possibly slow flash drive, so it reads only their tags: not the
+/// audio's properties, which lofty finds by decoding frames, nor the embedded pictures.
+fn tags_only() -> ParseOptions {
+    ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(false)
+}
+
+fn read_song_tags(song: &Path) -> Result<SongTags, FileParseError> {
+    let tagged_file = Probe::open(song)?.options(tags_only()).read()?;
+    let tags = tagged_file.tags();
+    Ok(SongTags {
+        title: tag_values(tags, ItemKey::TrackTitle)
+            .first()
+            .map(|title| (*title).to_owned()),
+        artist: ARTIST_KEYS
+            .into_iter()
+            .map(|key| tag_values(tags, key))
+            .find(|artists| !artists.is_empty())
+            .map(|artists| artists.join(ARTIST_SEPARATOR)),
+    })
+}
+
+/// The trimmed, non-blank values of `key` in the first of `tags` that has any. An MP3's tags come
+/// ID3v2 first, so its ID3v1 or APE tag only fills in what the ID3v2 tag lacks.
+fn tag_values(tags: &[Tag], key: ItemKey) -> Vec<&str> {
+    tags.iter()
+        .map(|tag| {
+            tag.get_strings(key)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .find(|values| !values.is_empty())
+        .unwrap_or_default()
 }
 
 fn is_mp3(path: &Path) -> bool {
@@ -205,7 +275,48 @@ fn has_mp3_name(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use lofty::{
+        config::WriteOptions,
+        tag::{ItemValue, TagExt, TagItem, TagType},
+    };
+
     use super::*;
+
+    /// Two silent MPEG-1 Layer III frames (128 kbit/s, 44.1 kHz): the shortest audio lofty decodes
+    /// as MP3, since it checks a frame against the next one.
+    fn silent_audio() -> Vec<u8> {
+        const FRAME_HEADER: [u8; 4] = [0xFF, 0xFB, 0x90, 0x64];
+        const FRAME_LENGTH: usize = 417;
+        const FRAME_COUNT: usize = 2;
+        let mut frame = vec![0; FRAME_LENGTH];
+        frame[..FRAME_HEADER.len()].copy_from_slice(&FRAME_HEADER);
+        frame.repeat(FRAME_COUNT)
+    }
+
+    /// The bytes of a `tag_type` tag holding `items`, as lofty writes it into a file. A key given
+    /// more than once holds several values.
+    fn tag_bytes(tag_type: TagType, items: &[(ItemKey, &str)]) -> Vec<u8> {
+        let mut tag = Tag::new(tag_type);
+        for &(key, value) in items {
+            tag.push(TagItem::new(key, ItemValue::Text(value.to_owned())));
+        }
+        let mut bytes = Vec::new();
+        tag.dump_to(&mut bytes, WriteOptions::default()).unwrap();
+        bytes
+    }
+
+    /// An MP3 whose ID3v2 tag, at its start, holds `items`.
+    fn song_tagged(items: &[(ItemKey, &str)]) -> Vec<u8> {
+        [tag_bytes(TagType::Id3v2, items), silent_audio()].concat()
+    }
+
+    /// The track the scan lists for a song file named `file_name` holding `bytes`.
+    fn track_of_song(file_name: &str, bytes: &[u8]) -> Track {
+        let songs_dir = tempfile::tempdir().unwrap();
+        let song = songs_dir.path().join(file_name);
+        fs::write(&song, bytes).unwrap();
+        track_from(&song)
+    }
 
     #[test]
     fn accepts_mp3_names_in_any_case() {
@@ -303,16 +414,209 @@ mod tests {
     }
 
     #[test]
+    fn names_tracks_after_their_title_tag() {
+        let track = track_of_song(
+            "08 Nothing Else Matters.mp3",
+            &song_tagged(&[(ItemKey::TrackTitle, "Nothing Else Matters")]),
+        );
+
+        assert_eq!(track.title, "Nothing Else Matters");
+        assert_eq!(track.path, "Songs/08 Nothing Else Matters.mp3");
+        assert_eq!(track.artist, None);
+    }
+
+    #[test]
+    fn names_tracks_with_a_blank_title_tag_after_their_file() {
+        let track = track_of_song(
+            "Paradise.mp3",
+            &song_tagged(&[(ItemKey::TrackTitle, "   ")]),
+        );
+
+        assert_eq!(track.title, "Paradise");
+    }
+
+    #[test]
+    fn trims_the_title_and_the_artist() {
+        let track = track_of_song(
+            "05 Orion.mp3",
+            &song_tagged(&[
+                (ItemKey::TrackTitle, "  Orion  "),
+                (ItemKey::TrackArtist, " Metallica "),
+            ]),
+        );
+
+        assert_eq!(track.title, "Orion");
+        assert_eq!(track.artist.as_deref(), Some("Metallica"));
+    }
+
+    #[test]
+    fn credits_the_artist_tag_over_the_album_artist() {
+        let track = track_of_song(
+            "Wasting My Hate.mp3",
+            &song_tagged(&[
+                (ItemKey::TrackArtist, "Metallica"),
+                (ItemKey::AlbumArtist, "Shaman"),
+            ]),
+        );
+
+        assert_eq!(track.artist.as_deref(), Some("Metallica"));
+    }
+
+    #[test]
+    fn credits_the_album_artist_when_the_artist_tag_is_missing_or_blank() {
+        let without_artist = track_of_song(
+            "Arising Thunder.mp3",
+            &song_tagged(&[(ItemKey::AlbumArtist, "Angra")]),
+        );
+        let with_blank_artist = track_of_song(
+            "Roulette.mp3",
+            &song_tagged(&[
+                (ItemKey::TrackArtist, " "),
+                (ItemKey::AlbumArtist, "System of a Down"),
+            ]),
+        );
+
+        assert_eq!(without_artist.artist.as_deref(), Some("Angra"));
+        assert_eq!(
+            with_blank_artist.artist.as_deref(),
+            Some("System of a Down")
+        );
+    }
+
+    #[test]
+    fn joins_the_artists_of_a_song_that_names_several() {
+        let track = track_of_song(
+            "Faithless Sanctuary.mp3",
+            &song_tagged(&[
+                (ItemKey::TrackArtist, "Angra"),
+                (ItemKey::TrackArtist, "Woodkid"),
+            ]),
+        );
+
+        assert_eq!(track.artist.as_deref(), Some("Angra, Woodkid"));
+    }
+
+    #[test]
+    fn names_tracks_without_tags_after_their_file() {
+        let track = track_of_song("Devil's Dance.mp3", &silent_audio());
+
+        assert_eq!(track.title, "Devil's Dance");
+        assert_eq!(track.artist, None);
+    }
+
+    #[test]
+    fn names_tracks_with_corrupt_tags_after_their_file() {
+        // ID3v2 has no version 9, so lofty can't read the file at all.
+        let unknown_version = [b"ID3\x09\x00\x00\x00\x00\x00\x20".as_slice(), &[0xAB; 32]].concat();
+        // A valid ID3v2.4 header, then 64 bytes that aren't frames.
+        let unreadable_frames =
+            [b"ID3\x04\x00\x00\x00\x00\x00\x40".as_slice(), &[0xFF; 64]].concat();
+        // Every byte of an ID3v2 size is below 0x80 (synchsafe), so this size can't be.
+        let impossible_size = [b"ID3\x04\x00\x00\xFF\xFF\xFF\xFF".as_slice(), &[0x41; 64]].concat();
+
+        for (title, corrupt_tag) in [
+            ("In Excelsis", unknown_version),
+            ("Innervision", unreadable_frames),
+            ("Reactor", impossible_size),
+        ] {
+            let song = [corrupt_tag, silent_audio()].concat();
+
+            let track = track_of_song(&format!("{title}.mp3"), &song);
+
+            assert_eq!(track.title, title);
+            assert_eq!(track.artist, None, "{title} should have no artist");
+        }
+    }
+
+    #[test]
+    fn reads_id3v1_tags() {
+        let id3v1_tag = tag_bytes(
+            TagType::Id3v1,
+            &[
+                (ItemKey::TrackTitle, "The Shortest Straw"),
+                (ItemKey::TrackArtist, "Metallica"),
+            ],
+        );
+        let song = [silent_audio(), id3v1_tag].concat();
+
+        let track = track_of_song("04 The Shortest Straw.mp3", &song);
+
+        assert_eq!(track.title, "The Shortest Straw");
+        assert_eq!(track.artist.as_deref(), Some("Metallica"));
+    }
+
+    #[test]
+    fn prefers_the_id3v2_tag_and_fills_in_from_id3v1() {
+        let id3v2_tag = tag_bytes(
+            TagType::Id3v2,
+            &[(ItemKey::TrackTitle, "Angels and Demons")],
+        );
+        let id3v1_tag = tag_bytes(
+            TagType::Id3v1,
+            &[
+                (ItemKey::TrackTitle, "angels and demons"),
+                (ItemKey::TrackArtist, "Angra"),
+            ],
+        );
+        let song = [id3v2_tag, silent_audio(), id3v1_tag].concat();
+
+        let track = track_of_song("02 Angels and Demons.mp3", &song);
+
+        assert_eq!(track.title, "Angels and Demons");
+        assert_eq!(track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_tags_without_decoding_the_audio() {
+        // A tag with no audio after it: only decoding the audio's properties would fail on it.
+        let song = tag_bytes(
+            TagType::Id3v2,
+            &[
+                (ItemKey::TrackTitle, "Make Believe"),
+                (ItemKey::TrackArtist, "Angra"),
+            ],
+        );
+
+        let track = track_of_song("11 Make Believe.mp3", &song);
+
+        assert_eq!(track.title, "Make Believe");
+        assert_eq!(track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
     fn serializes_tracks_like_the_frontend_track_type() {
         // Mirrors `Track` in src/features/library/types.ts.
         let track = Track {
             path: "Songs/Nothing To Say.mp3".into(),
             title: "Nothing To Say".into(),
+            artist: Some("Angra".into()),
         };
 
         assert_eq!(
             serde_json::to_value(&track).unwrap(),
-            serde_json::json!({ "path": "Songs/Nothing To Say.mp3", "title": "Nothing To Say" })
+            serde_json::json!({
+                "path": "Songs/Nothing To Say.mp3",
+                "title": "Nothing To Say",
+                "artist": "Angra"
+            })
+        );
+    }
+
+    #[test]
+    fn serializes_a_track_without_an_artist_with_a_null_artist() {
+        let track = Track {
+            path: "Songs/Leper Messiah.mp3".into(),
+            title: "Leper Messiah".into(),
+            artist: None,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&track).unwrap(),
+            serde_json::json!({
+                "path": "Songs/Leper Messiah.mp3",
+                "title": "Leper Messiah",
+                "artist": null
+            })
         );
     }
 

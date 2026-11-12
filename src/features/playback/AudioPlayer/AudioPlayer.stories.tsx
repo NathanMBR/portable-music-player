@@ -5,12 +5,21 @@ import type { Track } from '../../library/types'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { AudioPlayer } from './AudioPlayer'
 
-const firstTrack: Track = { path: 'Songs/Angels and Demons.mp3', title: 'Angels and Demons' }
+const firstTrack: Track = {
+  path: 'Songs/Angels and Demons.mp3',
+  title: 'Angels and Demons',
+  artist: 'Angra'
+}
 const secondTrack: Track = {
   path: 'Songs/A Monster in Her Eyes.mp3',
-  title: 'A Monster in Her Eyes'
+  title: 'A Monster in Her Eyes',
+  artist: 'Angra'
 }
-const thirdTrack: Track = { path: 'Songs/Silence and Distance.mp3', title: 'Silence and Distance' }
+const thirdTrack: Track = {
+  path: 'Songs/Silence and Distance.mp3',
+  title: 'Silence and Distance',
+  artist: 'Angra'
+}
 const queue = [firstTrack, secondTrack, thirdTrack]
 
 const LONG_TITLE =
@@ -73,7 +82,7 @@ export const UnknownLength: Story = {
 /** A title too long for the player is cut with an ellipsis. */
 export const LongTitle: Story = {
   beforeEach: () => {
-    const longTrack: Track = { path: `Songs/${LONG_TITLE}.mp3`, title: LONG_TITLE }
+    const longTrack: Track = { path: `Songs/${LONG_TITLE}.mp3`, title: LONG_TITLE, artist: 'Angra' }
     loadSession({ track: longTrack, queue: [longTrack], playOrder: [longTrack] })
   },
   play: async ({ canvas }) => {

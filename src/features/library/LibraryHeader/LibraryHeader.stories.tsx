@@ -8,11 +8,11 @@ import type { Track } from '../types'
 import { LibraryHeader } from './LibraryHeader'
 
 const TRACKS: Track[] = [
-  { path: 'Songs/Gate XIII.mp3', title: 'Gate XIII' },
-  { path: 'Songs/Heroes of Sand.mp3', title: 'Heroes of Sand' },
-  { path: 'Songs/Holy Land.mp3', title: 'Holy Land' },
-  { path: 'Songs/The Rage of the Waters.mp3', title: 'The Rage of the Waters' },
-  { path: 'Songs/Weakness of a Man.mp3', title: 'Weakness of a Man' }
+  { path: 'Songs/Gate XIII.mp3', title: 'Gate XIII', artist: 'Angra' },
+  { path: 'Songs/Heroes of Sand.mp3', title: 'Heroes of Sand', artist: 'Angra' },
+  { path: 'Songs/Holy Land.mp3', title: 'Holy Land', artist: 'Angra' },
+  { path: 'Songs/The Rage of the Waters.mp3', title: 'The Rage of the Waters', artist: 'Angra' },
+  { path: 'Songs/Weakness of a Man.mp3', title: 'Weakness of a Man', artist: 'Angra' }
 ]
 
 const OPEN_FOLDER_ERROR = "Couldn't open the Songs folder: no application can open folders"

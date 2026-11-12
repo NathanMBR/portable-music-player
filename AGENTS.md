@@ -50,6 +50,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
+- App icons: `src-tauri/icons/app-icon.png` (1024×1024, transparent: "PMP" in the side menu title's type and `ink`, on a `paper` circle) is the source of every icon. Regenerate them with `pnpm tauri icon src-tauri/icons/app-icon.png`, then delete what it adds beyond the files already there (`64x64.png`, `android/`, `ios/`). `public/favicon.svg` is the same design, with the letters as paths. Cargo doesn't track the icon files, so an existing dev build keeps the old ones until the crate recompiles.
 
 ### Frontend layout
 

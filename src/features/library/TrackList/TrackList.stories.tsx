@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, waitFor } from 'storybook/test'
+import { drawCover, noCover, UNTIL_COVER_SHOWS } from '../../../testing/covers'
+import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../types'
 import { TrackList } from './TrackList'
@@ -18,9 +20,19 @@ const LONG_TITLE =
 const firstTrack: Track = { path: 'Songs/Nova Era.mp3', title: 'Nova Era', artist: 'Angra' }
 const secondTrack: Track = { path: 'Songs/Rebirth.mp3', title: 'Rebirth', artist: 'Angra' }
 
+/** The square between a row's play button and its title, which holds the song's cover. */
+const coverSquareAfter = (playButton: HTMLElement) => {
+  const square = playButton.nextElementSibling
+  if (!square) throw new Error('The play button has nothing after it')
+  return square
+}
+
 const meta = {
   component: TrackList,
-  args: { tracks: TRACKS }
+  args: { tracks: TRACKS },
+  beforeEach: () => {
+    mockCommands({ read_cover: noCover })
+  }
 } satisfies Meta<typeof TrackList>
 
 export default meta
@@ -99,10 +111,54 @@ export const LongTitle: Story = {
   ],
   play: async ({ canvas }) => {
     const label = canvas.getByText(LONG_TITLE)
+    const coverBox = coverSquareAfter(canvas.getByRole('button')).getBoundingClientRect()
 
     await expect(label).toHaveAttribute('title', `${LONG_TITLE} · Angra`)
     await expect(label).toContainElement(canvas.getByText('· Angra'))
     await expect(getComputedStyle(label).textOverflow).toBe('ellipsis')
     await expect(label.scrollWidth).toBeGreaterThan(label.clientWidth)
+    await expect(coverBox.width).toBe(coverBox.height)
+  }
+}
+
+/**
+ * A song with an embedded cover shows a miniature of it between the play button and the title.
+ * The square is no taller than the play button, so the row stays as tall as one without a cover.
+ */
+export const SongWithCover: Story = {
+  args: { tracks: [{ path: 'Songs/Gentle Change.mp3', title: 'Gentle Change', artist: 'Angra' }] },
+  parameters: renderInOwnFrame(80),
+  beforeEach: () => {
+    mockCommands({ read_cover: drawCover })
+  },
+  play: async ({ canvas }) => {
+    const playButton = canvas.getByRole('button', { name: 'Play Gentle Change' })
+    const square = coverSquareAfter(playButton)
+
+    await expect(square.nextElementSibling).toBe(canvas.getByText('Gentle Change'))
+    await waitFor(
+      () => expect(square.querySelector('img')?.naturalWidth).toBeGreaterThan(0),
+      UNTIL_COVER_SHOWS
+    )
+    const squareBox = square.getBoundingClientRect()
+    await expect(squareBox.width).toBe(squareBox.height)
+    await expect(squareBox.height).toBeLessThanOrEqual(playButton.getBoundingClientRect().height)
+  }
+}
+
+/**
+ * A song without a cover shows a photo icon in its square instead, in the same place and at the
+ * same size.
+ */
+export const SongWithoutCover: Story = {
+  args: { tracks: [{ path: 'Songs/Cure.mp3', title: 'Cure', artist: 'Metallica' }] },
+  parameters: renderInOwnFrame(80),
+  play: async ({ canvas }) => {
+    const square = coverSquareAfter(canvas.getByRole('button', { name: 'Play Cure' }))
+
+    await expect(square.nextElementSibling).toBe(canvas.getByText('Cure'))
+    await waitFor(() => expect(square.querySelector('svg')).toBeVisible(), UNTIL_COVER_SHOWS)
+    await expect(square.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    await expect(square.querySelector('img')).toBeNull()
   }
 }

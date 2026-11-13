@@ -1,13 +1,15 @@
 use std::{
     ffi::OsStr,
-    fs, io,
+    fs::{self, File},
+    io::{self, BufReader},
     path::{Path, PathBuf},
 };
 
 use lofty::{
     config::ParseOptions,
     error::FileParseError,
-    file::TaggedFileExt,
+    file::{FileType, TaggedFileExt},
+    picture::{Picture, PictureType},
     probe::Probe,
     tag::{ItemKey, Tag},
 };
@@ -108,6 +110,16 @@ pub async fn read_song(path: String) -> Result<Response, LibraryError> {
     read_song_in(&root, &path).map(Response::new)
 }
 
+/// A song's embedded cover, sent as raw bytes rather than JSON, or as no bytes at all when it has
+/// none. The scan leaves pictures out (`tags_only`), so the webview asks for each cover on its own,
+/// once the song's row is on screen.
+#[tauri::command]
+pub async fn read_cover(path: String) -> Result<Response, LibraryError> {
+    let root = portable::root_dir().map_err(LibraryError::RootDir)?;
+    let cover = read_cover_in(&root, &path)?;
+    Ok(Response::new(cover.unwrap_or_default()))
+}
+
 /// Checks that `track_path` is a song of `root`'s Songs folder, then says where it plays from:
 /// its URL on the song server when songs `stream`, started with the first one, or memory.
 fn song_source_in(
@@ -172,6 +184,42 @@ fn read_song_in(root: &Path, track_path: &str) -> Result<Vec<u8>, LibraryError> 
         path: track_path.to_owned(),
         source,
     })
+}
+
+/// The cover of the song a `Track::path` points to. Only a song that can't be found or opened is
+/// an error: one without pictures, or whose tags can't be read, simply has no cover.
+fn read_cover_in(root: &Path, track_path: &str) -> Result<Option<Vec<u8>>, LibraryError> {
+    let song = find_song_in(root, track_path)?;
+    let file = File::open(song).map_err(|source| LibraryError::ReadSong {
+        path: track_path.to_owned(),
+        source,
+    })?;
+    Ok(read_song_cover(file))
+}
+
+fn read_song_cover(song: File) -> Option<Vec<u8>> {
+    // Bad tags never fail a cover, like they never fail the scan: the row shows the placeholder.
+    let tagged_file = Probe::with_file_type(BufReader::new(song), FileType::Mpeg)
+        .options(tags_with_pictures())
+        .read()
+        .ok()?;
+    cover_among(tagged_file.tags()).map(|cover| cover.data().to_vec())
+}
+
+/// Covers are read one song at a time, as their rows come on screen, so they're read with the
+/// tags' pictures, but still without decoding the audio's properties.
+fn tags_with_pictures() -> ParseOptions {
+    ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(true)
+}
+
+/// A song's front cover, else its first picture. An MP3's tags come ID3v2 first.
+fn cover_among(tags: &[Tag]) -> Option<&Picture> {
+    let pictures = || tags.iter().flat_map(Tag::pictures);
+    pictures()
+        .find(|picture| picture.pic_type() == PictureType::CoverFront)
+        .or_else(|| pictures().next())
 }
 
 /// `\` is checked on every OS: it's a separator on Windows, where it could climb out of the folder.
@@ -277,6 +325,7 @@ fn has_mp3_name(path: &Path) -> bool {
 mod tests {
     use lofty::{
         config::WriteOptions,
+        picture::MimeType,
         tag::{ItemValue, TagExt, TagItem, TagType},
     };
 
@@ -293,21 +342,68 @@ mod tests {
         frame.repeat(FRAME_COUNT)
     }
 
-    /// The bytes of a `tag_type` tag holding `items`, as lofty writes it into a file. A key given
-    /// more than once holds several values.
-    fn tag_bytes(tag_type: TagType, items: &[(ItemKey, &str)]) -> Vec<u8> {
-        let mut tag = Tag::new(tag_type);
-        for &(key, value) in items {
-            tag.push(TagItem::new(key, ItemValue::Text(value.to_owned())));
-        }
+    /// The bytes of `tag`, as lofty writes it into a file.
+    fn bytes_of(tag: &Tag) -> Vec<u8> {
         let mut bytes = Vec::new();
         tag.dump_to(&mut bytes, WriteOptions::default()).unwrap();
         bytes
     }
 
+    /// The bytes of a `tag_type` tag holding `items`. A key given more than once holds several
+    /// values.
+    fn tag_bytes(tag_type: TagType, items: &[(ItemKey, &str)]) -> Vec<u8> {
+        let mut tag = Tag::new(tag_type);
+        for &(key, value) in items {
+            tag.push(TagItem::new(key, ItemValue::Text(value.to_owned())));
+        }
+        bytes_of(&tag)
+    }
+
     /// An MP3 whose ID3v2 tag, at its start, holds `items`.
     fn song_tagged(items: &[(ItemKey, &str)]) -> Vec<u8> {
         [tag_bytes(TagType::Id3v2, items), silent_audio()].concat()
+    }
+
+    /// The bytes of an ID3v2 tag holding `pictures`, in order, each of a type and with its data.
+    /// Lofty keeps a picture's data as it is, so any bytes tell pictures apart. ID3v2 keeps one
+    /// picture per description, so each one is described by its type.
+    fn tag_with_pictures(pictures: &[(PictureType, &[u8])]) -> Vec<u8> {
+        let mut tag = Tag::new(TagType::Id3v2);
+        for &(picture_type, data) in pictures {
+            let picture = Picture::unchecked(data.to_vec())
+                .pic_type(picture_type)
+                .mime_type(MimeType::Jpeg)
+                .description(format!("{picture_type:?}"))
+                .build();
+            tag.push_picture(picture);
+        }
+        bytes_of(&tag)
+    }
+
+    /// An MP3 whose ID3v2 tag, at its start, holds `pictures`.
+    fn song_with_pictures(pictures: &[(PictureType, &[u8])]) -> Vec<u8> {
+        [tag_with_pictures(pictures), silent_audio()].concat()
+    }
+
+    /// ID3v2 tags that lofty can't read, each broken in its own way.
+    fn corrupt_tags() -> [Vec<u8>; 3] {
+        // ID3v2 has no version 9, so lofty can't read the file at all.
+        let unknown_version = [b"ID3\x09\x00\x00\x00\x00\x00\x20".as_slice(), &[0xAB; 32]].concat();
+        // A valid ID3v2.4 header, then 64 bytes that aren't frames.
+        let unreadable_frames =
+            [b"ID3\x04\x00\x00\x00\x00\x00\x40".as_slice(), &[0xFF; 64]].concat();
+        // Every byte of an ID3v2 size is below 0x80 (synchsafe), so this size can't be.
+        let impossible_size = [b"ID3\x04\x00\x00\xFF\xFF\xFF\xFF".as_slice(), &[0x41; 64]].concat();
+        [unknown_version, unreadable_frames, impossible_size]
+    }
+
+    /// The cover `read_cover_in` finds in a song of the Songs folder named `file_name` holding
+    /// `bytes`.
+    fn cover_of_song(file_name: &str, bytes: &[u8]) -> Option<Vec<u8>> {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        fs::write(songs_dir.join(file_name), bytes).unwrap();
+        read_cover_in(root.path(), &format!("{SONGS_FOLDER_NAME}/{file_name}")).unwrap()
     }
 
     /// The track the scan lists for a song file named `file_name` holding `bytes`.
@@ -506,19 +602,10 @@ mod tests {
 
     #[test]
     fn names_tracks_with_corrupt_tags_after_their_file() {
-        // ID3v2 has no version 9, so lofty can't read the file at all.
-        let unknown_version = [b"ID3\x09\x00\x00\x00\x00\x00\x20".as_slice(), &[0xAB; 32]].concat();
-        // A valid ID3v2.4 header, then 64 bytes that aren't frames.
-        let unreadable_frames =
-            [b"ID3\x04\x00\x00\x00\x00\x00\x40".as_slice(), &[0xFF; 64]].concat();
-        // Every byte of an ID3v2 size is below 0x80 (synchsafe), so this size can't be.
-        let impossible_size = [b"ID3\x04\x00\x00\xFF\xFF\xFF\xFF".as_slice(), &[0x41; 64]].concat();
-
-        for (title, corrupt_tag) in [
-            ("In Excelsis", unknown_version),
-            ("Innervision", unreadable_frames),
-            ("Reactor", impossible_size),
-        ] {
+        for (title, corrupt_tag) in ["In Excelsis", "Innervision", "Reactor"]
+            .into_iter()
+            .zip(corrupt_tags())
+        {
             let song = [corrupt_tag, silent_audio()].concat();
 
             let track = track_of_song(&format!("{title}.mp3"), &song);
@@ -728,6 +815,110 @@ mod tests {
                 "Couldn't find Songs/The Shaman.mp3: it may have been moved, renamed or deleted"
             )
         );
+    }
+
+    #[test]
+    fn serializes_a_failed_song_read_as_its_message() {
+        let error = LibraryError::ReadSong {
+            path: "Songs/Attitude.mp3".into(),
+            source: io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&error).unwrap(),
+            serde_json::json!("Couldn't read Songs/Attitude.mp3: permission denied")
+        );
+    }
+
+    #[test]
+    fn reads_the_front_cover_over_the_other_pictures() {
+        let song = song_with_pictures(&[
+            (PictureType::Artist, b"the band on stage"),
+            (PictureType::CoverFront, b"the front cover"),
+            (PictureType::CoverBack, b"the back cover"),
+        ]);
+
+        let cover = cover_of_song("Horizons into Battlegrounds.mp3", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_first_picture_of_a_song_without_a_front_cover() {
+        let song = song_with_pictures(&[
+            (PictureType::CoverBack, b"the back cover"),
+            (PictureType::Artist, b"the band on stage"),
+        ]);
+
+        let cover = cover_of_song("In Your Likeness.mp3", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the back cover".as_slice()));
+    }
+
+    #[test]
+    fn gives_no_cover_for_a_song_without_pictures() {
+        let song = song_tagged(&[
+            (ItemKey::TrackTitle, "Motorbreath"),
+            (ItemKey::TrackArtist, "Metallica"),
+        ]);
+
+        assert_eq!(cover_of_song("Motorbreath.mp3", &song), None);
+    }
+
+    #[test]
+    fn gives_no_cover_for_a_song_without_tags() {
+        assert_eq!(
+            cover_of_song("Violent Pornography.mp3", &silent_audio()),
+            None
+        );
+    }
+
+    #[test]
+    fn gives_no_cover_for_a_song_with_corrupt_tags() {
+        for corrupt_tag in corrupt_tags() {
+            let song = [corrupt_tag, silent_audio()].concat();
+
+            assert_eq!(cover_of_song("Fight Fire with Fire.mp3", &song), None);
+        }
+    }
+
+    #[test]
+    fn reads_the_cover_without_decoding_the_audio() {
+        // A tag with no audio after it: only decoding the audio's properties would fail on it.
+        let song = tag_with_pictures(&[(PictureType::CoverFront, b"the front cover")]);
+
+        let cover = cover_of_song("Awake from Darkness.mp3", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn refuses_covers_of_files_outside_the_songs_folder() {
+        let root = tempfile::tempdir().unwrap();
+        ensure_songs_dir_in(root.path()).unwrap();
+        let song = song_with_pictures(&[(PictureType::CoverFront, b"the front cover")]);
+        fs::write(root.path().join("Don't Tread on Me.mp3"), song).unwrap();
+
+        for path in ["Don't Tread on Me.mp3", "Songs/../Don't Tread on Me.mp3"] {
+            assert!(
+                matches!(
+                    read_cover_in(root.path(), path),
+                    Err(LibraryError::NotASong { .. })
+                ),
+                "{path} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn reports_the_cover_of_a_song_that_is_gone() {
+        let root = tempfile::tempdir().unwrap();
+        ensure_songs_dir_in(root.path()).unwrap();
+
+        assert!(matches!(
+            read_cover_in(root.path(), "Songs/Shift.mp3"),
+            Err(LibraryError::SongMissing { .. })
+        ));
     }
 
     #[test]

@@ -50,9 +50,10 @@ and one view in `viewByCategory`.
 The only category so far is **Songs** (`LibraryView`): a header with the song count, which stays in place while the list scrolls, then the
 song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
 scan. Each song starts with a `PlayButton`, which plays it in the audio player with the whole list
-as the queue. Then comes its title and, when its tags name one, its artist, past a middle dot. The
-dot and the artist are in a lighter ink (`ink-faded`) than the title, as in "Better than You ·
-Metallica".
+as the queue. Next comes a square miniature of the song's cover (`CoverThumbnail`), or a photo icon
+on the `rule` color when it has none. Then comes its title and, when its tags name one, its artist,
+past a middle dot. The dot and the artist are in a lighter ink (`ink-faded`) than the title, as in
+"Better than You · Metallica".
 
 ## Where the code lives
 
@@ -77,6 +78,16 @@ The library scan reads each song's tags in Rust, and only its tags, since the dr
 `Track`'s `title` is its title tag, or its file name without the extension when it has none, and
 its `artist` is the artist tag, else the album artist, else `null`. A song whose tags are missing or
 corrupt still shows up, under its file name.
+
+Covers are read apart from the scan, one song at a time, only for the rows on screen. A row's square
+asks for its cover once it has stayed on screen for a moment, so the rows a fast scroll flies past
+read nothing. `read_cover` sends the song's front cover, else its first picture, as raw bytes, or no
+bytes when it has none, and `coverStore.ts` shows them through an object URL. The store keeps a
+limited number of covers, freeing the ones asked for longest ago, and forgets them all after every
+scan, so changed covers are read again. Songs without a picture, with tags that can't be read, or
+with a picture the webview can't draw show the photo icon. A cover Rust can't read at all, because
+the song vanished or the drive was pulled, shows it too, and raises one "Couldn't load a cover"
+notification, which every further failure replaces instead of stacking a copy per row.
 
 Rust errors reach the frontend as their message string. The store that caught one calls
 `notifyError(title, error)`: the title says what failed, and Rust's message, shown as it is, says
@@ -120,6 +131,9 @@ work anyway:
   dismisses every notification. A story then sets the state it shows in its `beforeEach`, for
   example a failed scan. Stories of a component that raises notifications render the notification
   area next to it with the `withNotificationArea` decorator.
+- **Drawn covers.** Stories have no songs to read covers from, so `drawCover`
+  (`src/testing/covers.ts`) draws a small PNG in the browser for `read_cover` to answer, and
+  `noCover` answers a song without one. Every story that shows the song list mocks `read_cover`.
 - **One frame per story on Docs pages.** The stores are shared by everything on a page, so stories
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.

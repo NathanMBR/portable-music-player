@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
+import { useCoverStore } from './coverStore'
 import { useLibraryStore } from './libraryStore'
 import type { ScanOutcome, Track } from './types'
 
@@ -72,6 +73,16 @@ describe('scanLibrary', () => {
       isScanning: false,
       lastScan: { kind: 'loaded', tracks: [trackTitled('Silence and Distance', 'Angra')] }
     })
+  })
+
+  it('forgets the covers once the scan is done, so each is read again from its song', async () => {
+    const track = trackTitled('Winds of Destination', 'Angra')
+    mockCommands({ load_music_library: () => [track] })
+    useCoverStore.setState({ covers: new Map([[track.path, { kind: 'missing' }]]) })
+
+    await scanLibrary()
+
+    expect(useCoverStore.getState().covers.size).toBe(0)
   })
 
   it('ignores a scan requested while one is running', async () => {

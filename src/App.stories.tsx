@@ -5,6 +5,7 @@ import { useLibraryStore } from './features/library/libraryStore'
 import type { Track } from './features/library/types'
 import { DISMISS_LABEL } from './features/notifications/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
+import { noCover } from './testing/covers'
 import { failingCommand, mockCommands } from './testing/mockCommands'
 import { renderInOwnFrame } from './testing/storyParameters'
 
@@ -82,7 +83,8 @@ const meta = {
     mockCommands({
       load_music_library: () => TRACKS,
       open_songs_folder: () => undefined,
-      save_settings: () => undefined
+      save_settings: () => undefined,
+      read_cover: noCover
     })
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: TRACKS } })
   }
@@ -125,7 +127,8 @@ export const NotifiesAboveTheSideMenu: Story = {
   beforeEach: () => {
     mockCommands({
       load_music_library: () => TRACKS,
-      save_settings: failingCommand(SAVE_ERROR)
+      save_settings: failingCommand(SAVE_ERROR),
+      read_cover: noCover
     })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -175,7 +178,7 @@ export const KeepsPlayingAcrossCategories: Story = {
  */
 export const NotifiesAboveThePlayer: Story = {
   beforeEach: () => {
-    mockCommands({ open_songs_folder: failingCommand(OPEN_FOLDER_ERROR) })
+    mockCommands({ open_songs_folder: failingCommand(OPEN_FOLDER_ERROR), read_cover: noCover })
     loadPlayingSong()
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -205,7 +208,7 @@ const SCROLLBAR_WIDTH = 6
  */
 export const ScrollsOnlyTheSongs: Story = {
   beforeEach: () => {
-    mockCommands({ load_music_library: () => LONG_LIST })
+    mockCommands({ load_music_library: () => LONG_LIST, read_cover: noCover })
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: LONG_LIST } })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {

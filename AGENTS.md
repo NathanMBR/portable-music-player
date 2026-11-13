@@ -77,7 +77,7 @@ src/
       <Component>.stories.tsx  its stories: its documentation and component tests
   docs/                 Storybook MDX pages (Introduction, Design tokens)
   testing/              helpers shared by tests and stories (mockCommands, resetStores, shownNotifications,
-                        withNotificationArea, unit test setup)
+                        withNotificationArea, covers, unit test setup)
 ```
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
@@ -92,6 +92,11 @@ src/
   - The app draws every scrollbar itself: `::-webkit-scrollbar` base styles in `src/index.css`, `scrollbar` spacing token for the width. WebKitGTK and WebView2 both draw those, and WebView2 would ignore them if `scrollbar-color` or `scrollbar-width` were set.
   - The scrollbar sits in the right gutter, beside the content, and the content keeps the width between the gutters, like the header (`px-gutter`). The scroll area stops inside the right gutter (see `LibraryView.tsx`) and uses `overflow-y-scroll`, so the scrollbar always keeps its room and only hides while nothing scrolls: WebKitGTK ignores `scrollbar-gutter`.
   - Playwright hides scrollbars by default, so the story tests launch Chromium without `--hide-scrollbars` (`vite.config.ts`) to lay them out like the webviews.
+- Covers: each row of the song list shows a square miniature of its song's embedded cover (`CoverThumbnail`), read apart from the scan, which skips pictures to stay fast on a slow drive.
+  - A square asks for its cover only once it has stayed on screen for `COVER_READ_DELAY_MS` (`useIsOnScreen.ts`, an `IntersectionObserver`), so a long list reads only the covers it shows, and the rows a fast scroll flies past read nothing.
+  - `read_cover` (`library.rs`) sends the picture's bytes as they are (`tauri::ipc::Response`), the same way on both OSes, or no bytes when the song has none; `readCover` in `libraryApi.ts` turns no bytes into `null`. The webview scales the full picture down into the square (`object-cover`), so no image crate is needed. A custom URI scheme could serve the images instead, but a command can be mocked in stories and tells a song without a cover from a failure.
+  - `coverStore.ts` keeps each cover as an object URL, by track path. It frees the ones asked for longest ago past `MAX_CACHED_COVERS`, and all of them after every scan (`forgetCovers`), so changed covers are read again. A read that finishes after its cover was freed is dropped.
+  - A song without a picture, or whose tags can't be read, shows the placeholder: Heroicons' `PhotoIcon` (it has no crossed-out photo) in `ink-faded` on `rule`. So does a picture the webview can't draw, through the image's `error` event. Only a cover Rust can't read at all, because the song vanished or the drive was pulled, is a failure: it shows the placeholder too, and notifies under one title, so failing rows replace one notification instead of stacking one each.
 - Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, and, only while it's open, the space kept for it at the bottom of the window (`pb-player`, eased with the player's slide) and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it.
   - The audio plays from `src/features/playback/songAudio.ts`, the only module that touches it. `main.tsx` connects it once to an `Audio` element, which then follows the playback store (song, play state, position, volume) and reports the song's length, progress and end back to it. Stories never connect it, so they stay silent.
     - The progress follows the wall clock between the audio's reports (`progressEstimate.ts`), from the moment the audio's clock is seen moving until it pauses, waits for data or jumps. On Linux, PulseAudio's clock can hold still for seconds and then catch up while the song plays on (seen in WSL and on Linux Mint, and with plain GStreamer), which froze the progress bar.
@@ -118,6 +123,8 @@ src/
   - `Track::title` is the title tag, else the file name without the extension. `Track::artist` is the artist tag (ID3's lead performer), else the album artist (ID3's band/orchestra), else `None`. Several values of one tag, like ID3v2.4's multi-value frames, are joined with `, ` (`ARTIST_SEPARATOR`). Values are trimmed, and blank counts as missing.
   - Each value comes from the first tag that has it: an MP3's ID3v2 tag first, so its ID3v1 or APE tag only fills in what the ID3v2 tag lacks.
   - Bad tags never fail the scan: a song with no tags, or with unreadable or corrupt ones, is listed under its file name with no artist.
+  - `read_cover` reads one song's tags with their pictures (`tags_with_pictures()`, still without audio properties), once `find_song_in` has checked its path, and sends its front cover, else its first picture (`cover_among`). Only a song that can't be found or opened is an error (`SongMissing`, `ReadSong`); a song without pictures, or with unreadable or corrupt tags, has no cover.
+  - lofty hands back whatever part of a picture is there when the file ends inside it, as after a copy cut short, so such a song can send part of an image: the webview draws what it can, or the placeholder.
 - `song_server.rs`: the HTTP server that streams songs to the Linux webview, on `std::net` with no HTTP crate.
   - It answers one request per connection, each on its own thread, since sending a song takes as long as the webview takes to read it.
   - Every request goes through `library::find_song_in`, the same check as `song_source`, so the server reaches no other file.
@@ -190,7 +197,8 @@ These follow from the project goal and are easy to get wrong:
   - tests call that function with a `tempfile::tempdir()`, never the real executable folder, and the folder is deleted even when a test fails.
 - Every struct and error sent to the frontend has a test pinning its JSON (`serde_json::to_value`), which must match the TypeScript type in the feature's `types.ts`.
 - `unwrap`/`expect` are fine in tests: a panic is how a Rust test fails.
-- Rust tests of tag reading build their MP3s in the temp folder instead of committing fixtures: lofty writes the tag's bytes (`dump_to`), followed by two silent MPEG frames (`silent_audio()` in `library.rs`).
+- Rust tests of tag reading build their MP3s in the temp folder instead of committing fixtures: lofty writes the tag's bytes (`dump_to`), followed by two silent MPEG frames (`silent_audio()` in `library.rs`). Pictures go in the same way (`tag_with_pictures`), each with its own description, since ID3v2 keeps one picture per description.
+- Covers in stories come from `src/testing/covers.ts`: `drawCover` draws a small PNG in the browser for `read_cover` to answer, `noCover` answers a song without one, and waits for a cover use `UNTIL_COVER_SHOWS`, longer than `waitFor`'s default. Every story that renders `TrackList` mocks `read_cover`.
 - **Example songs come from `test/get_mock_songs.sh`**, in stories, tests (frontend and Rust) and docs: titles, artists, file names and paths alike. Never make up a song name or artist.
   - Run `test/get_mock_songs.sh <count>`, asking for as many songs as the example needs, and use the songs it prints, picked at random from `test/mock_songs.csv`. It repeats songs only when you ask for more than the file holds.
   - It prints one CSV record per line, `title,artist`, without a header. A field holding a comma, a double quote, or leading or trailing spaces comes enclosed in double quotes, with inner quotes doubled; take the field without them. The artist may be empty.

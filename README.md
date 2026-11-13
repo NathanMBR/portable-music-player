@@ -8,6 +8,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Keeps all its data next to the executable
 - Songs library from the `Songs` folder
 - Song titles and artists from their tags
+- Song cover miniatures from their tags
 - Songs sorted alphabetically
 - Open the `Songs` folder
 - Scan the library again

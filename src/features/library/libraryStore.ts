@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { notifyError } from '../notifications/notify'
+import { useCoverStore } from './coverStore'
 import { loadMusicLibrary, openSongsFolder } from './libraryApi'
 import { sortTracksByTitle } from './sortTracks'
 import type { ScanOutcome } from './types'
@@ -29,7 +30,10 @@ export const useLibraryStore = create<LibraryStore>()((set, get) => ({
     if (get().isScanning) return
 
     set({ isScanning: true })
-    set({ lastScan: await scanSongsFolder(), isScanning: false })
+    const lastScan = await scanSongsFolder()
+    // The songs may have changed since the last scan, so their covers are read anew too.
+    useCoverStore.getState().forgetCovers()
+    set({ lastScan, isScanning: false })
   },
   openFolder: async () => {
     try {

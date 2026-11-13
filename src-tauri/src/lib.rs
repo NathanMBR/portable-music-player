@@ -16,6 +16,7 @@ pub fn run() {
             library::open_songs_folder,
             library::song_source,
             library::read_song,
+            library::read_cover,
             settings::load_settings,
             settings::save_settings
         ])

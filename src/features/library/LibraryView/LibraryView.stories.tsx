@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect } from 'storybook/test'
+import { noCover } from '../../../testing/covers'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { useLibraryStore } from '../libraryStore'
@@ -20,7 +21,8 @@ const meta = {
   beforeEach: () => {
     mockCommands({
       load_music_library: () => TRACKS,
-      open_songs_folder: () => undefined
+      open_songs_folder: () => undefined,
+      read_cover: noCover
     })
   }
 } satisfies Meta<typeof LibraryView>

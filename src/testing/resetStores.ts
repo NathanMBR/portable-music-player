@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import type { StoreApi } from 'zustand'
+import { useCoverStore } from '../features/library/coverStore'
 import { useLibraryStore } from '../features/library/libraryStore'
 import { useNavigationStore } from '../features/navigation/navigationStore'
 import { usePlaybackStore } from '../features/playback/playbackStore'
@@ -13,6 +14,7 @@ const resetStore = <State>(store: StoreApi<State>) => store.setState(store.getIn
  * they're dismissed too.
  */
 export const resetStores = () => {
+  resetStore(useCoverStore)
   resetStore(useLibraryStore)
   resetStore(useNavigationStore)
   resetStore(usePlaybackStore)

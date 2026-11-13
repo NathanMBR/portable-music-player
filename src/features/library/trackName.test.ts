@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fullTrackName } from './trackName'
+import { fileNameOf, fullTrackName } from './trackName'
 
 describe('fullTrackName', () => {
   it('follows the title with the artist, past a middle dot', () => {
@@ -16,5 +16,13 @@ describe('fullTrackName', () => {
     const track = { path: 'Songs/Boat Song.mp3', title: 'Boat Song', artist: null }
 
     expect(fullTrackName(track)).toBe('Boat Song')
+  })
+})
+
+describe('fileNameOf', () => {
+  it("is the song's file name, without its folder but with its extension", () => {
+    const track = { path: 'Songs/Mama Said.mp3', title: 'Mama Said', artist: 'Metallica' }
+
+    expect(fileNameOf(track)).toBe('Mama Said.mp3')
   })
 })

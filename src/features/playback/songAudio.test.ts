@@ -257,6 +257,17 @@ describe('connectSongAudio', () => {
     expect(audio.volume).toBe(0.4)
   })
 
+  it("plays silent while muted, and at the slider's volume while it moves", () => {
+    const { audio } = connectAudio()
+    playback().setVolume(0.4)
+
+    playback().toggleMute()
+    expect(audio.volume).toBe(0)
+
+    playback().moveVolume(0.25)
+    expect(audio.volume).toBe(0.25)
+  })
+
   it('reports the length of the song and how far it has played', async () => {
     mockCommands(songsFromMemory)
     const connected = connectAudio()
@@ -280,6 +291,24 @@ describe('connectSongAudio', () => {
     playback().seek(200)
 
     expect(audio.currentTime).toBe(200)
+  })
+
+  it('loads a song put back in the player paused, from where it was', async () => {
+    const boatSong = trackTitled('Boat Song', 'Woodkid')
+    mockCommands(streamedSongs)
+    const connected = connectAudio()
+
+    playback().restore({
+      volume: 1,
+      isMuted: false,
+      repeatMode: 'off',
+      isShuffled: false,
+      song: { track: boatSong, queue: [boatSong], elapsedSeconds: 95.5 }
+    })
+
+    await waitUntilStreaming(connected, boatSong)
+    expect(connected.audio.currentTime).toBe(95.5)
+    expect(connected.audio.paused).toBe(true)
   })
 
   it("doesn't pull the audio back to the time it last reported", async () => {

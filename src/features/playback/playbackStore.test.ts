@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { loggedMessages } from '../../testing/logs'
 import type { Track } from '../library/types'
-import { type PlaybackSession, usePlaybackStore } from './playbackStore'
+import { audibleVolume, type PlaybackSession, usePlaybackStore } from './playbackStore'
 
 const trackTitled = (title: string, artist: string): Track => ({
   path: `Songs/${title}.mp3`,
@@ -17,6 +17,8 @@ const queue = [firstTrack, secondTrack, thirdTrack, fourthTrack]
 
 const playback = () => usePlaybackStore.getState()
 const session = () => usePlaybackStore.getState().session
+
+const heardVolume = () => audibleVolume(usePlaybackStore.getState())
 
 const sortedTitles = (tracks: Track[] | undefined) => tracks?.map(track => track.title).sort()
 
@@ -367,13 +369,53 @@ describe('toggleShuffle', () => {
   })
 })
 
-describe('setVolume', () => {
-  it('starts at full volume and takes the chosen one', () => {
+describe('moveVolume', () => {
+  it('is heard at once, but chooses the volume only once the move ends', () => {
+    playback().moveVolume(0.3)
+
+    expect(heardVolume()).toBe(0.3)
     expect(playback().volume).toBe(1)
+
+    playback().setVolume(0.3)
+
+    expect(playback()).toMatchObject({ volume: 0.3, movingVolume: null })
+    expect(heardVolume()).toBe(0.3)
+  })
+
+  it('is heard while muted too', () => {
+    playback().toggleMute()
+
+    playback().moveVolume(0.5)
+
+    expect(heardVolume()).toBe(0.5)
+  })
+})
+
+describe('setVolume', () => {
+  it('starts at full volume, unmuted, and takes the chosen one', () => {
+    expect(playback()).toMatchObject({ volume: 1, isMuted: false })
 
     playback().setVolume(0.4)
 
     expect(playback().volume).toBe(0.4)
+  })
+
+  it('mutes when the move ends at silent, keeping the volume from before for unmuting', () => {
+    playback().setVolume(0.6)
+    playback().moveVolume(0)
+
+    playback().setVolume(0)
+
+    expect(playback()).toMatchObject({ volume: 0.6, isMuted: true, movingVolume: null })
+    expect(heardVolume()).toBe(0)
+  })
+
+  it('unmutes when the move ends above silent', () => {
+    playback().toggleMute()
+
+    playback().setVolume(0.7)
+
+    expect(playback()).toMatchObject({ volume: 0.7, isMuted: false })
   })
 })
 
@@ -382,32 +424,21 @@ describe('toggleMute', () => {
     playback().setVolume(0.4)
 
     playback().toggleMute()
-    expect(playback().volume).toBe(0)
+    expect(playback()).toMatchObject({ volume: 0.4, isMuted: true })
+    expect(heardVolume()).toBe(0)
 
     playback().toggleMute()
-    expect(playback().volume).toBe(0.4)
+    expect(heardVolume()).toBe(0.4)
   })
 
-  it('brings back full volume when the slider was moved down to silent', () => {
+  it('brings back the volume from before a move that ended at silent', () => {
     playback().setVolume(0.4)
-    playback().toggleMute()
-    playback().toggleMute()
     playback().setVolume(0)
 
     playback().toggleMute()
 
-    expect(playback().volume).toBe(1)
-  })
-
-  it('silences a volume moved by the slider after muting, not the one from before', () => {
-    playback().setVolume(0.4)
-    playback().toggleMute()
-    playback().setVolume(0.7)
-
-    playback().toggleMute()
-    playback().toggleMute()
-
-    expect(playback().volume).toBe(0.7)
+    expect(playback()).toMatchObject({ volume: 0.4, isMuted: false })
+    expect(heardVolume()).toBe(0.4)
   })
 })
 
@@ -497,5 +528,67 @@ describe('the log', () => {
       'Stopped playing song "Sad but True"',
       'Stopped playing song "Sprouts of Time"'
     ])
+  })
+})
+
+describe('restore', () => {
+  const theGoldenAge = trackTitled('The Golden Age', 'Woodkid')
+  const choicesLeft = {
+    volume: 0.6,
+    isMuted: false,
+    repeatMode: 'one',
+    isShuffled: false
+  } as const
+
+  it('puts the song back paused where it was, its length unknown until its audio loads', () => {
+    const songQueue = [firstTrack, theGoldenAge]
+
+    playback().restore({
+      ...choicesLeft,
+      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 125.25 }
+    })
+
+    expect(session()).toEqual({
+      track: theGoldenAge,
+      queue: songQueue,
+      playOrder: songQueue,
+      isPlaying: false,
+      elapsedSeconds: 125.25,
+      durationSeconds: null
+    })
+    expect(playback()).toMatchObject(choicesLeft)
+  })
+
+  it('shuffles the songs after the one put back when shuffle was on', () => {
+    const songQueue = [...queue, theGoldenAge]
+
+    playback().restore({
+      ...choicesLeft,
+      isShuffled: true,
+      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 0 }
+    })
+
+    expect(session()?.playOrder[0]).toBe(theGoldenAge)
+    expect(sortedTitles(session()?.playOrder)).toEqual(sortedTitles(songQueue))
+  })
+
+  it('keeps values edited by hand in settings.json within their range', () => {
+    playback().restore({
+      ...choicesLeft,
+      volume: 1.5,
+      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: -3 }
+    })
+
+    expect(playback().volume).toBe(1)
+    expect(session()?.elapsedSeconds).toBe(0)
+  })
+
+  it('logs the song put back and where', () => {
+    playback().restore({
+      ...choicesLeft,
+      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: 125.25 }
+    })
+
+    expect(loggedMessages()).toEqual(['Restored song "The Golden Age" at 02:05.250'])
   })
 })

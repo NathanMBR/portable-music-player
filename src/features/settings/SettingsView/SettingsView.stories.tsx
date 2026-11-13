@@ -11,7 +11,18 @@ const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
 
 // What settings.rs gives when nothing was saved yet.
-const DEFAULT_SETTINGS: Settings = { theme: null, checksForUpdates: true, songOrder: 'title' }
+const DEFAULT_SETTINGS: Settings = {
+  theme: null,
+  checksForUpdates: true,
+  songOrder: 'title',
+  playback: {
+    volume: 1,
+    isMuted: false,
+    repeatMode: 'off',
+    isShuffled: false,
+    song: null
+  }
+}
 
 const UPDATES_SWITCH = { name: 'Search automatically for updates' }
 const SONG_ORDER_SELECT = { name: /^Sort songs by/ }

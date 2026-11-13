@@ -23,10 +23,10 @@ export const Full: Story = {
   }
 }
 
-/** Silent: the speaker is crossed out, and clicking it unmutes. */
+/** Muted: the slider shows silent and the speaker is crossed out, and clicking it unmutes. */
 export const Muted: Story = {
   beforeEach: () => {
-    usePlaybackStore.setState({ volume: 0 })
+    usePlaybackStore.setState({ volume: 0.6, isMuted: true })
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('slider', { name: 'Volume' })).toHaveAttribute(
@@ -46,6 +46,47 @@ export const MutesAndUnmutes: Story = {
     const slider = canvas.getByRole('slider', { name: 'Volume' })
 
     await userEvent.click(canvas.getByRole('button', { name: 'Mute' }))
+    await expect(slider).toHaveAttribute('aria-valuetext', '0%')
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Unmute' }))
+    await expect(slider).toHaveAttribute('aria-valuetext', '60%')
+  }
+}
+
+/**
+ * While the slider is dragged, the song plays at once at the volume it's on, but the player's
+ * volume is chosen only once the slider is released.
+ */
+export const HearsTheVolumeWhileMoving: Story = {
+  beforeEach: () => {
+    usePlaybackStore.setState({ volume: 0.6 })
+  },
+  play: async ({ canvas }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.input(slider, { target: { value: '30' } })
+    await expect(usePlaybackStore.getState()).toMatchObject({ volume: 0.6, movingVolume: 0.3 })
+    await expect(slider).toHaveAttribute('aria-valuetext', '30%')
+
+    fireEvent.change(slider, { target: { value: '30' } })
+    await expect(usePlaybackStore.getState()).toMatchObject({ volume: 0.3, movingVolume: null })
+  }
+}
+
+/**
+ * Released at silent, the slider mutes instead of choosing a volume of 0%, so unmuting brings
+ * back the volume from before the drag.
+ */
+export const ReleasingAtSilentMutes: Story = {
+  beforeEach: () => {
+    usePlaybackStore.setState({ volume: 0.6 })
+  },
+  play: async ({ canvas, userEvent }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.input(slider, { target: { value: '0' } })
+    fireEvent.change(slider, { target: { value: '0' } })
+    await expect(usePlaybackStore.getState()).toMatchObject({ volume: 0.6, isMuted: true })
     await expect(slider).toHaveAttribute('aria-valuetext', '0%')
 
     await userEvent.click(canvas.getByRole('button', { name: 'Unmute' }))

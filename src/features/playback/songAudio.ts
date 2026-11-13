@@ -2,7 +2,7 @@ import { readSong, songSource } from '../library/libraryApi'
 import type { Track } from '../library/types'
 import { notifyError } from '../notifications/notify'
 import { MS_PER_SECOND, POSITION_STEP_SECONDS } from './constants'
-import { type PlaybackSession, usePlaybackStore } from './playbackStore'
+import { audibleVolume, type PlaybackSession, usePlaybackStore } from './playbackStore'
 import { anchorAfterReport, estimateProgress, type TimedPosition } from './progressEstimate'
 
 /** The parts of an `<audio>` element the player uses, so unit tests can stand in for one. */
@@ -31,7 +31,7 @@ export type ObjectUrls = Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>
 /** What the audio needs to play a song: the URL it streams from, or the bytes of its file. */
 type PlayableSong = { url: string } | { bytes: ArrayBuffer }
 
-type FollowedState = { session: PlaybackSession | null; volume: number }
+type FollowedState = Parameters<typeof audibleVolume>[0] & { session: PlaybackSession | null }
 
 // Every song of the library is an MP3.
 const SONG_TYPE = 'audio/mpeg'
@@ -190,7 +190,8 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
 
       audio.src = addressOf(playableSong)
       song.status = 'ready'
-      followPlaying(playback().session?.isPlaying ?? false)
+      // From the store's position, which isn't the start for a song put back when the app opens.
+      followStore(playback())
     } catch (error) {
       if (loadedSong === song) fail(track, error)
     }
@@ -203,8 +204,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     audio.currentTime = seconds
   }
 
-  const followStore = ({ session, volume }: FollowedState) => {
-    audio.volume = volume
+  const followStore = (state: FollowedState) => {
+    const { session } = state
+    audio.volume = audibleVolume(state)
     if (!session) {
       if (loadedSong) releaseSource()
       loadedSong = null

@@ -45,7 +45,18 @@ export const SwitchesToDark: Story = {
     await expect(canvasElement.ownerDocument.documentElement.dataset.theme).toBe('dark')
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith({
-        settings: { theme: 'dark', checksForUpdates: true, songOrder: 'title' }
+        settings: {
+          theme: 'dark',
+          checksForUpdates: true,
+          songOrder: 'title',
+          playback: {
+            volume: 1,
+            isMuted: false,
+            repeatMode: 'off',
+            isShuffled: false,
+            song: null
+          }
+        }
       })
     )
   }

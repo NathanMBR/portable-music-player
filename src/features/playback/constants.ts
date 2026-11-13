@@ -6,3 +6,6 @@ export const PLAYER_HEIGHT = 'var(--spacing-player)'
 export const POSITION_STEP_SECONDS = 0.1
 
 export const MS_PER_SECOND = 1000
+
+/** How long the player's state has to stay the same before it's saved: the mouse wheel saves once. */
+export const PLAYBACK_SAVE_DELAY_MS = 1000

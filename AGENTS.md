@@ -96,7 +96,7 @@ src/
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
-- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
+- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
   - Nothing searches for updates yet: `checksForUpdates` (on by default) is only a saved choice.
   - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
 - Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
@@ -116,6 +116,11 @@ src/
     - On Linux they stream from `song_server.rs`, a small HTTP server on `127.0.0.1`, started with the first song: a random port, a random token in every URL, Range requests for seeking, and only the MP3s of the Songs folder. Blob URLs can't be used there: WebKitGTK 2.48+ plays `blob:` media through a 2 MB ring buffer that skips ahead in larger files while the timer keeps counting.
     - On Windows `read_song` sends the whole file as raw bytes (`tauri::ipc::Response`), and `songAudio.ts` plays them from an object URL, freed when the song changes. WebView2 plays those fine, and the song server would run into its planned Local Network Access checks on requests to `127.0.0.1`.
     - Tauri's asset protocol (`convertFileSrc`) can't be used for audio: WebKitGTK's media backend can't stream from a custom URI scheme, and `play()` fails with `NotSupportedError`. A CSP added later must allow `blob:` and `http://127.0.0.1:*` as media sources.
+  - Volume: the playback store keeps the volume chosen (`volume`, what's saved and what unmuting brings back), `isMuted`, and the slider's value while it moves (`movingVolume`). The song plays at `audibleVolume`: the moving value, else silent while muted, else the volume. `VolumeSlider` moves it live (`moveVolume`) and chooses it on release (`setVolume`, from the slider's `onCommit`); released at 0, it mutes instead, keeping the volume from before.
+  - The player is put back as it was left when the app opens again (`playbackMemory.ts`): the volume and whether it's muted, repeat, shuffle, and the song in the player with its position, saved in `settings.json`'s `playback`. Their defaults are full volume, unmuted, repeat off and shuffle off, the playback store's own.
+    - `main.tsx` waits for both the settings and the first scan, then calls `restorePlayback`, which finds the song among the scanned ones by its file name (`fileNameOf`, the same on every OS), queues it with the songs as the Songs view sorts them, and puts it back paused (the playback store's `restore`, which also keeps hand-edited values in range). A song gone from the Songs folder, or with no songs scanned, is saved as `null` at once and leaves the player closed. `songAudio.ts` then loads a song put back from its position.
+    - Only then does `connectPlaybackMemory` start saving: `PLAYBACK_SAVE_DELAY_MS` after the saved state last changed, so turning the mouse wheel saves once, and when the window is asked to close. A playing song's position alone calls for no save, since it changes a few times a second.
+    - The close goes through `onCloseRequested`: Tauri keeps the window open while a JS listener runs, and the JS API closes it with `destroy()` once the save is done (`core:window:allow-destroy` in the capabilities). The save never rejects, since a rejected listener would keep the window from closing. A process killed from outside keeps the last state saved.
   - `windowTitle.ts`, also connected once from `main.tsx`, names the window after the title of the song in the player, never its artist (`setTitle`, allowed by `core:window:allow-set-title` in the capabilities), and after the app while there is none. It sets the title only when it changes, since the store changes a few times a second while a song plays.
   - `mediaSession.ts`, also connected once from `main.tsx`, hands the song in the player, with its artist, to the system through `navigator.mediaSession`, so the media keys and the system's media controls drive the playback store (play, pause, stop, next, previous, seek). WebView2 passes it on to Windows' media controls, and WebKitGTK to MPRIS, built in by default from WebKitGTK 2.46. Webviews without the API get nothing.
     - It sets the title and play state only when they change, and no position state: both webviews read the position from the `<audio>` element, and a position state would override it.
@@ -143,7 +148,7 @@ src/
   - Its threads must never panic: the release build aborts on panic, which would kill the app. A failed write only means the webview let go of the song.
   - Responses carry `Cache-Control: no-store`, so the webview doesn't copy songs into its cache on the computer.
 - `settings.rs`: user settings in `settings.json` next to the executable.
-  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet) and the songs' order (`SongOrder`: title by default, or file name).
+  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name and position, `SavedSong`).
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
   - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
 - `logs.rs`: the log, through the official `tauri-plugin-log`, printed to stdout and saved in `Logs/portable-music-player.log` next to the executable (its `Folder` target: the plugin's default `LogDir` is in the user's profile, off the drive). It takes everything logged through the `log` crate, which the plugin re-exports (`tauri_plugin_log::log`).
@@ -201,6 +206,7 @@ These follow from the project goal and are easy to get wrong:
 - **Fake the Rust side only through `mockCommands`** (`src/testing/mockCommands.ts`):
   - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
   - it always answers `write_log`, unless a handler replaces it, keeping the messages: check them with `loggedMessages()` (`src/testing/logs.ts`). Unit tests start with `mockCommands({})` (`setupUnitTests.ts`), like stories, so logging works in every test;
+  - it mocks events too (`shouldMockEvents`), so a test can `emit` what Rust would, like `tauri://close-requested`; window commands also need `mockWindows('main')`;
   - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
   - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
 - Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification and forgets the logged messages.
@@ -278,6 +284,7 @@ Every feature logs what the user does and what the app does in response, followi
 | The song's progress bar is clicked or dragged | `Jumping song to mm:ss.mmm` |
 | The volume slider is moved | `Set volume to <percent>%` |
 | The current page changes | `Changing to page "<page name>"`, the category's name in the menu |
+| A song is put back in the player when the app opens | `Restored song "<title>" at mm:ss.mmm` |
 | The app opens and closes | `Opening app`, `Closing app` |
 
 - `<name>` is the control's accessible name, as screen readers hear it.

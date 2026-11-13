@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Track } from '../library/types'
 import { log } from '../logging/log'
+import { formatPreciseTime } from './playbackTime'
 import {
   createPlayOrder,
   findNextTrack,
@@ -27,6 +28,24 @@ export type PlaybackSession = {
   durationSeconds: number | null
 }
 
+/** The song put back in the player when the app opens again, found among the library's songs. */
+export type RestoredSong = {
+  track: Track
+  /** The list it plays from, as the Songs view shows it. */
+  queue: Track[]
+  elapsedSeconds: number
+}
+
+/** What the player is put back to when the app opens again, as it was left. */
+export type RestoredPlayback = {
+  volume: number
+  isMuted: boolean
+  repeatMode: RepeatMode
+  isShuffled: boolean
+  /** `null` when there was no song in the player, or it's no longer in the library. */
+  song: RestoredSong | null
+}
+
 type TrackFinder = (playOrder: Track[], current: Track, repeatMode: RepeatMode) => Track | null
 
 type PlaybackStore = {
@@ -34,10 +53,14 @@ type PlaybackStore = {
   session: PlaybackSession | null
   repeatMode: RepeatMode
   isShuffled: boolean
-  /** From 0 (silent) to 1 (full). */
+  /** From 0 (silent) to 1 (full): the one heard unless muted, and the one unmuting brings back. */
   volume: number
-  /** The volume that unmuting brings back, `null` unless muted from the speaker button. */
-  volumeBeforeMuting: number | null
+  isMuted: boolean
+  /**
+   * The volume slider's value while it moves, heard at once but chosen only once the move ends;
+   * `null` the rest of the time.
+   */
+  movingVolume: number | null
   shownTime: ShownTime
   playTrack: (track: Track, queue: Track[]) => void
   togglePlaying: () => void
@@ -52,9 +75,13 @@ type PlaybackStore = {
   pause: () => void
   cycleRepeatMode: () => void
   toggleShuffle: () => void
+  /** Plays at the slider's volume while it moves, without choosing it yet. */
+  moveVolume: (volume: number) => void
+  /** Chooses the volume a move of the slider ends on: ending at silent mutes instead. */
   setVolume: (volume: number) => void
   toggleMute: () => void
   toggleShownTime: () => void
+  restore: (restored: RestoredPlayback) => void
 }
 
 const FULL_VOLUME = 1
@@ -76,6 +103,25 @@ const startFromTheBeginning = (session: PlaybackSession, track: Track): Playback
 })
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+
+type HeardVolume = Pick<PlaybackStore, 'volume' | 'isMuted' | 'movingVolume'>
+
+/** The volume the song plays at: the slider's while it moves, else the volume unless muted. */
+export const audibleVolume = ({ volume, isMuted, movingVolume }: HeardVolume) =>
+  movingVolume ?? (isMuted ? SILENT : volume)
+
+// settings.json can be edited by hand, and the audio throws on a volume outside of 0 to 1.
+const toVolume = (value: number) => clamp(value, SILENT, FULL_VOLUME)
+
+// A song put back stays paused: the app opening shouldn't start the music on its own.
+const sessionOf = ({ track, queue, elapsedSeconds }: RestoredSong, isShuffled: boolean) => ({
+  track,
+  queue,
+  playOrder: createPlayOrder(queue, track, isShuffled),
+  isPlaying: false,
+  elapsedSeconds: Math.max(elapsedSeconds, 0),
+  durationSeconds: null
+})
 
 type SongEvent = 'Started' | 'Paused' | 'Resumed' | 'Stopped'
 
@@ -115,7 +161,8 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     repeatMode: 'off',
     isShuffled: false,
     volume: FULL_VOLUME,
-    volumeBeforeMuting: null,
+    isMuted: false,
+    movingVolume: null,
     shownTime: 'elapsed',
     playTrack: (track, queue) => {
       const playOrder = createPlayOrder(queue, track, get().isShuffled)
@@ -188,16 +235,30 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
         }
       })
     },
-    // A volume chosen on the slider replaces the one from before muting.
-    setVolume: volume => set({ volume, volumeBeforeMuting: null }),
-    toggleMute: () => {
-      const { volume, volumeBeforeMuting } = get()
+    moveVolume: movingVolume => set({ movingVolume }),
+    // Keeping the volume from before a move down to silent lets unmuting bring it back.
+    setVolume: volume =>
       set(
         volume === SILENT
-          ? { volume: volumeBeforeMuting ?? FULL_VOLUME, volumeBeforeMuting: null }
-          : { volume: SILENT, volumeBeforeMuting: volume }
-      )
-    },
-    toggleShownTime: () => set(state => ({ shownTime: OTHER_SHOWN_TIME[state.shownTime] }))
+          ? { isMuted: true, movingVolume: null }
+          : { volume, isMuted: false, movingVolume: null }
+      ),
+    toggleMute: () => set(state => ({ isMuted: !state.isMuted, movingVolume: null })),
+    toggleShownTime: () => set(state => ({ shownTime: OTHER_SHOWN_TIME[state.shownTime] })),
+    restore: ({ volume, isMuted, repeatMode, isShuffled, song }) => {
+      const session = song && sessionOf(song, isShuffled)
+      set({
+        volume: toVolume(volume),
+        isMuted,
+        repeatMode,
+        isShuffled,
+        session
+      })
+      if (session) {
+        log(
+          `Restored song "${session.track.title}" at ${formatPreciseTime(session.elapsedSeconds)}`
+        )
+      }
+    }
   }
 })

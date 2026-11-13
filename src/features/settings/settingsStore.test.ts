@@ -2,11 +2,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
 import { useSettingsStore } from './settingsStore'
-import type { Settings, Theme } from './types'
+import type { SavedPlayback, Settings, Theme } from './types'
 
 const SAVE_ERROR = "Couldn't save the settings at settings.json: read-only file system"
 
-const SAVED_DEFAULTS: Settings = { theme: null, checksForUpdates: true, songOrder: 'title' }
+const SAVED_DEFAULTS: Settings = {
+  theme: null,
+  checksForUpdates: true,
+  songOrder: 'title',
+  playback: {
+    volume: 1,
+    isMuted: false,
+    repeatMode: 'off',
+    isShuffled: false,
+    song: null
+  }
+}
 
 const themeOnScreen = () => document.documentElement.dataset.theme
 
@@ -133,6 +144,38 @@ describe('setSongOrder', () => {
     expect(useSettingsStore.getState().settings.songOrder).toBe('fileName')
     expect(shownNotifications()).toEqual([
       { type: 'error', title: "Couldn't save the song order", description: SAVE_ERROR }
+    ])
+  })
+})
+
+describe('savePlayback', () => {
+  const playbackLeft: SavedPlayback = {
+    volume: 0.35,
+    isMuted: false,
+    repeatMode: 'all',
+    isShuffled: true,
+    song: { fileName: 'Know.mp3', elapsedSeconds: 42.5 }
+  }
+
+  it("saves the player's state to settings.json, along with the other settings", async () => {
+    const saveSettings = vi.fn()
+    mockCommands({ save_settings: saveSettings })
+
+    await useSettingsStore.getState().savePlayback(playbackLeft)
+
+    expect(useSettingsStore.getState().settings.playback).toEqual(playbackLeft)
+    expect(saveSettings).toHaveBeenCalledWith({
+      settings: { ...SAVED_DEFAULTS, playback: playbackLeft }
+    })
+  })
+
+  it('notifies why saving failed', async () => {
+    mockCommands({ save_settings: failingCommand(SAVE_ERROR) })
+
+    await useSettingsStore.getState().savePlayback(playbackLeft)
+
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't save the player's state", description: SAVE_ERROR }
     ])
   })
 })

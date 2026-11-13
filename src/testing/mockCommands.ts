@@ -13,14 +13,18 @@ const DEFAULT_HANDLERS: Record<string, CommandHandler> = { write_log: recordLogM
  * Fakes the Rust side for tests and stories, where there is no Tauri runtime. Each handler answers
  * the command of the same name, and `write_log` is answered unless a handler replaces it. A command
  * without a handler rejects, so a missing mock fails loudly instead of quietly resolving to
- * `undefined`.
+ * `undefined`. Events go through Tauri's own mock of them, so a test can `emit` what Rust would,
+ * like a window's `tauri://close-requested`.
  */
 export const mockCommands = (handlers: Record<string, CommandHandler>) => {
-  mockIPC((command, args) => {
-    const handler = handlers[command] ?? DEFAULT_HANDLERS[command]
-    if (!handler) throw new Error(`Unmocked command: ${command}`)
-    return handler(args)
-  })
+  mockIPC(
+    (command, args) => {
+      const handler = handlers[command] ?? DEFAULT_HANDLERS[command]
+      if (!handler) throw new Error(`Unmocked command: ${command}`)
+      return handler(args)
+    },
+    { shouldMockEvents: true }
+  )
 }
 
 /** Rust errors reach the frontend as their message string, so a failing command rejects with one. */

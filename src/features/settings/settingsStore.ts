@@ -2,10 +2,21 @@ import { create } from 'zustand'
 import { notifyError } from '../notifications/notify'
 import { loadSettings, saveSettings } from './settingsApi'
 import { applyTheme, readAppliedTheme } from './theme'
-import type { Settings, SongOrder, Theme } from './types'
+import type { SavedPlayback, Settings, SongOrder, Theme } from './types'
 
 // The same as settings.rs gives for a missing settings.json.
-const DEFAULT_SETTINGS: Settings = { theme: null, checksForUpdates: true, songOrder: 'title' }
+const DEFAULT_SETTINGS: Settings = {
+  theme: null,
+  checksForUpdates: true,
+  songOrder: 'title',
+  playback: {
+    volume: 1,
+    isMuted: false,
+    repeatMode: 'off',
+    isShuffled: false,
+    song: null
+  }
+}
 
 type SettingsStore = {
   settings: Settings
@@ -15,6 +26,8 @@ type SettingsStore = {
   setTheme: (theme: Theme) => Promise<void>
   setChecksForUpdates: (checksForUpdates: boolean) => Promise<void>
   setSongOrder: (songOrder: SongOrder) => Promise<void>
+  /** Saves what the player is left with, for the app to put back when it opens again. */
+  savePlayback: (playback: SavedPlayback) => Promise<void>
 }
 
 export const useSettingsStore = create<SettingsStore>()((set, get) => {
@@ -51,6 +64,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
     },
     setChecksForUpdates: checksForUpdates =>
       saveChoice({ checksForUpdates }, "Couldn't save the update setting"),
-    setSongOrder: songOrder => saveChoice({ songOrder }, "Couldn't save the song order")
+    setSongOrder: songOrder => saveChoice({ songOrder }, "Couldn't save the song order"),
+    savePlayback: playback => saveChoice({ playback }, "Couldn't save the player's state")
   }
 })

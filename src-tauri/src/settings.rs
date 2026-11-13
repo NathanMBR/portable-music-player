@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::portable;
 
 const SETTINGS_FILE_NAME: &str = "settings.json";
+const FULL_VOLUME: f64 = 1.0;
 
 /// Fields missing from the file take their default, so files saved before a choice existed load.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -18,6 +19,7 @@ pub struct Settings {
     /// Whether the player looks for new versions on its own. Nothing acts on it yet.
     checks_for_updates: bool,
     song_order: SongOrder,
+    playback: SavedPlayback,
 }
 
 impl Default for Settings {
@@ -26,8 +28,51 @@ impl Default for Settings {
             theme: None,
             checks_for_updates: true,
             song_order: SongOrder::default(),
+            playback: SavedPlayback::default(),
         }
     }
+}
+
+/// What the player was left with, put back when the app opens again.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SavedPlayback {
+    /// From 0 (silent) to 1 (full): the one heard unless muted, which muting keeps.
+    volume: f64,
+    is_muted: bool,
+    repeat_mode: RepeatMode,
+    is_shuffled: bool,
+    /// `None` when no song was in the player.
+    song: Option<SavedSong>,
+}
+
+impl Default for SavedPlayback {
+    fn default() -> Self {
+        Self {
+            volume: FULL_VOLUME,
+            is_muted: false,
+            repeat_mode: RepeatMode::default(),
+            is_shuffled: false,
+            song: None,
+        }
+    }
+}
+
+/// The song in the player, by its file name in the Songs folder, which is the same on every OS.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSong {
+    file_name: String,
+    elapsed_seconds: f64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RepeatMode {
+    #[default]
+    Off,
+    All,
+    One,
 }
 
 /// How the songs list is sorted.
@@ -150,6 +195,45 @@ mod tests {
     }
 
     #[test]
+    fn settings_saved_before_the_player_was_saved_restore_its_defaults() {
+        let settings: Settings = serde_json::from_str(r#"{"theme":"dark"}"#).unwrap();
+
+        assert_eq!(
+            settings.playback,
+            SavedPlayback {
+                volume: 1.0,
+                is_muted: false,
+                repeat_mode: RepeatMode::Off,
+                is_shuffled: false,
+                song: None,
+            }
+        );
+    }
+
+    #[test]
+    fn reads_the_saved_player_state() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"playback":{"volume":0.4,"isMuted":true,"repeatMode":"one","isShuffled":true,
+                "song":{"fileName":"Streets of Tomorrow.mp3","elapsedSeconds":83.25}}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            settings.playback,
+            SavedPlayback {
+                volume: 0.4,
+                is_muted: true,
+                repeat_mode: RepeatMode::One,
+                is_shuffled: true,
+                song: Some(SavedSong {
+                    file_name: "Streets of Tomorrow.mp3".to_owned(),
+                    elapsed_seconds: 83.25,
+                }),
+            }
+        );
+    }
+
+    #[test]
     fn reads_the_saved_update_and_song_order_choices() {
         let settings: Settings =
             serde_json::from_str(r#"{"checksForUpdates":false,"songOrder":"fileName"}"#).unwrap();
@@ -172,6 +256,16 @@ mod tests {
             theme: Some(Theme::Light),
             checks_for_updates: false,
             song_order: SongOrder::FileName,
+            playback: SavedPlayback {
+                volume: 0.65,
+                is_muted: false,
+                repeat_mode: RepeatMode::All,
+                is_shuffled: true,
+                song: Some(SavedSong {
+                    file_name: "In Excelsis.mp3".to_owned(),
+                    elapsed_seconds: 12.5,
+                }),
+            },
         };
         write_settings(&path, &saved).unwrap();
         let loaded = read_settings(&path).unwrap();
@@ -206,15 +300,47 @@ mod tests {
             theme: Some(Theme::Dark),
             checks_for_updates: false,
             song_order: SongOrder::FileName,
+            playback: SavedPlayback {
+                volume: 0.8,
+                is_muted: true,
+                repeat_mode: RepeatMode::One,
+                is_shuffled: true,
+                song: Some(SavedSong {
+                    file_name: "Streets of Tomorrow.mp3".to_owned(),
+                    elapsed_seconds: 201.5,
+                }),
+            },
         };
 
         assert_eq!(
             serde_json::to_value(Settings::default()).unwrap(),
-            serde_json::json!({ "theme": null, "checksForUpdates": true, "songOrder": "title" })
+            serde_json::json!({
+                "theme": null,
+                "checksForUpdates": true,
+                "songOrder": "title",
+                "playback": {
+                    "volume": 1.0,
+                    "isMuted": false,
+                    "repeatMode": "off",
+                    "isShuffled": false,
+                    "song": null
+                }
+            })
         );
         assert_eq!(
             serde_json::to_value(chosen).unwrap(),
-            serde_json::json!({ "theme": "dark", "checksForUpdates": false, "songOrder": "fileName" })
+            serde_json::json!({
+                "theme": "dark",
+                "checksForUpdates": false,
+                "songOrder": "fileName",
+                "playback": {
+                    "volume": 0.8,
+                    "isMuted": true,
+                    "repeatMode": "one",
+                    "isShuffled": true,
+                    "song": { "fileName": "Streets of Tomorrow.mp3", "elapsedSeconds": 201.5 }
+                }
+            })
         );
     }
 

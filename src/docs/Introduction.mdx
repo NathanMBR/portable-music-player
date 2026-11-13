@@ -32,11 +32,19 @@ has the elapsed time on its left, which a click turns into the time left counted
 song's length on its right. The progress stops growing at a set width, so in wide windows the
 spaces around it widen instead.
 Clicking the speaker mutes, and clicking it again brings the volume back, and the mouse wheel over
-the volume turns it up or down by 5%. The views end above its
+the volume turns it up or down by 5%. The song plays at the volume slider's value as it's dragged,
+but the volume is chosen only once it's released: released at zero, it mutes, so unmuting brings
+back the volume from before the drag. The views end above its
 space, and while it's open notifications pop up above it, both sized by the `player` token. The
 progress bar is a slider: clicking or dragging it jumps within the song. Past a song's first 3
 seconds, previous starts it over. A song's length shows as `--:--` while its audio loads, and when
 the last song ends without repeat, it stays in the player, paused at its start.
+
+The player picks up where it was left: its volume, mute, repeat and shuffle, and the song it held,
+paused at the same moment, come back when the app opens again. They're saved in `settings.json` a
+moment after they change, and when the window closes. The song is found again by its file name, so
+one removed from the `Songs` folder is forgotten, and the player stays closed. Nothing saved yet
+means full volume, unmuted, with repeat and shuffle off.
 
 The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
 the side menu included. Notifications pop up there, close by themselves after a few seconds or

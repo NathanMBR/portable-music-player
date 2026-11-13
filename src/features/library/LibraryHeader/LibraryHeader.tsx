@@ -8,8 +8,8 @@ import { useLibraryStore } from '../libraryStore'
 /**
  * Header of the Songs view, which stays in place while the songs scroll below it: the title, the
  * "Open folder" and "Scan again" buttons, and a status line that screen readers announce as it
- * changes. When the file manager can't open the
- * Songs folder, a notification says why.
+ * changes. A rescan ends with a notification counting the songs, and when the file manager can't
+ * open the Songs folder, a notification says why.
  *
  * @summary Songs view header with the folder and rescan actions
  */

@@ -1,5 +1,9 @@
 import { XMarkIcon } from '@heroicons/react/16/solid'
-import { ExclamationCircleIcon, InformationCircleIcon } from '@heroicons/react/20/solid'
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  InformationCircleIcon
+} from '@heroicons/react/20/solid'
 import { createPortal } from 'react-dom'
 import { Toaster } from 'sonner'
 import {
@@ -32,6 +36,7 @@ const CLASS_NAMES = {
 const ICONS = {
   error: <ExclamationCircleIcon className="size-5 text-correction" />,
   info: <InformationCircleIcon className="size-5 text-pen" />,
+  success: <CheckCircleIcon className="size-5 text-pen" />,
   close: <XMarkIcon className="size-4" />
 }
 
@@ -39,8 +44,8 @@ const offsetAbove = (bottomClearance: string | undefined, edgeGap: string) =>
   bottomClearance === undefined ? edgeGap : `calc(${bottomClearance} + ${edgeGap})`
 
 /**
- * The bottom-right corner where notifications pop up, raised from anywhere with `notifyError` or
- * `notify` (`notify.ts`). Each one closes by itself after a few seconds, or earlier with its ×
+ * The bottom-right corner where notifications pop up, raised from anywhere with `notifyError`,
+ * `notifySuccess` or `notify` (`notify.ts`). Each one closes by itself after a few seconds, or earlier with its ×
  * button. Hovering the stack spreads it out and pauses the timers. The app shell renders it once,
  * raised above the audio player while the player is open.
  *

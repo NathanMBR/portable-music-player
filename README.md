@@ -12,7 +12,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Song cover miniatures from their tags
 - Songs sorted by title or by filename
 - Open the `Songs` folder
-- Scan the library again
+- Scan the library again, with a notification counting the songs
 - Audio player with shuffle, repeat, volume and seeking
 - Volume from the mouse wheel
 - Seeking from the arrow keys
@@ -22,7 +22,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Side menu with the categories
 - Settings page
 - Dark theme
-- Error notifications in the bottom-right corner
+- Error and success notifications in the bottom-right corner
 - Remembers the window size on each computer
 - Always opens centered
 

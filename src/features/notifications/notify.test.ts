@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { shownNotifications } from '../../testing/notifications'
-import { notify, notifyError } from './notify'
+import { notify, notifyError, notifySuccess } from './notify'
 
 const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
@@ -28,6 +28,16 @@ describe('notify', () => {
 
     expect(shownNotifications()).toEqual([
       { type: 'info', title: 'Library scanned', description: 'The Songs folder was read again.' }
+    ])
+  })
+})
+
+describe('notifySuccess', () => {
+  it('shows that something went well', () => {
+    notifySuccess('Song list updated', '3 songs in the Songs folder')
+
+    expect(shownNotifications()).toEqual([
+      { type: 'success', title: 'Song list updated', description: '3 songs in the Songs folder' }
     ])
   })
 })

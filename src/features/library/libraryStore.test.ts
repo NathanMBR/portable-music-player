@@ -78,6 +78,57 @@ describe('scanLibrary', () => {
     expect(useCoverStore.getState().covers.size).toBe(0)
   })
 
+  it('notifies the song count when scanning again', async () => {
+    useLibraryStore.setState({
+      lastScan: { kind: 'loaded', tracks: [trackTitled('Metal Militia', 'Metallica')] }
+    })
+    mockCommands({
+      load_music_library: () => [
+        trackTitled('Metal Militia', 'Metallica'),
+        trackTitled('Never Understand', 'Angra'),
+        trackTitled('Cyclus Doloris', 'Angra')
+      ]
+    })
+
+    await scanLibrary()
+
+    expect(shownNotifications()).toEqual([
+      { type: 'success', title: 'Song list updated', description: '3 songs in the Songs folder' }
+    ])
+  })
+
+  it('notifies the songs found when scanning again after a failed scan', async () => {
+    useLibraryStore.setState({ lastScan: { kind: 'failed' } })
+    mockCommands({ load_music_library: () => [trackTitled('Know', 'System of a Down')] })
+
+    await scanLibrary()
+
+    expect(shownNotifications()).toEqual([
+      { type: 'success', title: 'Song list updated', description: '1 song in the Songs folder' }
+    ])
+  })
+
+  it('notifies nothing after the first scan, at launch', async () => {
+    mockCommands({ load_music_library: () => [trackTitled('Deep Blue', 'Angra')] })
+
+    await scanLibrary()
+
+    expect(shownNotifications()).toEqual([])
+  })
+
+  it('notifies only the failure when scanning again fails', async () => {
+    useLibraryStore.setState({
+      lastScan: { kind: 'loaded', tracks: [trackTitled('Cochise', 'Audioslave')] }
+    })
+    mockCommands({ load_music_library: failingCommand(READ_ERROR) })
+
+    await scanLibrary()
+
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't load your music", description: READ_ERROR }
+    ])
+  })
+
   it('ignores a scan requested while one is running', async () => {
     const loadMusicLibrary = vi.fn(() => [])
     mockCommands({ load_music_library: loadMusicLibrary })

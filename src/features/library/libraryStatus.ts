@@ -1,6 +1,7 @@
 import type { ScanOutcome } from './types'
 
-const formatSongCount = (count: number) =>
+/** A number of songs, in the singular for one: `1 song`, `12 songs`. */
+export const formatSongCount = (count: number) =>
   count === 1 ? '1 song' : `${count.toLocaleString()} songs`
 
 export const describeLibraryStatus = (lastScan: ScanOutcome | null, isScanning: boolean) => {

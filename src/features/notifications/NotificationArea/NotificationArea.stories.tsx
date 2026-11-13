@@ -3,7 +3,7 @@ import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { PLAYER_HEIGHT } from '../../playback/constants'
 import { DISMISS_LABEL } from '../constants'
-import { notify, notifyError } from '../notify'
+import { notify, notifyError, notifySuccess } from '../notify'
 import { NotificationArea } from './NotificationArea'
 
 const SAVE_ERROR =
@@ -36,6 +36,17 @@ export const Failure: Story = {
 export const Information: Story = {
   beforeEach: () => {
     notify('Library scanned', 'The Songs folder was read again.')
+  }
+}
+
+/** Something went well, like a rescan of the Songs folder, with a `pen` check mark. */
+export const Success: Story = {
+  beforeEach: () => {
+    notifySuccess('Song list updated', '214 songs in the Songs folder')
+  },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    await waitFor(() => expect(page.getByText('214 songs in the Songs folder')).toBeVisible())
   }
 }
 

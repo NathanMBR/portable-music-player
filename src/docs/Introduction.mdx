@@ -95,7 +95,8 @@ flash drive.
 The library scan reads each song's tags in Rust, and only its tags, since the drive may be slow. A
 `Track`'s `title` is its title tag, or its file name without the extension when it has none, and
 its `artist` is the artist tag, else the album artist, else `null`. A song whose tags are missing or
-corrupt still shows up, under its file name.
+corrupt still shows up, under its file name. Every scan after the one at launch, like "Scan again",
+ends with a success notification (`notifySuccess`) counting the songs found.
 
 Covers are read apart from the scan, one song at a time, only for the rows on screen. A row's square
 asks for its cover once it has stayed on screen for a moment, so the rows a fast scroll flies past

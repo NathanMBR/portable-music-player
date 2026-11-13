@@ -9,6 +9,11 @@ export const notify = (title: string, description?: string) => {
   toast.info(title, { id: title, description })
 }
 
+/** Pops up a message saying something went well, like a rescan of the Songs folder. */
+export const notifySuccess = (title: string, description?: string) => {
+  toast.success(title, { id: title, description })
+}
+
 /** Pops up a failure in the bottom-right corner: `title` says what failed, `error` says why. */
 export const notifyError = (title: string, error: unknown) => {
   // Rust errors reach the frontend as their message string.

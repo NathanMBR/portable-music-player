@@ -46,6 +46,20 @@ export const Scanning: Story = {
   }
 }
 
+/** Each rescan, from "Scan again", ends with a notification counting the songs found. */
+export const ScannedAgain: Story = {
+  parameters: renderInOwnFrame(260),
+  decorators: [withNotificationArea],
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Scan again' }))
+
+    await waitFor(() => expect(page.getByText('Song list updated')).toBeVisible())
+    await expect(page.getByText(`${TRACKS.length} songs in the Songs folder`)).toBeVisible()
+  }
+}
+
 /** After a failed scan the status line reports it; the view below shows the details. */
 export const ScanFailed: Story = {
   beforeEach: () => {

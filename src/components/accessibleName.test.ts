@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { accessibleNameOf } from './accessibleName'
+import { accessibleNameOf, labelOf } from './accessibleName'
 
 const firstButtonOf = (html: string) => {
   document.body.innerHTML = html
@@ -38,5 +38,22 @@ describe('accessibleNameOf', () => {
     const button = firstButtonOf('<button title="Show remaining time"><svg></svg></button>')
 
     expect(accessibleNameOf(button)).toBe('Show remaining time')
+  })
+})
+
+describe('labelOf', () => {
+  it("leaves out what the control shows, like a select's chosen option", () => {
+    const button = firstButtonOf(
+      '<label id="label">Sort songs by</label>' +
+        '<button id="select" aria-labelledby="label select">Title (if existing)</button>'
+    )
+
+    expect(labelOf(button)).toBe('Sort songs by')
+  })
+
+  it('takes the label of a control labelled by nothing else', () => {
+    const button = firstButtonOf('<button aria-label="Volume">40%</button>')
+
+    expect(labelOf(button)).toBe('Volume')
   })
 })

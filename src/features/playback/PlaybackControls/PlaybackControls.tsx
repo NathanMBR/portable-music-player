@@ -60,6 +60,7 @@ const RepeatButton = () => {
       icon={repeatMode === 'one' ? RepeatOneIcon : ArrowPathRoundedSquareIcon}
       label={REPEAT_LABELS[repeatMode]}
       isPressed={repeatMode !== 'off'}
+      state={repeatMode}
       onClick={cycleRepeatMode}
     />
   )

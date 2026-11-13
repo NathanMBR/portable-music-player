@@ -1,6 +1,6 @@
 import { Switch as HeadlessSwitch } from '@headlessui/react'
 import { type ComponentType, useRef } from 'react'
-import { log } from '../../features/logging/log'
+import { logToggle } from '../../features/logging/log'
 import { accessibleNameOf } from '../accessibleName'
 import { FOCUS_CLASSES } from '../buttonStyles'
 
@@ -31,9 +31,7 @@ export const Switch = ({ checked, onChange, label, knobIcon: KnobIcon }: SwitchP
 
   // Logged here rather than from clicks, since Space toggles a switch without one.
   const toggle = (isOn: boolean) => {
-    if (switchRef.current) {
-      log(`"${accessibleNameOf(switchRef.current)}" is ${isOn ? 'on' : 'off'}`)
-    }
+    if (switchRef.current) logToggle(accessibleNameOf(switchRef.current), isOn)
     onChange(isOn)
   }
 

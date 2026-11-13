@@ -10,3 +10,6 @@ const WRITE_FAILURE_TITLE = "Couldn't write to the log"
 export const log = (message: string) => {
   writeLog(message).catch((error: unknown) => notifyError(WRITE_FAILURE_TITLE, error))
 }
+
+/** Logs the state a control with only on and off is left in, like a switch or shuffle. */
+export const logToggle = (name: string, isOn: boolean) => log(`"${name}" is ${isOn ? 'on' : 'off'}`)

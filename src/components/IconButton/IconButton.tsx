@@ -34,6 +34,11 @@ type IconButtonProps = {
    * that aren't toggles.
    */
   isPressed?: boolean
+  /**
+   * The state of a button with three or more, like repeat's mode, which the log writes after each
+   * click. A toggle with only on and off needs `isPressed` alone.
+   */
+  state?: string
   /** Fades the button and ignores clicks, like "Next song" on the last song without repeat. */
   isDisabled?: boolean
   /** Spins the icon while its action runs, e.g. during a library scan. */
@@ -49,7 +54,8 @@ const SHAPE_CLASSES: Record<IconButtonShape, string> = {
 /**
  * Button that shows only an icon. Its `label` is both the accessible name and the hover tooltip,
  * so the icon never has to explain itself. Its geometry (`shape`) and its look (`variant`) are
- * chosen apart. It can be a toggle (`isPressed`) or disabled. The spin of `isBusy` stops for users
+ * chosen apart. It can be a toggle (`isPressed`), have three or more states (`state`), or be
+ * disabled. The spin of `isBusy` stops for users
  * who prefer reduced motion.
  *
  * @summary Icon-only button with an accessible label and tooltip
@@ -61,12 +67,14 @@ export const IconButton = ({
   shape = 'circle',
   variant = 'quiet',
   isPressed,
+  state,
   isDisabled = false,
   isBusy = false
 }: IconButtonProps) => (
   <Button
     aria-label={label}
     aria-pressed={isPressed}
+    data-state={state}
     title={label}
     disabled={isDisabled}
     onClick={onClick}

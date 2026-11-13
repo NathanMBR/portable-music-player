@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fireEvent } from 'storybook/test'
+import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { usePlaybackStore } from '../playbackStore'
 import { VolumeSlider } from './VolumeSlider'
@@ -78,5 +79,21 @@ export const ChangesTheVolumeWithTheWheel: Story = {
     fireEvent.wheel(slider, { deltaY: -100 })
     fireEvent.wheel(slider, { deltaY: -100 })
     await expect(slider).toHaveAttribute('aria-valuetext', '65%')
+  }
+}
+
+/**
+ * The log gets the volume a move ends on, in percent: once a drag is released, not at every step,
+ * and at each turn of the wheel.
+ */
+export const LogsTheVolumeSet: Story = {
+  play: async ({ canvas }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.input(slider, { target: { value: '55' } })
+    fireEvent.change(slider, { target: { value: '70' } })
+    fireEvent.wheel(slider, { deltaY: -100 })
+
+    await expect(loggedMessages()).toEqual(['Set volume to 70%', 'Set volume to 75%'])
   }
 }

@@ -47,13 +47,14 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin. Configuration is CSS-first: there is no `tailwind.config.js`; theme customization goes in `@theme` blocks in `src/index.css`, which is imported by `main.tsx`. Biome's `css.parser.tailwindDirectives` is enabled so `@theme`, `@apply`, etc. parse.
 - UI primitives come from Headless UI (`@headlessui/react`, unstyled and accessible; style it with Tailwind) and icons from Heroicons (`@heroicons/react/24/outline`, `/24/solid`, `/20/solid`, `/16/solid`).
 - Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
-- Logs: what the user does and what plays goes to the log through `log(message)` (`src/features/logging/log.ts`), which hands it to Rust's `write_log` (`logs.rs`) without waiting: Rust prints it to stdout and saves it in the Logs folder, under the `webview` target. A failed write notifies. Each situation logs where it's known for sure:
-  - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>` as `Clicked at button "<name>"`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so the click is logged before what it does;
-  - switches: `Switch` logs `"<name>" is on` or `off` itself, though it's otherwise feature-agnostic, because Space toggles a Headless switch without a click; `buttonLog.ts` skips them;
-  - songs: the playback store logs `Started`, `Paused`, `Resumed` or `Stopped playing song "<title>"` (the title tag, else the file name) only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
-  - jumps: the progress bar logs `Jumping song to mm:ss.mmm` (`formatPreciseTime`) from the slider's `onCommit`, at the end of a click or drag and at each key press, not at every step of a drag;
-  - pages: the navigation store logs `Changing to page "<label>"` when the category changes;
-  - Rust logs `Opening app` and `Closing app` (see `logs.rs`).
+- Logs: what the user does and what plays goes to the log through `log(message)` (`src/features/logging/log.ts`), which hands it to Rust's `write_log` (`logs.rs`) without waiting: Rust prints it to stdout and saves it in the Logs folder, under the `webview` target. A failed write notifies. The messages follow **Logging** below, each logged where it's known for sure:
+  - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so a plain click is logged before what it does. A toggle (`aria-pressed`, `IconButton`'s `isPressed`) or a button with three or more states (`data-state`, `IconButton`'s `state`) is logged a task later, once React has drawn the state the click left, with the name the button had when clicked;
+  - switches: `Switch` logs itself (`logToggle`), though it's otherwise feature-agnostic, because Space toggles a Headless switch without a click; `buttonLog.ts` skips them;
+  - selects: `Select` logs its list opening and closing (from Headless UI's `open`, skipping the first render) and the option chosen, from the pointer or the keyboard alike, by the select's label alone (`labelOf`), without the chosen option its button's accessible name includes. `buttonLog.ts` skips a select's button (`aria-haspopup="listbox"`), since the keyboard opens it without a click;
+  - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
+  - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
+  - pages: the navigation store logs them when the category changes;
+  - Rust logs the app's opening and closing (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
@@ -259,6 +260,31 @@ Features and fixes are developed test first. A test states a rule the system mus
 - There's no need to run them again before committing: the CI workflow runs every test on every push.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
+
+## Logging
+
+Every feature logs what the user does and what the app does in response, following these patterns. Keep the double quotes: they hold names as the user sees them.
+
+| Situation | Message |
+|---|---|
+| A button is clicked | `Clicked at button "<name>"` |
+| A toggle button (on/off, not a switch) is clicked | `"<name>" is on` or `"<name>" is off`, its state after the click |
+| A button with three or more states is clicked | `Clicked at button "<name>" State: "<state>"`, its state after the click |
+| A switch is toggled | `"<name>" is on` or `"<name>" is off` |
+| A select's list opens | `Opened selector "<label>"` |
+| An option is chosen in a select | `Selector "<label>" set value to "<option>"`, the option's visible text |
+| A select's list closes, by a choice or not | `Closed selector "<label>"`, after the choice if there is one |
+| A song starts, pauses, resumes or stops | `Started`, `Paused`, `Resumed` or `Stopped playing song "<title>"`: the title tag, else the file name without its extension |
+| The song's progress bar is clicked or dragged | `Jumping song to mm:ss.mmm` |
+| The volume slider is moved | `Set volume to <percent>%` |
+| The current page changes | `Changing to page "<page name>"`, the category's name in the menu |
+| The app opens and closes | `Opening app`, `Closing app` |
+
+- `<name>` is the control's accessible name, as screen readers hear it.
+- Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own.
+- A slider logs the value a move ends on, through `onCommit`, never at every step of a drag.
+- A new kind of situation gets a message in the same style, a short sentence starting with a capitalized verb with names in double quotes, and its test asserts the exact message. Say which message was chosen when proposing the change.
+- Test each message where it's logged: `loggedMessages()` lists them in unit tests and stories.
 
 ## Clean code
 

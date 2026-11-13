@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loggedMessages } from '../../testing/logs'
 import { connectButtonLog } from './buttonLog'
 
@@ -35,6 +35,44 @@ describe('connectButtonLog', () => {
     click('path')
 
     expect(loggedMessages()).toEqual(['Clicked at button "Next song"'])
+  })
+
+  it('logs a toggle like a switch, in the state the click leaves it in', async () => {
+    show('<button aria-pressed="false" aria-label="Shuffle"></button>')
+    const shuffle = document.querySelector('button')
+    shuffle?.addEventListener('click', () => shuffle.setAttribute('aria-pressed', 'true'))
+
+    click('button')
+
+    await vi.waitFor(() => expect(loggedMessages()).toEqual(['"Shuffle" is on']))
+  })
+
+  it('logs the state a button of several states moves to, after the name it was clicked by', async () => {
+    show('<button aria-pressed="false" data-state="off" aria-label="Repeat off"></button>')
+    const repeat = document.querySelector('button')
+    repeat?.addEventListener('click', () => {
+      repeat.setAttribute('aria-label', 'Repeat all')
+      repeat.setAttribute('aria-pressed', 'true')
+      repeat.setAttribute('data-state', 'all')
+    })
+
+    click('button')
+
+    await vi.waitFor(() =>
+      expect(loggedMessages()).toEqual(['Clicked at button "Repeat off" State: "all"'])
+    )
+  })
+
+  it('leaves selects to log their opening and closing themselves', () => {
+    show(
+      '<label id="label">Sort songs by</label>' +
+        '<button id="select" aria-haspopup="listbox" aria-labelledby="label select">' +
+        'Title (if existing)</button>'
+    )
+
+    click('button')
+
+    expect(loggedMessages()).toEqual([])
   })
 
   it('leaves switches to log their new state themselves', () => {

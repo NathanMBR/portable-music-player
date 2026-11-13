@@ -64,6 +64,20 @@ export const Pressed: Story = {
 }
 
 /**
+ * A button with three or more states, like repeat's off, all and one, carries the one it's in,
+ * which the log writes after each click.
+ */
+export const WithSeveralStates: Story = {
+  args: { icon: ArrowPathIcon, label: 'Repeat all', isPressed: true, state: 'all' },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('button', { name: 'Repeat all' })).toHaveAttribute(
+      'data-state',
+      'all'
+    )
+  }
+}
+
+/**
  * An action that can't run right now, like "Next song" on the last song without repeat: the
  * button fades, and clicking it does nothing.
  */

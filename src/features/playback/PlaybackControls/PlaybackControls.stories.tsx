@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, waitFor } from 'storybook/test'
+import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import { connectButtonLog } from '../../logging/buttonLog'
 import { usePlaybackStore } from '../playbackStore'
 import { PlaybackControls } from './PlaybackControls'
 
@@ -87,5 +89,27 @@ export const TogglesShuffle: Story = {
 
     await userEvent.click(shuffleButton)
     await expect(shuffleButton).toHaveAttribute('aria-pressed', 'false')
+  }
+}
+
+/**
+ * With the button log connected, as in the app: shuffle logs like a switch and repeat logs the
+ * mode it moves to, both once the click has taken effect.
+ */
+export const LogsTheStatesClicksLeave: Story = {
+  parameters: renderInOwnFrame(80),
+  beforeEach: () => connectButtonLog(),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Shuffle' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Repeat off' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Repeat all' }))
+
+    await waitFor(() =>
+      expect(loggedMessages()).toEqual([
+        '"Shuffle" is on',
+        'Clicked at button "Repeat off" State: "all"',
+        'Clicked at button "Repeat all" State: "one"'
+      ])
+    )
   }
 }

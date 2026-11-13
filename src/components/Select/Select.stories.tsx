@@ -1,6 +1,8 @@
 import { Field, Label } from '@headlessui/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, waitFor, within } from 'storybook/test'
+import { connectButtonLog } from '../../features/logging/buttonLog'
+import { loggedMessages } from '../../testing/logs'
 import { Select } from './Select'
 
 const SELECT_NAME = /^Sort songs by/
@@ -110,5 +112,66 @@ export const KeyboardFocusDrawsTheRing: Story = {
 
     await expect(select).toHaveFocus()
     await expect(outlineStyleOf(select)).toBe('solid')
+  }
+}
+
+/**
+ * The log gets the list opening, the option chosen, then the list closing, all under the select's
+ * label. The button log is connected, as in the app, and leaves the select's clicks to it.
+ */
+export const LogsOpeningChoosingAndClosing: Story = {
+  beforeEach: () => connectButtonLog(),
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: SELECT_NAME }))
+    await userEvent.click(await page.findByRole('option', { name: 'Filename' }))
+
+    await waitFor(() =>
+      expect(loggedMessages()).toEqual([
+        'Opened selector "Sort songs by"',
+        'Selector "Sort songs by" set value to "Filename"',
+        'Closed selector "Sort songs by"'
+      ])
+    )
+  }
+}
+
+/** Closed without a choice, by Escape or a click elsewhere, the list still logs its closing. */
+export const LogsClosingWithoutAChoice: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: SELECT_NAME }))
+    await page.findByRole('listbox')
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(loggedMessages()).toEqual([
+        'Opened selector "Sort songs by"',
+        'Closed selector "Sort songs by"'
+      ])
+    )
+  }
+}
+
+/** Opened and chosen from the keyboard, the select logs the same lines as with the pointer. */
+export const LogsAChoiceFromTheKeyboard: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.tab()
+    await expect(canvas.getByRole('button', { name: SELECT_NAME })).toHaveFocus()
+    await userEvent.keyboard('{ArrowDown}')
+    await page.findByRole('listbox')
+    await userEvent.keyboard('{ArrowUp}{Enter}')
+
+    await waitFor(() =>
+      expect(loggedMessages()).toEqual([
+        'Opened selector "Sort songs by"',
+        'Selector "Sort songs by" set value to "Filename"',
+        'Closed selector "Sort songs by"'
+      ])
+    )
   }
 }

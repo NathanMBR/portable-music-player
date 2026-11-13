@@ -23,3 +23,14 @@ export const accessibleNameOf = (element: Element) => {
     collapseSpaces(element.getAttribute('title') ?? '')
   )
 }
+
+/**
+ * What labels a control apart from what it shows, like a select's label without its chosen
+ * option: the elements it's labelled by, itself left out, else its `aria-label`.
+ */
+export const labelOf = (element: Element) => {
+  const labels = labelsOf(element).filter(label => label !== element)
+  if (labels.length > 0) return collapseSpaces(labels.map(textOf).join(' '))
+
+  return collapseSpaces(element.getAttribute('aria-label') ?? '')
+}

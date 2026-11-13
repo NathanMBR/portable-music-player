@@ -5,13 +5,14 @@ import { useLibraryStore } from '../features/library/libraryStore'
 import { useNavigationStore } from '../features/navigation/navigationStore'
 import { usePlaybackStore } from '../features/playback/playbackStore'
 import { useSettingsStore } from '../features/settings/settingsStore'
+import { forgetLoggedMessages } from './logs'
 
 const resetStore = <State>(store: StoreApi<State>) => store.setState(store.getInitialState(), true)
 
 /**
  * Stores are module-level singletons, so state set by one test or story would leak into the next.
  * Every store must be listed here. Sonner keeps the notifications in a singleton of its own, so
- * they're dismissed too.
+ * they're dismissed too, and the logged messages are forgotten.
  */
 export const resetStores = () => {
   resetStore(useCoverStore)
@@ -20,4 +21,5 @@ export const resetStores = () => {
   resetStore(usePlaybackStore)
   resetStore(useSettingsStore)
   toast.dismiss()
+  forgetLoggedMessages()
 }

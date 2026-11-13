@@ -14,7 +14,7 @@ pub fn run() {
         .plugin(main_window::size_memory_plugin())
         .manage(song_server::LazySongServer::default())
         .setup(move |app| {
-            logs::warn_if_unsaved(&logs_dir);
+            logs::log_opening(&logs_dir);
             main_window::show(app).map_err(Into::into)
         })
         .invoke_handler(tauri::generate_handler![
@@ -23,9 +23,11 @@ pub fn run() {
             library::song_source,
             library::read_song,
             library::read_cover,
+            logs::write_log,
             settings::load_settings,
             settings::save_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| logs::log_closing(&event));
 }

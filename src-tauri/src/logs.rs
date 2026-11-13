@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use tauri::{Runtime, plugin::TauriPlugin};
+use tauri::{RunEvent, Runtime, plugin::TauriPlugin};
 use tauri_plugin_log::{
     RotationStrategy, Target, TargetKind,
     log::{self, LevelFilter},
@@ -21,6 +21,10 @@ const LOG_LEVEL: LevelFilter = LevelFilter::Info;
 const MAX_LOG_FILE_BYTES: u128 = 1_000_000;
 /// Full log files kept beside the current one, each renamed with the date it filled up.
 const FULL_LOG_FILES_KEPT: usize = 3;
+/// Where the webview's lines show in the log, in place of this module's path.
+const WEBVIEW_TARGET: &str = "webview";
+const OPENING_MESSAGE: &str = "Opening app";
+const CLOSING_MESSAGE: &str = "Closing app";
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogsError {
@@ -57,11 +61,27 @@ pub fn plugin<R: Runtime>(logs_dir: Option<&Path>) -> TauriPlugin<R> {
         .build()
 }
 
-/// Says why the log isn't saved, once the plugin runs: before that, nothing would print it.
-pub fn warn_if_unsaved(logs_dir: &Result<PathBuf, LogsError>) {
+/// Says the app is opening and, when the log can't be saved, why. It runs once the plugin does:
+/// before that, nothing would print it.
+pub fn log_opening(logs_dir: &Result<PathBuf, LogsError>) {
+    log::info!("{OPENING_MESSAGE}");
     if let Err(error) = logs_dir {
         log::warn!("{error}. The log goes only to stdout.");
     }
+}
+
+/// Says the app is closing, once it's about to exit. A process killed from outside never gets
+/// there.
+pub fn log_closing(event: &RunEvent) {
+    if matches!(event, RunEvent::Exit) {
+        log::info!("{CLOSING_MESSAGE}");
+    }
+}
+
+/// Writes a line from the webview to the log, about what the user does or what plays.
+#[tauri::command]
+pub async fn write_log(message: String) {
+    log::info!(target: WEBVIEW_TARGET, "{message}");
 }
 
 /// Returns the Logs folder inside `root`, creating it first if it's missing, once the log file in

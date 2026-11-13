@@ -4,7 +4,14 @@ import { Slider } from './Slider'
 
 const meta = {
   component: Slider,
-  args: { label: 'Volume', value: 40, max: 100, valueText: '40%', onChange: fn() },
+  args: {
+    label: 'Volume',
+    value: 40,
+    max: 100,
+    valueText: '40%',
+    onChange: fn(),
+    onCommit: fn()
+  },
   // Sliders fill their container, which sets their width.
   decorators: [
     Story => (
@@ -127,6 +134,37 @@ export const MovesWithTheArrowKeys: Story = {
     await expect(args.onChange).toHaveBeenLastCalledWith(45)
     await userEvent.keyboard('{ArrowDown}')
     await expect(args.onChange).toHaveBeenLastCalledWith(35)
+  }
+}
+
+/**
+ * A drag moves the slider all along (`onChange`), and the move is committed (`onCommit`) only once
+ * it's released, which the browser tells with a `change` event, like a click's.
+ */
+export const CommitsWhenTheMoveEnds: Story = {
+  play: async ({ args, canvas }) => {
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+
+    fireEvent.input(slider, { target: { value: '55' } })
+    await expect(args.onChange).toHaveBeenLastCalledWith(55)
+    await expect(args.onCommit).not.toHaveBeenCalled()
+
+    fireEvent.change(slider, { target: { value: '70' } })
+    await expect(args.onCommit).toHaveBeenCalledTimes(1)
+    await expect(args.onCommit).toHaveBeenCalledWith(70)
+  }
+}
+
+/** Every press of an arrow key is a whole move, committed at once. */
+export const CommitsEachArrowKeyPress: Story = {
+  args: { arrowKeyStep: 5 },
+  play: async ({ args, userEvent }) => {
+    await userEvent.tab()
+
+    await userEvent.keyboard('{ArrowRight}')
+    await expect(args.onCommit).toHaveBeenLastCalledWith(45)
+    await userEvent.keyboard('{ArrowRight}')
+    await expect(args.onCommit).toHaveBeenCalledTimes(2)
   }
 }
 

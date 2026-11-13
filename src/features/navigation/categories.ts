@@ -9,3 +9,7 @@ export const CATEGORIES = [
 export type CategoryId = (typeof CATEGORIES)[number]['id']
 
 export const DEFAULT_CATEGORY: CategoryId = 'songs'
+
+/** The name the menu shows for a category. */
+export const categoryLabel = (id: CategoryId) =>
+  CATEGORIES.find(category => category.id === id)?.label ?? id

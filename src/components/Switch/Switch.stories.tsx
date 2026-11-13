@@ -2,6 +2,7 @@ import { Field, Label } from '@headlessui/react'
 import { MoonIcon } from '@heroicons/react/16/solid'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'
+import { loggedMessages } from '../../testing/logs'
 import { Switch } from './Switch'
 
 const SWITCH_NAME = 'Search automatically for updates'
@@ -44,7 +45,7 @@ export const Toggles: Story = {
 
 /**
  * Inside a Headless UI `Field`, a visible `Label` names the switch, so it needs no `label`, like the
- * Settings view's options. Made `passive`, the label only names it: clicking a Headless label hands
+ * Settings view's options. The log calls it by that name too. Made `passive`, the label only names it: clicking a Headless label hands
  * the switch a synthetic click, which Headless takes for a screen reader's and answers with the
  * focus ring.
  */
@@ -58,8 +59,30 @@ export const NamedByAVisibleLabel: Story = {
       <Switch {...args} />
     </Field>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole('switch', { name: SWITCH_NAME })).toBeInTheDocument()
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('switch', { name: SWITCH_NAME }))
+
+    await expect(loggedMessages()).toEqual([`"${SWITCH_NAME}" is on`])
+  }
+}
+
+/** Turning it on or off writes its name and its new state to the log. */
+export const LogsItsNewState: Story = {
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('switch', { name: SWITCH_NAME }))
+
+    await expect(loggedMessages()).toEqual([`"${SWITCH_NAME}" is on`])
+  }
+}
+
+/** Space toggles it without a click, and the log still says so. */
+export const LogsItsNewStateFromTheKeyboard: Story = {
+  args: { checked: true },
+  play: async ({ userEvent }) => {
+    await userEvent.tab()
+    await userEvent.keyboard(' ')
+
+    await expect(loggedMessages()).toEqual([`"${SWITCH_NAME}" is off`])
   }
 }
 

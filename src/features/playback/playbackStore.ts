@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Track } from '../library/types'
+import { log } from '../logging/log'
 import {
   createPlayOrder,
   findNextTrack,
@@ -76,10 +77,20 @@ const startFromTheBeginning = (session: PlaybackSession, track: Track): Playback
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
+type SongEvent = 'Started' | 'Paused' | 'Resumed' | 'Stopped'
+
+// A track's title is its title tag or, for a song without one, its file name.
+const logSong = (event: SongEvent, track: Track) => log(`${event} playing song "${track.title}"`)
+
 export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
   const updateSession = (change: (session: PlaybackSession) => Partial<PlaybackSession>) => {
     const { session } = get()
     if (session) set({ session: { ...session, ...change(session) } })
+  }
+
+  const start = (session: PlaybackSession, track: Track) => {
+    set({ session: startFromTheBeginning(session, track) })
+    logSong('Started', track)
   }
 
   const skipTo = (findTrack: TrackFinder) => {
@@ -87,7 +98,16 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     if (!session) return
 
     const track = findTrack(session.playOrder, session.track, repeatMode)
-    if (track) set({ session: startFromTheBeginning(session, track) })
+    if (track) start(session, track)
+  }
+
+  // Only a change is logged: the audio and the media keys may ask for the state the song is in.
+  const setPlaying = (isPlaying: boolean) => {
+    const { session } = get()
+    if (!session || session.isPlaying === isPlaying) return
+
+    set({ session: { ...session, isPlaying } })
+    logSong(isPlaying ? 'Resumed' : 'Paused', session.track)
   }
 
   return {
@@ -109,14 +129,22 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
           durationSeconds: null
         }
       })
+      logSong('Started', track)
     },
-    togglePlaying: () => updateSession(session => ({ isPlaying: !session.isPlaying })),
-    stop: () => set({ session: null }),
+    togglePlaying: () => {
+      const { session } = get()
+      if (session) setPlaying(!session.isPlaying)
+    },
+    stop: () => {
+      const { session } = get()
+      set({ session: null })
+      if (session) logSong('Stopped', session.track)
+    },
     playNext: () => skipTo(findNextTrack),
     playPrevious: () => {
       const { session } = get()
       if (session && restartsOnPrevious(session.elapsedSeconds)) {
-        set({ session: startFromTheBeginning(session, session.track) })
+        start(session, session.track)
       } else {
         skipTo(findPreviousTrack)
       }
@@ -129,12 +157,13 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
         repeatMode === 'one'
           ? session.track
           : findNextTrack(session.playOrder, session.track, repeatMode)
+      if (nextTrack) {
+        start(session, nextTrack)
+        return
+      }
       // Without a next song, the last one stays in the player, ready to play again from its start.
-      set({
-        session: nextTrack
-          ? startFromTheBeginning(session, nextTrack)
-          : { ...session, isPlaying: false, elapsedSeconds: 0 }
-      })
+      set({ session: { ...session, isPlaying: false, elapsedSeconds: 0 } })
+      logSong('Stopped', session.track)
     },
     reportProgress: elapsedSeconds => updateSession(() => ({ elapsedSeconds })),
     reportDuration: durationSeconds => updateSession(() => ({ durationSeconds })),
@@ -145,8 +174,8 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
 
       set({ session: { ...session, elapsedSeconds: clamp(seconds, 0, session.durationSeconds) } })
     },
-    play: () => updateSession(() => ({ isPlaying: true })),
-    pause: () => updateSession(() => ({ isPlaying: false })),
+    play: () => setPlaying(true),
+    pause: () => setPlaying(false),
     cycleRepeatMode: () => set(state => ({ repeatMode: nextRepeatMode(state.repeatMode) })),
     toggleShuffle: () => {
       const { session, isShuffled } = get()

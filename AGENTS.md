@@ -47,6 +47,13 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin. Configuration is CSS-first: there is no `tailwind.config.js`; theme customization goes in `@theme` blocks in `src/index.css`, which is imported by `main.tsx`. Biome's `css.parser.tailwindDirectives` is enabled so `@theme`, `@apply`, etc. parse.
 - UI primitives come from Headless UI (`@headlessui/react`, unstyled and accessible; style it with Tailwind) and icons from Heroicons (`@heroicons/react/24/outline`, `/24/solid`, `/20/solid`, `/16/solid`).
 - Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
+- Logs: what the user does and what plays goes to the log through `log(message)` (`src/features/logging/log.ts`), which hands it to Rust's `write_log` (`logs.rs`) without waiting: Rust prints it to stdout and saves it in the Logs folder, under the `webview` target. A failed write notifies. Each situation logs where it's known for sure:
+  - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>` as `Clicked at button "<name>"`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so the click is logged before what it does;
+  - switches: `Switch` logs `"<name>" is on` or `off` itself, though it's otherwise feature-agnostic, because Space toggles a Headless switch without a click; `buttonLog.ts` skips them;
+  - songs: the playback store logs `Started`, `Paused`, `Resumed` or `Stopped playing song "<title>"` (the title tag, else the file name) only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
+  - jumps: the progress bar logs `Jumping song to mm:ss.mmm` (`formatPreciseTime`) from the slider's `onCommit`, at the end of a click or drag and at each key press, not at every step of a drag;
+  - pages: the navigation store logs `Changing to page "<label>"` when the category changes;
+  - Rust logs `Opening app` and `Closing app` (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
@@ -78,7 +85,7 @@ src/
       <Component>.stories.tsx  its stories: its documentation and component tests
   docs/                 Storybook MDX pages (Introduction, Design tokens)
   testing/              helpers shared by tests and stories (mockCommands, resetStores, shownNotifications,
-                        withNotificationArea, covers, unit test setup)
+                        loggedMessages, withNotificationArea, covers, unit test setup)
 ```
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
@@ -142,7 +149,8 @@ src/
   - A full file (`MAX_LOG_FILE_BYTES`, 1 MB, instead of the plugin's 40 KB) is renamed with its date and a new one starts; the 3 newest full files are kept (`FULL_LOG_FILES_KEPT`).
   - `writable_logs_dir` creates the folder and opens the log file before the plugin starts, because the plugin opens it in its setup, and an error there would stop the app from starting, as on a write-protected drive. If it can't, the log goes only to stdout, and a warning says why once the plugin runs (`warn_if_unsaved`).
   - The Windows release build has no console (`windows_subsystem` in `main.rs`), so there the file is the only log.
-  - Nothing in the frontend logs yet: that would need `@tauri-apps/plugin-log` and the `log:default` permission.
+  - `log_opening` writes `Opening app` in `setup`, the first moment the plugin runs, and `log_closing` writes `Closing app` on `RunEvent::Exit`, which a process killed from outside never reaches.
+  - The webview writes through `write_log`, a command of this module, rather than `@tauri-apps/plugin-log`, whose lines would each carry the caller's place in the bundled script.
 - Commands are `async`: sync commands run on the main thread, and file I/O on a slow USB drive would freeze the window.
 - Commands return `Result<T, FeatureError>`. The error enum uses `thiserror` for messages and serializes as its message string, which the frontend shows to the user. Structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.
 
@@ -191,9 +199,10 @@ These follow from the project goal and are easy to get wrong:
 - Vitest is configured in `vite.config.ts` (`test.projects`), and `pnpm test:ts` runs both projects. Unit tests import `describe`, `it`, `expect` and `vi` from `vitest` explicitly (no globals).
 - **Fake the Rust side only through `mockCommands`** (`src/testing/mockCommands.ts`):
   - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
+  - it always answers `write_log`, unless a handler replaces it, keeping the messages: check them with `loggedMessages()` (`src/testing/logs.ts`). Unit tests start with `mockCommands({})` (`setupUnitTests.ts`), like stories, so logging works in every test;
   - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
   - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
-- Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification.
+- Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification and forgets the logged messages.
 - Notifications are checked through what the user sees:
   - in unit tests, `shownNotifications()` (`src/testing/notifications.ts`) lists the ones on screen as `{ type, title, description }`;
   - stories of a component that raises them add the `withNotificationArea` decorator and find the text in `<body>`. Notifications fade in, so wait for them with `waitFor(() => expect(...).toBeVisible())`.

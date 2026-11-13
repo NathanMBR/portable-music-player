@@ -136,11 +136,13 @@ work anyway:
 - **Fake commands.** `mockCommands` (`src/testing/mockCommands.ts`) answers Rust commands through
   Tauri's own `mockIPC`. Each story mocks the commands its interactions trigger, which also
   documents the commands a component uses. A command that isn't mocked rejects with
-  `Unmocked command: <name>`, and `failingCommand(message)` fakes a Rust error.
+  `Unmocked command: <name>`, and `failingCommand(message)` fakes a Rust error. `write_log`, which
+  logging runs behind almost every action, is always answered: `loggedMessages()`
+  (`src/testing/logs.ts`) lists what a story wrote to the log.
 - **Fresh stores.** Before every story, `resetStores` puts every store back to its initial state and
-  dismisses every notification. A story then sets the state it shows in its `beforeEach`, for
-  example a failed scan. Stories of a component that raises notifications render the notification
-  area next to it with the `withNotificationArea` decorator.
+  dismisses every notification, and the logged messages are forgotten. A story then sets the state
+  it shows in its `beforeEach`, for example a failed scan. Stories of a component that raises
+  notifications render the notification area next to it with the `withNotificationArea` decorator.
 - **Drawn covers.** Stories have no songs to read covers from, so `drawCover`
   (`src/testing/covers.ts`) draws a small PNG in the browser for `read_cover` to answer, and
   `noCover` answers a song without one. Every story that shows the song list mocks `read_cover`.

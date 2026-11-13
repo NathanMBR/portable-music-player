@@ -1,9 +1,15 @@
 import { Button } from '@headlessui/react'
 import { FOCUS_CLASSES } from '../../../components/buttonStyles'
 import { Slider } from '../../../components/Slider/Slider'
+import { log } from '../../logging/log'
 import { POSITION_STEP_SECONDS } from '../constants'
 import { type ShownTime, usePlaybackStore } from '../playbackStore'
-import { formatCountdown, formatPlaybackTime, remainingSeconds } from '../playbackTime'
+import {
+  formatCountdown,
+  formatPlaybackTime,
+  formatPreciseTime,
+  remainingSeconds
+} from '../playbackTime'
 
 type SongProgressProps = {
   /** How far into the song playback is. */
@@ -24,6 +30,8 @@ const SWITCH_HINTS: Record<ShownTime, string> = {
 
 const SONG_LENGTH_NAME = 'Song length'
 
+const logJump = (seconds: number) => log(`Jumping song to ${formatPreciseTime(seconds)}`)
+
 // The bar moves in tenths of a second, but a press of an arrow key skips a few seconds, like in
 // most players.
 const ARROW_KEY_STEP_SECONDS = 5
@@ -34,7 +42,8 @@ const ARROW_KEY_STEP_SECONDS = 5
  * slider: clicking or dragging it jumps within the song, and so do the keyboard's arrows (5
  * seconds a press), Page Up and Down (a tenth of the song), Home and End. Clicking the left time
  * switches it to the time left, counted down as `-mm:ss`, and back. Until the song's length is
- * known, the bar stays empty and disabled, and the length shows dashes.
+ * known, the bar stays empty and disabled, and the length shows dashes. Each jump on the bar is
+ * logged once it ends, with where it lands to the millisecond.
  *
  * @summary Seekable progress bar of the playing song, with its times
  */
@@ -72,6 +81,7 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
           }
           isDisabled={!isLengthKnown}
           onChange={seek}
+          onCommit={logJump}
         />
       </div>
       <span className="w-14 shrink-0">

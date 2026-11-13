@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatCountdown, formatPlaybackTime, remainingSeconds } from './playbackTime'
+import {
+  formatCountdown,
+  formatPlaybackTime,
+  formatPreciseTime,
+  remainingSeconds
+} from './playbackTime'
 
 describe('formatPlaybackTime', () => {
   it('pads minutes and seconds to two digits', () => {
@@ -42,5 +47,20 @@ describe('remainingSeconds', () => {
 
   it('never goes below zero', () => {
     expect(remainingSeconds(275, 270)).toBe(0)
+  })
+})
+
+describe('formatPreciseTime', () => {
+  it('shows minutes and seconds like the player, then the milliseconds', () => {
+    expect(formatPreciseTime(0)).toBe('00:00.000')
+    expect(formatPreciseTime(83.4)).toBe('01:23.400')
+  })
+
+  it('keeps counting minutes past an hour', () => {
+    expect(formatPreciseTime(3725.25)).toBe('62:05.250')
+  })
+
+  it('carries a millisecond rounded up into the seconds', () => {
+    expect(formatPreciseTime(59.9996)).toBe('01:00.000')
   })
 })

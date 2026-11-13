@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fireEvent } from 'storybook/test'
+import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
 import { usePlaybackStore } from '../playbackStore'
@@ -100,6 +101,35 @@ export const SeeksWithinTheSong: Story = {
     })
 
     await expect(usePlaybackStore.getState().session?.elapsedSeconds).toBe(200)
+  }
+}
+
+/** A jump on the bar writes where it lands to the log, to the millisecond, once it ends. */
+export const LogsWhereItJumps: Story = {
+  parameters: renderInOwnFrame(80),
+  beforeEach: () => {
+    const track: Track = {
+      path: 'Songs/Attack.mp3',
+      title: 'Attack',
+      artist: 'System of a Down'
+    }
+    usePlaybackStore.setState({
+      session: {
+        track,
+        queue: [track],
+        playOrder: [track],
+        isPlaying: true,
+        elapsedSeconds: 83,
+        durationSeconds: 270
+      }
+    })
+  },
+  play: async ({ canvas }) => {
+    fireEvent.change(canvas.getByRole('slider', { name: 'Song position' }), {
+      target: { value: '200.5' }
+    })
+
+    await expect(loggedMessages()).toEqual(['Jumping song to 03:20.500'])
   }
 }
 

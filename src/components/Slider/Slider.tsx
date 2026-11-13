@@ -1,5 +1,5 @@
 import { Input } from '@headlessui/react'
-import { type KeyboardEvent, useState, type WheelEvent } from 'react'
+import { type KeyboardEvent, useEffect, useRef, useState, type WheelEvent } from 'react'
 import { DISABLED_CLASSES } from '../buttonStyles'
 import { type FillEnd, fillEnd } from '../sliderFill'
 import { snapToStep } from '../sliderStep'
@@ -17,6 +17,11 @@ type SliderProps = {
   valueText: string
   /** Runs with the new value when the slider is dragged, clicked or moved from the keyboard. */
   onChange: (value: number) => void
+  /**
+   * Runs with the value a move ends on: once a click or a drag is released, and at every press of
+   * a key or turn of the wheel. A drag runs `onChange` all along, but this only at its end.
+   */
+  onCommit?: (value: number) => void
   /** Fades the slider and ignores input, like the song's position while its length is unknown. */
   isDisabled?: boolean
   /** How far one turn of the mouse wheel over the slider moves it. Without it, the wheel doesn't. */
@@ -78,17 +83,32 @@ export const Slider = ({
   step = BROWSER_STEP,
   valueText,
   onChange,
+  onCommit,
   isDisabled = false,
   wheelStep,
   arrowKeyStep
 }: SliderProps) => {
   const [isFocusedByPointer, setIsFocusedByPointer] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
   const shownValue = snapToStep(value, step)
+
+  // React's onChange follows every input event, so the end of a move comes from the browser's own
+  // change event, sent once a click or a drag is released.
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || !onCommit) return
+
+    const commit = () => onCommit(Number(input.value))
+    input.addEventListener('change', commit)
+    return () => input.removeEventListener('change', commit)
+  }, [onCommit])
 
   const moveBy = (change: number) => {
     if (isDisabled) return
     const movedValue = clamp(value + change, 0, max)
-    if (movedValue !== value) onChange(movedValue)
+    if (movedValue === value) return
+    onChange(movedValue)
+    onCommit?.(movedValue)
   }
 
   // Wheeling up raises the value, like turning a knob. A turn that only scrolls sideways is no move.
@@ -107,6 +127,7 @@ export const Slider = ({
 
   return (
     <Input
+      ref={inputRef}
       type="range"
       min={0}
       max={max}

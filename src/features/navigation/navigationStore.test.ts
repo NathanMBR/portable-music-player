@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { loggedMessages } from '../../testing/logs'
 import { DEFAULT_CATEGORY } from './categories'
 import { useNavigationStore } from './navigationStore'
 
@@ -27,5 +28,17 @@ describe('navigationStore', () => {
       currentCategory: 'songs',
       isMenuOpen: false
     })
+  })
+
+  it('logs the page it changes to, by the name the menu shows', () => {
+    useNavigationStore.getState().selectCategory('settings')
+
+    expect(loggedMessages()).toEqual(['Changing to page "Settings"'])
+  })
+
+  it('logs nothing when the chosen page is already on screen', () => {
+    useNavigationStore.getState().selectCategory(DEFAULT_CATEGORY)
+
+    expect(loggedMessages()).toEqual([])
   })
 })

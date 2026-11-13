@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { loggedMessages } from '../../testing/logs'
 import type { Track } from '../library/types'
 import { type PlaybackSession, usePlaybackStore } from './playbackStore'
 
@@ -419,5 +420,82 @@ describe('toggleShownTime', () => {
 
     playback().toggleShownTime()
     expect(playback().shownTime).toBe('elapsed')
+  })
+})
+
+describe('the log', () => {
+  const sadButTrue = trackTitled('Sad but True', 'Metallica')
+  const horizonsIntoBattlegrounds = trackTitled('Horizons into Battlegrounds', 'Woodkid')
+  const sproutsOfTime = trackTitled('Sprouts of Time', 'Angra')
+  const loggedQueue = [sadButTrue, horizonsIntoBattlegrounds, sproutsOfTime]
+
+  const loadLoggedSession = (overrides: Partial<PlaybackSession>) =>
+    loadSession({
+      track: horizonsIntoBattlegrounds,
+      queue: loggedQueue,
+      playOrder: loggedQueue,
+      ...overrides
+    })
+
+  it('names the song that starts playing by its title, which the file name stands in for', () => {
+    const numberedFile: Track = { ...sadButTrue, path: 'Songs/05 Sad but True.mp3' }
+
+    playback().playTrack(numberedFile, loggedQueue)
+
+    expect(loggedMessages()).toEqual(['Started playing song "Sad but True"'])
+  })
+
+  it('says a song starts when the player moves to another one or starts one over', () => {
+    loadLoggedSession({ elapsedSeconds: 1 })
+
+    playback().playNext()
+    playback().reportProgress(83)
+    playback().playPrevious()
+    playback().playPrevious()
+    playback().finishSong()
+
+    expect(loggedMessages()).toEqual([
+      'Started playing song "Sprouts of Time"',
+      'Started playing song "Sprouts of Time"',
+      'Started playing song "Horizons into Battlegrounds"',
+      'Started playing song "Sprouts of Time"'
+    ])
+  })
+
+  it('says when the song is paused and resumed, from the play button or the media keys', () => {
+    loadLoggedSession({ isPlaying: true })
+
+    playback().togglePlaying()
+    playback().togglePlaying()
+    playback().pause()
+    playback().play()
+
+    expect(loggedMessages()).toEqual([
+      'Paused playing song "Horizons into Battlegrounds"',
+      'Resumed playing song "Horizons into Battlegrounds"',
+      'Paused playing song "Horizons into Battlegrounds"',
+      'Resumed playing song "Horizons into Battlegrounds"'
+    ])
+  })
+
+  it('says nothing when the song already plays or pauses as asked', () => {
+    loadLoggedSession({ isPlaying: true })
+    playback().play()
+    loadLoggedSession({ isPlaying: false })
+    playback().pause()
+
+    expect(loggedMessages()).toEqual([])
+  })
+
+  it('says which song stops, from the stop button or when the last one ends', () => {
+    loadLoggedSession({ track: sadButTrue })
+    playback().stop()
+    loadLoggedSession({ track: sproutsOfTime })
+    playback().finishSong()
+
+    expect(loggedMessages()).toEqual([
+      'Stopped playing song "Sad but True"',
+      'Stopped playing song "Sprouts of Time"'
+    ])
   })
 })

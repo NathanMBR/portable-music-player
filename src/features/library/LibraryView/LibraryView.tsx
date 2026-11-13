@@ -1,8 +1,21 @@
+import { useMemo } from 'react'
+import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
+import { useSettingsStore } from '../../settings/settingsStore'
 import { EmptyLibrary } from '../EmptyLibrary/EmptyLibrary'
 import { LibraryHeader } from '../LibraryHeader/LibraryHeader'
 import { useLibraryStore } from '../libraryStore'
 import { ScanFailure } from '../ScanFailure/ScanFailure'
+import { sortTracks } from '../sortTracks'
 import { TrackList } from '../TrackList/TrackList'
+import type { Track } from '../types'
+
+// Sorted here rather than in the store, so a new song order applies at once, and the settings
+// restored after the first scan still sort its songs.
+const SortedTrackList = ({ tracks }: { tracks: Track[] }) => {
+  const songOrder = useSettingsStore(state => state.settings.songOrder)
+  const sortedTracks = useMemo(() => sortTracks(tracks, songOrder), [tracks, songOrder])
+  return <TrackList tracks={sortedTracks} />
+}
 
 const LibraryContent = () => {
   const lastScan = useLibraryStore(state => state.lastScan)
@@ -10,15 +23,8 @@ const LibraryContent = () => {
   if (lastScan === null) return null
   if (lastScan.kind === 'failed') return <ScanFailure />
   if (lastScan.tracks.length === 0) return <EmptyLibrary />
-  return <TrackList tracks={lastScan.tracks} />
+  return <SortedTrackList tracks={lastScan.tracks} />
 }
-
-// The songs keep the width between the gutters, like the header. Their scroll area stops inside
-// the right gutter, so its scrollbar sits there, a small gap away from the songs. The scrollbar is
-// always there, only hidden while the songs all fit, so they never widen: WebKitGTK ignores
-// scrollbar-gutter, which would keep its room otherwise.
-const SONGS_COLUMN_CLASSES =
-  'overflow-y-scroll pl-gutter pr-3 mr-[calc(var(--spacing-gutter)_-_var(--spacing-scrollbar)_-_var(--spacing)_*_3)]'
 
 /**
  * The Songs category. Below the header it shows nothing until the first scan finishes, then the
@@ -29,12 +35,7 @@ const SONGS_COLUMN_CLASSES =
  * @summary Songs category view
  */
 export const LibraryView = () => (
-  <div className="flex h-full flex-col">
-    <div className="px-gutter">
-      <LibraryHeader />
-    </div>
-    <main className={`min-h-0 flex-1 ${SONGS_COLUMN_CLASSES}`}>
-      <LibraryContent />
-    </main>
-  </div>
+  <ViewLayout header={<LibraryHeader />}>
+    <LibraryContent />
+  </ViewLayout>
 )

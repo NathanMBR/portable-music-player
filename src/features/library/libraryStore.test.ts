@@ -17,25 +17,18 @@ const READ_ERROR =
 const scanLibrary = () => useLibraryStore.getState().scanLibrary()
 
 describe('scanLibrary', () => {
-  it('loads the songs from Rust, sorted by title', async () => {
-    mockCommands({
-      load_music_library: () => [
-        trackTitled('Silence and Distance', 'Angra'),
-        trackTitled('Generation Warriors', 'Angra')
-      ]
-    })
+  it('loads the songs from Rust in the order Rust lists them, for the Songs view to sort', async () => {
+    const tracks = [
+      trackTitled('Yesterday to Tomorrow', 'Audioslave'),
+      trackTitled('Acid Rain', 'Angra')
+    ]
+    mockCommands({ load_music_library: () => tracks })
 
     await scanLibrary()
 
     expect(useLibraryStore.getState()).toMatchObject({
       isScanning: false,
-      lastScan: {
-        kind: 'loaded',
-        tracks: [
-          trackTitled('Generation Warriors', 'Angra'),
-          trackTitled('Silence and Distance', 'Angra')
-        ]
-      }
+      lastScan: { kind: 'loaded', tracks }
     })
   })
 

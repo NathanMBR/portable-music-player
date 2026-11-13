@@ -112,10 +112,11 @@ export const NavigatesFromTheSideMenu: Story = {
     const page = within(canvasElement.ownerDocument.body)
 
     await userEvent.click(canvas.getByRole('button', { name: 'Open menu' }))
-    await userEvent.click(await page.findByRole('button', { name: 'Songs' }))
+    await userEvent.click(await page.findByRole('button', { name: 'Settings' }))
 
     await waitFor(() => expect(page.queryByRole('dialog')).not.toBeInTheDocument())
-    await expect(canvas.getByRole('heading', { name: 'Songs' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Settings' })).toBeVisible()
+    await expect(canvas.queryByRole('heading', { name: 'Songs' })).not.toBeInTheDocument()
   }
 }
 
@@ -163,8 +164,9 @@ export const KeepsPlayingAcrossCategories: Story = {
     const page = within(canvasElement.ownerDocument.body)
 
     await userEvent.click(canvas.getByRole('button', { name: 'Open menu' }))
-    await userEvent.click(await page.findByRole('button', { name: 'Songs' }))
+    await userEvent.click(await page.findByRole('button', { name: 'Settings' }))
     await waitFor(() => expect(page.queryByRole('dialog')).not.toBeInTheDocument())
+    await expect(canvas.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
     const player = canvas.getByRole('region', { name: 'Player' })
     await expect(within(player).getByText(playingTrack.title)).toBeVisible()

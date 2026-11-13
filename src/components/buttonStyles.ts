@@ -18,9 +18,14 @@ export const VARIANT_CLASSES: Record<ButtonVariant, string> = {
  */
 export const ACTIVE_CLASSES = 'bg-pen/15 text-pen data-hover:bg-pen/20'
 
-/** The keyboard focus ring of every control. */
+/**
+ * The keyboard focus ring of every control. Headless UI sets `data-focus` only for the keyboard,
+ * while the browser's own ring also shows after some clicks, so that one is always off. Tailwind's
+ * `outline-none` also resets the outline style the focused state's width relies on, hence
+ * `outline-solid`.
+ */
 export const FOCUS_CLASSES =
-  'data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-pen'
+  'outline-none data-focus:outline-2 data-focus:outline-solid data-focus:outline-offset-2 data-focus:outline-pen'
 
 /** A button that can't act right now fades; the base styles give it the not-allowed cursor. */
 export const DISABLED_CLASSES = 'data-disabled:opacity-40'

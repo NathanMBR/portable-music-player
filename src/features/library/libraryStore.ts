@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { notifyError } from '../notifications/notify'
 import { useCoverStore } from './coverStore'
 import { loadMusicLibrary, openSongsFolder } from './libraryApi'
-import { sortTracksByTitle } from './sortTracks'
 import type { ScanOutcome } from './types'
 
 type LibraryStore = {
@@ -15,8 +14,8 @@ type LibraryStore = {
 
 const scanSongsFolder = async (): Promise<ScanOutcome> => {
   try {
-    const tracks = await loadMusicLibrary()
-    return { kind: 'loaded', tracks: sortTracksByTitle(tracks) }
+    // Kept in the order Rust lists them: the Songs view sorts them as the settings ask.
+    return { kind: 'loaded', tracks: await loadMusicLibrary() }
   } catch (error) {
     notifyError("Couldn't load your music", error)
     return { kind: 'failed' }

@@ -39,7 +39,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * A small library, one row per song, in the order the store sorted it. Each row starts with a
+ * A small library, one row per song, in the order the Songs view sorted it. Each row starts with a
  * round play button named after its song, then shows the song's title and artist.
  */
 export const Default: Story = {

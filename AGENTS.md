@@ -63,7 +63,8 @@ src/
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
   components/           feature-agnostic UI built on Headless UI
-    <Component>/        one folder per component (Button, IconButton, Notice, Slider): <Component>.tsx
+    <Component>/        one folder per component (Button, IconButton, Notice, Select, Slider, Switch,
+                        ViewHeader, ViewLayout): <Component>.tsx
                         and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
@@ -87,10 +88,13 @@ src/
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
-- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Views keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
+- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
+  - Nothing searches for updates yet: `checksForUpdates` (on by default) is only a saved choice.
+  - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
+- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`main`).
   - The app draws every scrollbar itself: `::-webkit-scrollbar` base styles in `src/index.css`, `scrollbar` spacing token for the width. WebKitGTK and WebView2 both draw those, and WebView2 would ignore them if `scrollbar-color` or `scrollbar-width` were set.
-  - The scrollbar sits in the right gutter, beside the content, and the content keeps the width between the gutters, like the header (`px-gutter`). The scroll area stops inside the right gutter (see `LibraryView.tsx`) and uses `overflow-y-scroll`, so the scrollbar always keeps its room and only hides while nothing scrolls: WebKitGTK ignores `scrollbar-gutter`.
+  - The scrollbar sits in the right gutter, beside the content, and the content keeps the width between the gutters, like the header (`px-gutter`). The scroll area stops inside the right gutter (see `ViewLayout.tsx`) and uses `overflow-y-scroll`, so the scrollbar always keeps its room and only hides while nothing scrolls: WebKitGTK ignores `scrollbar-gutter`.
   - Playwright hides scrollbars by default, so the story tests launch Chromium without `--hide-scrollbars` (`vite.config.ts`) to lay them out like the webviews.
 - Covers: each row of the song list shows a square miniature of its song's embedded cover (`CoverThumbnail`), read apart from the scan, which skips pictures to stay fast on a slow drive.
   - A square asks for its cover only once it has stayed on screen for `COVER_READ_DELAY_MS` (`useIsOnScreen.ts`, an `IntersectionObserver`), so a long list reads only the covers it shows, and the rows a fast scroll flies past read nothing.
@@ -131,7 +135,8 @@ src/
   - Its threads must never panic: the release build aborts on panic, which would kill the app. A failed write only means the webview let go of the song.
   - Responses carry `Cache-Control: no-store`, so the webview doesn't copy songs into its cache on the computer.
 - `settings.rs`: user settings in `settings.json` next to the executable.
-  - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added.
+  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet) and the songs' order (`SongOrder`: title by default, or file name).
+  - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
   - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
 - Commands are `async`: sync commands run on the main thread, and file I/O on a slow USB drive would freeze the window.
 - Commands return `Result<T, FeatureError>`. The error enum uses `thiserror` for messages and serializes as its message string, which the frontend shows to the user. Structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.

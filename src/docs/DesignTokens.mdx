@@ -78,6 +78,8 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
 
 - **Titles** are `font-extrabold tracking-tight font-stretch-expanded`: the Songs header
   (`text-4xl`) and the app's name in the side menu (`text-lg`).
+- **Setting labels** (`SettingCard`) keep the default width, like the side menu's options, and
+  are `font-medium`, so they stand apart from the value beside them.
 - **Song rows** and the audio player's title are `font-stretch-semi-condensed`, so long titles fit
   before they are cut.
 - **Playback times** are `tabular-nums`, so the digits don't shift as they count.
@@ -97,8 +99,10 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   - `filled`: `pen` with `paper` on it, `data-hover:bg-pen/90`. The one main action on screen,
     like "Try again" or play and pause in the audio player.
 - **Focus:** every interactive element shows `data-focus:outline-2 data-focus:outline-offset-2
-  data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard. Sliders use
-  `outline-offset-4`, so the ring clears their thumb. They also hide the ring after a click,
+  data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard, and no ring after a
+  click: `outline-none` hides the browser's own. Labels beside a control are `passive`, so
+  clicking one doesn't hand the control a click Headless UI would ring as a screen reader's.
+  Sliders use `outline-offset-4`, so the ring clears their thumb. They also hide the ring after a click,
   because Headless UI rings inputs on any focus, like text fields.
 - **Active:** whatever is on right now, like a pressed toggle (shuffle, repeat), the playing
   song's button or the current category, shows `pen` on a pen tint (`bg-pen/15 text-pen`,

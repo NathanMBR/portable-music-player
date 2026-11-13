@@ -3,6 +3,8 @@ import { expect } from 'storybook/test'
 import { noCover } from '../../../testing/covers'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import { useSettingsStore } from '../../settings/settingsStore'
+import type { SongOrder } from '../../settings/types'
 import { useLibraryStore } from '../libraryStore'
 import type { Track } from '../types'
 import { LibraryView } from './LibraryView'
@@ -58,5 +60,65 @@ export const ScanFailed: Story = {
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
     await expect(await canvas.findByRole('list', { name: 'Songs' })).toBeVisible()
+  }
+}
+
+const chooseSongOrder = (songOrder: SongOrder) =>
+  useSettingsStore.setState(state => ({ settings: { ...state.settings, songOrder } }))
+
+/**
+ * Sorted by title, the default: the songs follow their titles, whatever their file names, and
+ * whatever order the scan found them in.
+ */
+export const SortedByTitle: Story = {
+  beforeEach: () => {
+    chooseSongOrder('title')
+    useLibraryStore.setState({
+      lastScan: {
+        kind: 'loaded',
+        tracks: [
+          { path: 'Songs/2 Shadows.mp3', title: 'Shadows', artist: 'Woodkid' },
+          { path: 'Songs/1 Wuthering Heights.mp3', title: 'Wuthering Heights', artist: 'Angra' },
+          { path: 'Songs/3 Hero of the Day.mp3', title: 'Hero of the Day', artist: 'Metallica' }
+        ]
+      }
+    })
+  },
+  play: async ({ canvas }) => {
+    const rows = canvas.getAllByRole('listitem').map(row => row.textContent)
+    await expect(rows).toEqual([
+      'Hero of the Day · Metallica',
+      'Shadows · Woodkid',
+      'Wuthering Heights · Angra'
+    ])
+  }
+}
+
+/** Sorted by file name, chosen in the settings: the songs follow their files, whatever their titles. */
+export const SortedByFileName: Story = {
+  beforeEach: () => {
+    chooseSongOrder('fileName')
+    useLibraryStore.setState({
+      lastScan: {
+        kind: 'loaded',
+        tracks: [
+          {
+            path: 'Songs/3 Old School Hollywood.mp3',
+            title: 'Old School Hollywood',
+            artist: 'System of a Down'
+          },
+          { path: 'Songs/1 Sad but True.mp3', title: 'Sad but True', artist: 'Metallica' },
+          { path: 'Songs/2 Out of Exile.mp3', title: 'Out of Exile', artist: 'Audioslave' }
+        ]
+      }
+    })
+  },
+  play: async ({ canvas }) => {
+    const rows = canvas.getAllByRole('listitem').map(row => row.textContent)
+    await expect(rows).toEqual([
+      'Sad but True · Metallica',
+      'Out of Exile · Audioslave',
+      'Old School Hollywood · System of a Down'
+    ])
   }
 }

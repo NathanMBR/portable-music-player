@@ -8,11 +8,13 @@ import { NotificationArea } from './features/notifications/NotificationArea/Noti
 import { AudioPlayer } from './features/playback/AudioPlayer/AudioPlayer'
 import { PLAYER_HEIGHT } from './features/playback/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
+import { SettingsView } from './features/settings/SettingsView/SettingsView'
 
 // Kept here, where the features meet, so the navigation feature never imports the views it
 // switches between.
 const viewByCategory: Record<CategoryId, ComponentType> = {
-  songs: LibraryView
+  songs: LibraryView,
+  settings: SettingsView
 }
 
 /**

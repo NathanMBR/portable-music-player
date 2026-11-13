@@ -47,17 +47,27 @@ categories from `src/features/navigation/categories.ts` and holds the theme togg
 category switches the view and closes the drawer. Adding a category takes one entry in `CATEGORIES`
 and one view in `viewByCategory`.
 
-The only category so far is **Songs** (`LibraryView`): a header with the song count, which stays in place while the list scrolls, then the
-song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
+Every category's view is a `ViewLayout`: a `ViewHeader` with the category's icon and title stays in
+place while the content below it scrolls.
+
+**Songs** (`LibraryView`) has a header with the song count, then the song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
 scan. Each song starts with a `PlayButton`, which plays it in the audio player with the whole list
 as the queue. Next comes a square miniature of the song's cover (`CoverThumbnail`), or a photo icon
 on the `rule` color when it has none. Then comes its title and, when its tags name one, its artist,
 past a middle dot. The dot and the artist are in a lighter ink (`ink-faded`) than the title, as in
-"Better than You · Metallica".
+"Better than You · Metallica". The songs are sorted as the Settings view says: by title, the
+default, or by filename.
+
+**Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default
+(nothing searches yet: only the choice is saved), and a choice to sort the songs by filename or by
+title (`Select`). Each option is a card (`SettingCard`), its label at the left and its control at
+the right. Each choice applies at once and is saved in `settings.json`; if saving fails, the choice
+still applies and a notification says why.
 
 ## Where the code lives
 
-- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`, `Slider`),
+- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`,
+  `Select`, `Slider`, `Switch`, `ViewHeader`, `ViewLayout`),
   built on Headless UI and styled with Tailwind, each in a folder of its own with its stories.
   `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
   `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.

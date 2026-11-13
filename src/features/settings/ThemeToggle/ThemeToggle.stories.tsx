@@ -43,7 +43,11 @@ export const SwitchesToDark: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(canvas.getByRole('switch', { name: 'Dark theme' }))
     await expect(canvasElement.ownerDocument.documentElement.dataset.theme).toBe('dark')
-    await waitFor(() => expect(saveSettings).toHaveBeenCalledWith({ settings: { theme: 'dark' } }))
+    await waitFor(() =>
+      expect(saveSettings).toHaveBeenCalledWith({
+        settings: { theme: 'dark', checksForUpdates: true, songOrder: 'title' }
+      })
+    )
   }
 }
 

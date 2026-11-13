@@ -4,7 +4,7 @@ import { fullTrackName, TITLE_ARTIST_SEPARATOR } from '../trackName'
 import type { Track } from '../types'
 
 type TrackListProps = {
-  /** The songs to list, in the order given (the store keeps them sorted by title). */
+  /** The songs to list, in the order given (the Songs view sorts them as the settings ask). */
   tracks: Track[]
 }
 

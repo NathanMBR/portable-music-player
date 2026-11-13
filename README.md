@@ -9,7 +9,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Songs library from the `Songs` folder
 - Song titles and artists from their tags
 - Song cover miniatures from their tags
-- Songs sorted alphabetically
+- Songs sorted by title or by filename
 - Open the `Songs` folder
 - Scan the library again
 - Audio player with shuffle, repeat, volume and seeking
@@ -18,6 +18,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Media keys and the system's media controls
 - Window title names the song in the player
 - Side menu with the categories
+- Settings page
 - Dark theme
 - Error notifications in the bottom-right corner
 - Remembers the window size on each computer

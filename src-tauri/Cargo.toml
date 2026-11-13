@@ -26,6 +26,7 @@ thiserror = "2"
 tauri-plugin-window-state = "2"
 getrandom = { version = "0.3", features = ["std"] }
 lofty = "0.25.5"
+tauri-plugin-log = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

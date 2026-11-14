@@ -125,5 +125,7 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   the track, so the `pen` part ends there too (`fillEnd` in `src/components/sliderFill.ts`) and
   meets the thumb at every value. The thumb stops on the slider's `step` (tenths of a second for
   the song's position), and the `pen` part is drawn from that same step (`snapToStep`).
-- **Motion:** spins and transitions stop for users who prefer reduced motion (`motion-safe:` and
-  `motion-reduce:`).
+- **Motion:** spins, transitions and marching dashes stop for users who prefer reduced motion
+  (`motion-safe:` and `motion-reduce:`). `animate-march` moves an SVG stroke's dashes forward along
+  its path, looping without a jump when the element's dash offset is one period of its dash pattern:
+  the song drop box's border marches clockwise this way.

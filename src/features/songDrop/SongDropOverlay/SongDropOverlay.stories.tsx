@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { useSongDropStore } from '../songDropStore'
 import { SongDropOverlay } from './SongDropOverlay'
@@ -24,7 +24,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Files are dragged over the window: the box over the page says to drop them. */
+/** Files are dragged over the window: the page blurs, and the box over it says to drop them. */
 export const Dragging: Story = {
   beforeEach: () => {
     useSongDropStore.setState({ isDragging: true })
@@ -32,6 +32,26 @@ export const Dragging: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body)
     await expect(page.getByText('Drop files here')).toBeVisible()
+  }
+}
+
+// Well within the box's fade, so it's still fading out then.
+const WHILE_FADING_OUT_MS = 50
+
+/** The files leave the window, or are dropped: the box fades out, then leaves the page. */
+export const FadingOut: Story = {
+  beforeEach: () => {
+    useSongDropStore.setState({ isDragging: true })
+  },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const message = await page.findByText('Drop files here')
+
+    useSongDropStore.getState().setDragging(false)
+    await new Promise(resolve => setTimeout(resolve, WHILE_FADING_OUT_MS))
+
+    await expect(message).toBeInTheDocument()
+    await waitFor(() => expect(page.queryByText('Drop files here')).not.toBeInTheDocument())
   }
 }
 

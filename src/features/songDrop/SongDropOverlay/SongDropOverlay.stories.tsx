@@ -38,6 +38,10 @@ export const Dragging: Story = {
 // Well within the box's fade, so it's still fading out then.
 const WHILE_FADING_OUT_MS = 50
 
+// Longer than waitFor's default second: while every story runs at once, the browser can hold back
+// the frames of the ones off screen, and with them the fade.
+const UNTIL_FADED_OUT = { timeout: 5000 }
+
 /** The files leave the window, or are dropped: the box fades out, then leaves the page. */
 export const FadingOut: Story = {
   beforeEach: () => {
@@ -51,7 +55,10 @@ export const FadingOut: Story = {
     await new Promise(resolve => setTimeout(resolve, WHILE_FADING_OUT_MS))
 
     await expect(message).toBeInTheDocument()
-    await waitFor(() => expect(page.queryByText('Drop files here')).not.toBeInTheDocument())
+    await waitFor(
+      () => expect(page.queryByText('Drop files here')).not.toBeInTheDocument(),
+      UNTIL_FADED_OUT
+    )
   }
 }
 

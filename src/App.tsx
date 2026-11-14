@@ -9,6 +9,8 @@ import { AudioPlayer } from './features/playback/AudioPlayer/AudioPlayer'
 import { PLAYER_HEIGHT } from './features/playback/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
 import { SettingsView } from './features/settings/SettingsView/SettingsView'
+import { SongDropDialog } from './features/songDrop/SongDropDialog/SongDropDialog'
+import { SongDropOverlay } from './features/songDrop/SongDropOverlay/SongDropOverlay'
 
 // Kept here, where the features meet, so the navigation feature never imports the views it
 // switches between.
@@ -19,7 +21,8 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
 
 /**
  * The page shell: the side menu, the current category's view filling the window, with the menu
- * button in its left margin, the audio player along the bottom while a song is loaded, and the
+ * button in its left margin, the audio player along the bottom while a song is loaded, where to
+ * drop songs while files are dragged over the window, the dialog adding them, and the
  * notification area in the bottom-right corner. The window never scrolls: the view scrolls its own
  * content, which reaches the window's bottom edge, or ends above the player while it's open. The
  * player sits outside the views, so a song keeps playing when the category changes.
@@ -46,6 +49,8 @@ export const App = () => {
         <CurrentView />
       </div>
       <AudioPlayer />
+      <SongDropOverlay />
+      <SongDropDialog />
       <NotificationArea bottomClearance={isPlayerOpen ? PLAYER_HEIGHT : undefined} />
     </>
   )

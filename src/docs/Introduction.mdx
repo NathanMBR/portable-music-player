@@ -46,6 +46,13 @@ moment after they change, and when the window closes. The song is found again by
 one removed from the `Songs` folder is forgotten, and the player stays closed. Nothing saved yet
 means full volume, unmuted, with repeat and shuffle off.
 
+Files and folders dropped anywhere on the window add their songs to the `Songs` folder. While
+files are dragged over the window, a dashed box covers it (`SongDropOverlay`), saying to drop them
+there. A dialog (`SongDropDialog`) then spins a loader while Rust finds the MP3s of the drop,
+subfolders included, and copies them flat into the `Songs` folder, which is then scanned again.
+When some of their file names are taken, the dialog first asks whether to skip those songs, to
+replace the songs already there, or to cancel.
+
 The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
 the side menu included. Notifications pop up there, close by themselves after a few seconds or
 earlier with their × button, and pause while hovered.

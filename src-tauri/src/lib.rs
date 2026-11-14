@@ -3,6 +3,7 @@ mod logs;
 mod main_window;
 mod portable;
 mod settings;
+mod song_drop;
 mod song_server;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,7 +26,9 @@ pub fn run() {
             library::read_cover,
             logs::write_log,
             settings::load_settings,
-            settings::save_settings
+            settings::save_settings,
+            song_drop::check_dropped_songs,
+            song_drop::copy_dropped_songs
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

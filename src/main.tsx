@@ -9,6 +9,7 @@ import { connectPlaybackMemory, restorePlayback } from './features/playback/play
 import { connectSongAudio } from './features/playback/songAudio'
 import { connectWindowTitle } from './features/playback/windowTitle'
 import { useSettingsStore } from './features/settings/settingsStore'
+import { connectSongDrop } from './features/songDrop/songDropEvents'
 import './index.css'
 
 // Runs once per launch; a mount effect would run twice in development under StrictMode.
@@ -18,6 +19,7 @@ connectSongAudio(new Audio())
 connectWindowTitle()
 connectMediaSession()
 connectButtonLog()
+connectSongDrop()
 // The player's song is found among the scanned ones, and the player is saved only once it's back.
 void Promise.all([settingsLoaded, libraryScanned]).then(() => {
   restorePlayback()

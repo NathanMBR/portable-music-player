@@ -18,7 +18,7 @@ use tauri::{State, ipc::Response};
 
 use crate::{portable, song_server::LazySongServer};
 
-const SONGS_FOLDER_NAME: &str = "Songs";
+pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 const MP3_EXTENSION: &str = "mp3";
 /// Linux's webview (WebKitGTK 2.48+) skips ahead in songs over 2 MiB played from memory, through a
 /// blob URL, so there songs stream from the song server. Windows' webview (WebView2) plays them from
@@ -145,7 +145,7 @@ fn ensure_songs_dir() -> Result<PathBuf, LibraryError> {
 }
 
 /// Returns the Songs folder inside `root`, creating it first if it's missing.
-fn ensure_songs_dir_in(root: &Path) -> Result<PathBuf, LibraryError> {
+pub(crate) fn ensure_songs_dir_in(root: &Path) -> Result<PathBuf, LibraryError> {
     let songs_dir = root.join(SONGS_FOLDER_NAME);
     fs::create_dir_all(&songs_dir).map_err(|source| LibraryError::CreateFolder {
         path: songs_dir.clone(),
@@ -311,7 +311,7 @@ fn is_mp3(path: &Path) -> bool {
 
 /// Hidden names are skipped because macOS writes a `._song.mp3` metadata file next to every song
 /// copied onto a FAT/exFAT flash drive.
-fn has_mp3_name(path: &Path) -> bool {
+pub(crate) fn has_mp3_name(path: &Path) -> bool {
     let is_hidden = path
         .file_name()
         .is_some_and(|name| name.to_string_lossy().starts_with('.'));

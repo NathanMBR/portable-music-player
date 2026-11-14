@@ -54,6 +54,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
   - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
   - pages: the navigation store logs them when the category changes;
+  - drops: the song drop store logs the songs a drop holds and the songs it copied;
   - Rust logs the app's opening and closing (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
@@ -113,7 +114,7 @@ src/
 - Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, and, only while it's open, the space kept for it at the bottom of the window (`pb-player`, eased with the player's slide) and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`), so nothing hides behind it.
   - The audio plays from `src/features/playback/songAudio.ts`, the only module that touches it. `main.tsx` connects it once to an `Audio` element, which then follows the playback store (song, play state, position, volume) and reports the song's length, progress and end back to it. Stories never connect it, so they stay silent.
     - The progress follows the wall clock between the audio's reports (`progressEstimate.ts`), from the moment the audio's clock is seen moving until it pauses, waits for data or jumps. On Linux, PulseAudio's clock can hold still for seconds and then catch up while the song plays on (seen in WSL and on Linux Mint, and with plain GStreamer), which froze the progress bar.
-  - Where songs play from depends on the OS, and Rust decides: `song_source` (`library.rs`) finds a track's file from its relative path and answers `stream` on Linux or `memory` on Windows (`STREAMS_SONGS`). The frontend never handles absolute paths.
+  - Where songs play from depends on the OS, and Rust decides: `song_source` (`library.rs`) finds a track's file from its relative path and answers `stream` on Linux or `memory` on Windows (`STREAMS_SONGS`). The frontend never handles absolute paths, except the ones a drop hands it (see Song drop).
     - On Linux they stream from `song_server.rs`, a small HTTP server on `127.0.0.1`, started with the first song: a random port, a random token in every URL, Range requests for seeking, and only the MP3s of the Songs folder. Blob URLs can't be used there: WebKitGTK 2.48+ plays `blob:` media through a 2 MB ring buffer that skips ahead in larger files while the timer keeps counting.
     - On Windows `read_song` sends the whole file as raw bytes (`tauri::ipc::Response`), and `songAudio.ts` plays them from an object URL, freed when the song changes. WebView2 plays those fine, and the song server would run into its planned Local Network Access checks on requests to `127.0.0.1`.
     - Tauri's asset protocol (`convertFileSrc`) can't be used for audio: WebKitGTK's media backend can't stream from a custom URI scheme, and `play()` fails with `NotSupportedError`. A CSP added later must allow `blob:` and `http://127.0.0.1:*` as media sources.
@@ -126,6 +127,11 @@ src/
   - `mediaSession.ts`, also connected once from `main.tsx`, hands the song in the player, with its artist, to the system through `navigator.mediaSession`, so the media keys and the system's media controls drive the playback store (play, pause, stop, next, previous, seek). WebView2 passes it on to Windows' media controls, and WebKitGTK to MPRIS, built in by default from WebKitGTK 2.46. Webviews without the API get nothing.
     - It sets the title and play state only when they change, and no position state: both webviews read the position from the `<audio>` element, and a position state would override it.
   - Before loading a song, `songAudio.ts` checks `canPlayType('audio/mpeg')` and, if it's empty, notifies what to install instead. WebKitGTK freezes the whole app, with no `error` event, as soon as it gets a source that GStreamer lacks the plugins (`appsink`, `autoaudiosink`, an MP3 decoder) to play.
+- Song drop: files and folders dropped anywhere on the window add their songs to the Songs folder (`src/features/songDrop/`).
+  - `songDropEvents.ts`, connected once from `main.tsx`, follows Tauri's drag events (`getCurrentWebview().onDragDropEvent`). While a drag holding files is over the window, `SongDropOverlay` covers it with a dashed box saying "Drop files here"; a drag without files, like a selected text, shows nothing. An app only learns of a drag once it enters its window: Windows and Wayland tell no other app, so the box can't show any earlier.
+  - Tauri's `dragDropEnabled` is on by default, and on Windows its drop handling replaces WebView2's, so the page gets no HTML5 drag and drop events: dragging within the page, like reordering songs, would need pointer events.
+  - The drop's paths, absolute as the OS gives them, go straight back to Rust (`song_drop.rs`), which copies only the MP3s among them, and only into the Songs folder.
+  - `songDropStore.ts` takes a drop through the steps `SongDropDialog` shows: `check_dropped_songs` counts the MP3s of the drop, subfolders included, and names those whose file name is taken; if any is, the dialog asks to skip them, replace the songs already there, or cancel; `copy_dropped_songs` copies them flat into the Songs folder; then the Songs folder is scanned again, once any scan already running ends, and that rescan notifies. The dialog stays open, with a loader, until the rescan ends. A drop without songs notifies instead, and a drop while another is added is ignored.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 
@@ -152,6 +158,10 @@ src/
   - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name and position, `SavedSong`).
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
   - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
+- `song_drop.rs`: adds the songs of a drop to the Songs folder, through `check_dropped_songs` and `copy_dropped_songs`.
+  - It walks each dropped folder with its subfolders, each folder's names sorted, so which of two songs of the same name is copied never depends on how the OS lists them. It doesn't follow links to folders, so a link back up can't loop, and it skips hidden subfolders (dot names, and Windows' hidden attribute): on a dropped drive they're the trash and the system's folders.
+  - A name is taken by a file of that name in the Songs folder (`exists()`, so the drive's file system applies its own case rules, as FAT and NTFS ignore case) or by an earlier dropped song (compared lowercase). The copy checks each name as it goes, so skipping keeps the first song of a name and replacing keeps the last.
+  - Each song is copied under a hidden `.<name>.part`, which the scan skips, then renamed over its own name, so pulling the drive never leaves half a song. A path that can't be read or copied is reported (`DropFailure`), and the other songs are still copied.
 - `logs.rs`: the log, through the official `tauri-plugin-log`, printed to stdout and saved in `Logs/portable-music-player.log` next to the executable (its `Folder` target: the plugin's default `LogDir` is in the user's profile, off the drive). It takes everything logged through the `log` crate, which the plugin re-exports (`tauri_plugin_log::log`).
   - A full file (`MAX_LOG_FILE_BYTES`, 1 MB, instead of the plugin's 40 KB) is renamed with its date and a new one starts; the 3 newest full files are kept (`FULL_LOG_FILES_KEPT`).
   - `writable_logs_dir` creates the folder and opens the log file before the plugin starts, because the plugin opens it in its setup, and an error there would stop the app from starting, as on a write-protected drive. If it can't, the log goes only to stdout, and a warning says why once the plugin runs (`warn_if_unsaved`).
@@ -207,7 +217,7 @@ These follow from the project goal and are easy to get wrong:
 - **Fake the Rust side only through `mockCommands`** (`src/testing/mockCommands.ts`):
   - it answers commands through Tauri's `mockIPC`, and a command without a handler rejects;
   - it always answers `write_log`, unless a handler replaces it, keeping the messages: check them with `loggedMessages()` (`src/testing/logs.ts`). Unit tests start with `mockCommands({})` (`setupUnitTests.ts`), like stories, so logging works in every test;
-  - it mocks events too (`shouldMockEvents`), so a test can `emit` what Rust would, like `tauri://close-requested`; window commands also need `mockWindows('main')`;
+  - it mocks events too (`shouldMockEvents`), so a test can `emit` what Rust would, like `tauri://close-requested` or `tauri://drag-drop`; window and webview APIs also need `mockWindows('main')`;
   - never mock the `*Api.ts` modules: going through `invoke` keeps the command names and argument shapes under test;
   - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
 - Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification and forgets the logged messages.
@@ -286,6 +296,8 @@ Every feature logs what the user does and what the app does in response, followi
 | The volume slider is moved | `Set volume to <percent>%` |
 | The current page changes | `Changing to page "<page name>"`, the category's name in the menu |
 | A song is put back in the player when the app opens | `Restored song "<title>" at mm:ss.mmm` |
+| Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
+| The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |
 
 - `<name>` is the control's accessible name, as screen readers hear it.

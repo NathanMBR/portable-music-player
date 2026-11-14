@@ -13,6 +13,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Songs sorted by title or by filename
 - Open the `Songs` folder
 - Scan the library again, with a notification counting the songs
+- Add songs by dropping files or folders on the window
 - Audio player with shuffle, repeat, volume and seeking
 - Volume from the mouse wheel
 - Seeking from the arrow keys

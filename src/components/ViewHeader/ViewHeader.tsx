@@ -7,19 +7,18 @@ type ViewHeaderProps = {
   title: string
   /** Controls at the right end of the title's line, like the Songs view's buttons. */
   actions?: ReactNode
-  /** What goes below the title's line, like the Songs view's status line. */
-  children?: ReactNode
 }
 
 /**
  * Header of a category view, above a thick ink rule: the view's icon and title in the page title's
- * type, with optional controls at the right end of the line. Its title's line is as tall as the
- * menu button beside it, so the two line up across their columns. It stays in place while the
- * view's content scrolls below it (see `ViewLayout`).
+ * type, with optional controls at the right end of the line, and nothing else, so every view's
+ * header looks the same; anything more about the view goes below the rule, in its content. Its
+ * title's line is as tall as the menu button beside it, so the two line up across their columns.
+ * It stays in place while the view's content scrolls below it (see `ViewLayout`).
  *
  * @summary Category view header
  */
-export const ViewHeader = ({ icon: Icon, title, actions, children }: ViewHeaderProps) => (
+export const ViewHeader = ({ icon: Icon, title, actions }: ViewHeaderProps) => (
   <header className="border-b-2 border-ink pt-8 pb-4">
     {/* min-h-10 matches the menu button's height, so the two line up across their columns. */}
     <div className="flex min-h-10 items-center gap-3">
@@ -29,6 +28,5 @@ export const ViewHeader = ({ icon: Icon, title, actions, children }: ViewHeaderP
       </h1>
       {actions}
     </div>
-    {children}
   </header>
 )

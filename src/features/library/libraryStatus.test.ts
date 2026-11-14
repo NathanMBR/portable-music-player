@@ -18,16 +18,19 @@ describe('describeLibraryStatus', () => {
     expect(describeLibraryStatus(null, false)).toBe('')
   })
 
-  it('reports a failed scan', () => {
-    expect(describeLibraryStatus({ kind: 'failed' }, false)).toBe('Failed to check songs')
+  it('says nothing after a failed scan, which the view explains below it', () => {
+    expect(describeLibraryStatus({ kind: 'failed' }, false)).toBe('')
+  })
+
+  it('says nothing when the Songs folder has no songs, which the view explains below it', () => {
+    expect(describeLibraryStatus(loadedWith([]), false)).toBe('')
   })
 
   it('counts one song in the singular', () => {
     expect(describeLibraryStatus(loadedWith(['Arising Thunder']), false)).toBe('1 song')
   })
 
-  it('counts any other number of songs in the plural', () => {
-    expect(describeLibraryStatus(loadedWith([]), false)).toBe('0 songs')
+  it('counts more songs in the plural', () => {
     expect(
       describeLibraryStatus(loadedWith(['Unfinished Allegro', 'Gods Of The World']), false)
     ).toBe('2 songs')

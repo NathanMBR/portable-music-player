@@ -32,14 +32,10 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** After a scan, the status line counts the songs. */
-export const Loaded: Story = {
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(`${TRACKS.length} songs`)).toBeVisible()
-  }
-}
+/** After a scan: the title and the two buttons, with the song count below, in the view. */
+export const Loaded: Story = {}
 
-/** While a scan runs, the status line says so and the "Scan again" icon spins. */
+/** While a scan runs, the "Scan again" icon spins. */
 export const Scanning: Story = {
   beforeEach: () => {
     useLibraryStore.setState({ isScanning: true })
@@ -57,13 +53,6 @@ export const ScannedAgain: Story = {
 
     await waitFor(() => expect(page.getByText('Song list updated')).toBeVisible())
     await expect(page.getByText(`${TRACKS.length} songs in the Songs folder`)).toBeVisible()
-  }
-}
-
-/** After a failed scan the status line reports it; the view below shows the details. */
-export const ScanFailed: Story = {
-  beforeEach: () => {
-    useLibraryStore.setState({ lastScan: { kind: 'failed' } })
   }
 }
 

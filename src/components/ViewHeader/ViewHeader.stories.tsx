@@ -19,15 +19,11 @@ export const TitleOnly: Story = {
   }
 }
 
-/**
- * Controls at the end of the title's line and a line below it, like the Songs view's buttons and
- * status line.
- */
-export const WithActionsAndALineBelow: Story = {
+/** Controls at the end of the title's line, like the Songs view's buttons. */
+export const WithActions: Story = {
   args: {
     icon: MusicalNoteIcon,
     title: 'Songs',
-    actions: <IconButton icon={ArrowPathIcon} label="Scan again" onClick={fn()} />,
-    children: <p className="mt-3 text-sm text-ink-faded">296 songs</p>
+    actions: <IconButton icon={ArrowPathIcon} label="Scan again" onClick={fn()} />
   }
 }

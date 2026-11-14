@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 import { noCover } from '../../../testing/covers'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
@@ -32,10 +32,14 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The usual view: the header and the song list. */
+/** The usual view: the header, then below its rule the song count and the song list. */
 export const Loaded: Story = {
   beforeEach: () => {
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: TRACKS } })
+  },
+  play: async ({ canvas }) => {
+    const content = within(canvas.getByRole('main'))
+    await expect(content.getByText(`${TRACKS.length} songs`)).toBeVisible()
   }
 }
 

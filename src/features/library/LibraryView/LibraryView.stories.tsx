@@ -46,10 +46,39 @@ export const Loaded: Story = {
 /** Until the first scan finishes, only the header shows, so nothing flashes on launch. */
 export const BeforeFirstScan: Story = {}
 
-/** No songs in the Songs folder yet: the view tells the user where to put them. */
+// The middle of the content column, between the gutters and above the bottom of the view.
+const contentCenterOf = (content: HTMLElement) => {
+  const { left, top } = content.getBoundingClientRect()
+  const { paddingLeft, paddingRight } = getComputedStyle(content)
+  const columnWidth = content.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight)
+  return { x: left + parseFloat(paddingLeft) + columnWidth / 2, y: top + content.clientHeight / 2 }
+}
+
+const centerOf = (element: HTMLElement) => {
+  const { left, top, width, height } = element.getBoundingClientRect()
+  return { x: left + width / 2, y: top + height / 2 }
+}
+
+/** No songs in the Songs folder yet: in the middle of the view, a folder says where to put them. */
 export const Empty: Story = {
+  // Views fill the window's height, so the notice has room to center in.
+  decorators: [
+    Story => (
+      <div className="h-96">
+        <Story />
+      </div>
+    )
+  ],
   beforeEach: () => {
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: [] } })
+  },
+  play: async ({ canvas }) => {
+    const notice = canvas.getByRole('heading', { name: 'Your Songs folder is empty' })
+    const contentCenter = contentCenterOf(canvas.getByRole('main'))
+    const noticeCenter = centerOf(notice.parentElement as HTMLElement)
+
+    await expect(noticeCenter.x).toBeCloseTo(contentCenter.x, 0)
+    await expect(noticeCenter.y).toBeCloseTo(contentCenter.y, 0)
   }
 }
 

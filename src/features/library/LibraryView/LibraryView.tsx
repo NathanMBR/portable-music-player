@@ -29,15 +29,19 @@ const LibraryContent = () => {
 
 /**
  * The Songs category. Below the header's rule, the status line counts the songs, and below it the
- * view shows nothing until the first scan finishes, then the song list, the empty-folder notice or
- * the scan failure. The previous list stays on screen while a new scan runs. The header stays in place and only the content below it scrolls, with the
- * scrollbar beside it in the right margin.
+ * view shows nothing until the first scan finishes, then the song list, the scan failure, or the
+ * empty-folder notice in the middle of the view. The previous list stays on screen while a new
+ * scan runs. The header stays in place and only the content below it scrolls, with the scrollbar
+ * beside it in the right margin.
  *
  * @summary Songs category view
  */
 export const LibraryView = () => (
   <ViewLayout header={<LibraryHeader />}>
-    <LibraryStatus />
-    <LibraryContent />
+    {/* At least as tall as the view, so the empty-folder notice can sit in its middle. */}
+    <div className="flex min-h-full flex-col">
+      <LibraryStatus />
+      <LibraryContent />
+    </div>
   </ViewLayout>
 )

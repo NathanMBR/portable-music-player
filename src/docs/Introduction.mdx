@@ -65,13 +65,15 @@ and one view in `viewByCategory`.
 Every category's view is a `ViewLayout`: a `ViewHeader` with the category's icon and title stays in
 place while the content below it scrolls.
 
-**Songs** (`LibraryView`) has a header with the song count, then the song list, a notice for an empty Songs folder, or a calm notice with "Try again" after a failed
-scan. Each song starts with a `PlayButton`, which plays it in the audio player with the whole list
-as the queue. Next comes a square miniature of the song's cover (`CoverThumbnail`), or a photo icon
-on the `rule` color when it has none. Then comes its title and, when its tags name one, its artist,
-past a middle dot. The dot and the artist are in a lighter ink (`ink-faded`) than the title, as in
-"Better than You · Metallica". The songs are sorted as the Settings view says: by title, the
-default, or by filename.
+**Songs** (`LibraryView`) has a header, and below its rule the song count (`LibraryStatus`), then
+the song list, a folder in the middle of the view saying the Songs folder is empty (`EmptyLibrary`),
+or a calm notice with "Try again" after a failed scan; without songs, the count is left out. Each
+song starts with a `PlayButton`, which plays it in the audio player with the whole list as the
+queue. Next comes a square miniature of the song's cover (`CoverThumbnail`), or a photo icon on the
+`rule` color when it has none. Then comes its title and, when its tags name one, its artist, past a
+middle dot. The dot and the artist are in a lighter ink (`ink-faded`) than the title, as in "Better
+than You · Metallica". The songs are sorted as the Settings view says: by title, the default, or by
+filename.
 
 **Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default
 (nothing searches yet: only the choice is saved), and a choice to sort the songs by filename or by

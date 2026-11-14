@@ -9,11 +9,12 @@ type TrackListProps = {
 }
 
 /**
- * The songs of the library, one row each, starting with a round play button. Playing a song makes
- * the whole list the audio player's queue, and only one song plays at a time. Next comes a square
- * miniature of the song's cover, read once the row is on screen, or a photo icon when it has none.
- * Then each row shows the song's title and, when its tags name one, a middle dot and the artist in
- * a lighter ink. A row too long for its width is cut with an ellipsis, and hovering shows it whole,
+ * The songs of the library, one row each between thin rules, from above the first row to below
+ * the last, each row starting with a round play button. Playing a song makes the whole list the
+ * audio player's queue, and only one song plays at a time. Next comes a square miniature of the
+ * song's cover, read once the row is on screen, or a photo icon when it has none. Then each row
+ * shows the song's title and, when its tags name one, a middle dot and the artist in a lighter
+ * ink. A row too long for its width is cut with an ellipsis, and hovering shows it whole,
  * as "Title · Artist".
  *
  * @summary List of songs
@@ -21,7 +22,10 @@ type TrackListProps = {
 export const TrackList = ({ tracks }: TrackListProps) => (
   <ul aria-label="Songs" className="pb-8">
     {tracks.map(track => (
-      <li key={track.path} className="flex items-center gap-2 border-b border-rule py-1.5">
+      <li
+        key={track.path}
+        className="flex items-center gap-2 border-b border-rule py-1.5 first:border-t"
+      >
         <PlayButton track={track} queue={tracks} />
         <CoverThumbnail path={track.path} />
         <span title={fullTrackName(track)} className="truncate font-stretch-semi-condensed">

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fireEvent, fn } from 'storybook/test'
+import { expect, fireEvent, fn, within } from 'storybook/test'
 import { Slider } from './Slider'
 
 const meta = {
@@ -56,7 +56,18 @@ export const StopsOnItsStep: Story = {
 export const Disabled: Story = {
   args: { value: 0, valueText: 'Length unknown', isDisabled: true },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('slider', { name: 'Volume' })).toBeDisabled()
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    await expect(slider).toBeDisabled()
+    await expect(getComputedStyle(slider).cursor).toBe('not-allowed')
+  }
+}
+
+/** The pointer over the slider turns into the hand buttons show, since a click there moves it. */
+export const ShowsTheButtonsCursor: Story = {
+  play: async ({ canvas }) => {
+    await expect(getComputedStyle(canvas.getByRole('slider', { name: 'Volume' })).cursor).toBe(
+      'pointer'
+    )
   }
 }
 
@@ -186,5 +197,86 @@ export const IgnoresTheWheelWithoutAStep: Story = {
     fireEvent.wheel(canvas.getByRole('slider', { name: 'Volume' }), { deltaY: -100 })
 
     await expect(args.onChange).not.toHaveBeenCalled()
+  }
+}
+
+const percent = (value: number) => `${value}%`
+
+// A point on the track, `x` from the window's left edge, halfway down it.
+const pointOn = (track: DOMRect, x: number) => ({
+  clientX: x,
+  clientY: track.top + track.height / 2
+})
+
+const centerX = (rect: DOMRect) => rect.left + rect.width / 2
+
+/**
+ * With `formatPointerValue`, a tooltip above the pointer says at once what a click there would
+ * set, its arrow on the pointer and clear of the thumb: half a track from its start gives half the
+ * maximum, and its end the maximum.
+ */
+export const TooltipShowsWhereAClickLands: Story = {
+  args: { formatPointerValue: percent },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    const track = slider.getBoundingClientRect()
+
+    await userEvent.pointer({ target: slider, coords: pointOn(track, centerX(track)) })
+    const tooltip = page.getByText('50%')
+    await expect(tooltip).toBeVisible()
+    const arrow = tooltip.parentElement?.querySelector('svg')?.getBoundingClientRect()
+    await expect(arrow && centerX(arrow)).toBeCloseTo(centerX(track), 0)
+    await expect(arrow?.bottom).toBeLessThan(track.top)
+
+    await userEvent.pointer({ target: slider, coords: pointOn(track, track.right - 1) })
+    await expect(page.getByText('100%')).toBeVisible()
+  }
+}
+
+/** The tooltip goes as soon as the pointer leaves the slider. */
+export const TooltipHidesWhenThePointerLeaves: Story = {
+  args: { formatPointerValue: percent },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    const track = slider.getBoundingClientRect()
+    await userEvent.pointer({ target: slider, coords: pointOn(track, centerX(track)) })
+    await expect(page.getByText('50%')).toBeVisible()
+
+    await userEvent.unhover(slider)
+
+    await expect(page.queryByText('50%')).not.toBeInTheDocument()
+  }
+}
+
+/** A disabled slider shows no tooltip, since a click there does nothing. */
+export const NoTooltipWhileDisabled: Story = {
+  args: { formatPointerValue: percent, isDisabled: true },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    const track = slider.getBoundingClientRect()
+
+    await userEvent.pointer({ target: slider, coords: pointOn(track, centerX(track)) })
+
+    await expect(page.queryByText('50%')).not.toBeInTheDocument()
+  }
+}
+
+/** A finger has no hover, so a touch shows no tooltip, even while it slides along the track. */
+export const NoTooltipForTouch: Story = {
+  args: { formatPointerValue: percent },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    const track = slider.getBoundingClientRect()
+
+    await userEvent.pointer([
+      { keys: '[TouchA>]', target: slider, coords: pointOn(track, track.left + 1) },
+      { pointerName: 'TouchA', target: slider, coords: pointOn(track, centerX(track)) }
+    ])
+
+    await expect(page.queryByText('50%')).not.toBeInTheDocument()
   }
 }

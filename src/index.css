@@ -61,11 +61,12 @@
   }
 
   /* Tailwind v4 resets buttons to the default arrow cursor; the pointer shows they're clickable,
-     like the options of a select's list, and disabled controls say they aren't. Non-button elements use
-     aria-disabled, since :disabled only matches form controls. */
+     like the options of a select's list and the sliders, and disabled controls say they aren't.
+     Non-button elements use aria-disabled, since :disabled only matches form controls. */
   button,
   [role="button"],
-  [role="option"] {
+  [role="option"],
+  input[type="range"] {
     cursor: pointer;
   }
 

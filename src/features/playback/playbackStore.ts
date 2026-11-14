@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { clamp } from '../../clamp'
 import type { Track } from '../library/types'
 import { log } from '../logging/log'
 import { formatPreciseTime } from './playbackTime'
@@ -101,8 +102,6 @@ const startFromTheBeginning = (session: PlaybackSession, track: Track): Playback
   elapsedSeconds: 0,
   durationSeconds: track.path === session.track.path ? session.durationSeconds : null
 })
-
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 type HeardVolume = Pick<PlaybackStore, 'volume' | 'isMuted' | 'movingVolume'>
 

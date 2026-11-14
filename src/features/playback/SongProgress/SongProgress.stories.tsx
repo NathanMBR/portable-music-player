@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fireEvent } from 'storybook/test'
+import { expect, fireEvent, within } from 'storybook/test'
 import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
@@ -161,5 +161,24 @@ export const JumpsFiveSecondsWithTheArrowKeys: Story = {
     await expect(elapsedSeconds()).toBe(88)
     await userEvent.keyboard('{ArrowLeft}')
     await expect(elapsedSeconds()).toBe(78)
+  }
+}
+
+/**
+ * The mouse over the bar shows at once, in a tooltip above it, the time a click there would jump
+ * to, to the tenth of a second: halfway along a 4:30 song, 2:15.
+ */
+export const HoveringShowsWhereAClickJumps: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const bar = canvas.getByRole('slider', { name: 'Song position' })
+    const track = bar.getBoundingClientRect()
+
+    await userEvent.pointer({
+      target: bar,
+      coords: { clientX: track.left + track.width / 2, clientY: track.top + track.height / 2 }
+    })
+
+    await expect(page.getByText('02:15.0')).toBeVisible()
   }
 }

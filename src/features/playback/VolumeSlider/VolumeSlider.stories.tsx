@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fireEvent } from 'storybook/test'
+import { expect, fireEvent, waitFor, within } from 'storybook/test'
 import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { usePlaybackStore } from '../playbackStore'
@@ -136,5 +136,48 @@ export const LogsTheVolumeSet: Story = {
     fireEvent.wheel(slider, { deltaY: -100 })
 
     await expect(loggedMessages()).toEqual(['Set volume to 70%', 'Set volume to 75%'])
+  }
+}
+
+// How far the tooltip keeps from the window's edges.
+const COLLISION_PADDING = 8
+
+/**
+ * The mouse over the slider shows at once, in a tooltip above it, the volume a click there would
+ * set. At the slider's right end, as close to the window's edge as in the player, the tooltip
+ * shifts to stay inside the window, and its arrow moves to keep pointing at the mouse.
+ */
+export const HoveringShowsTheVolumeAClickSets: Story = {
+  parameters: { layout: 'fullscreen' },
+  decorators: [
+    Story => (
+      <div className="flex justify-end py-12 pr-6">
+        <Story />
+      </div>
+    )
+  ],
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const slider = canvas.getByRole('slider', { name: 'Volume' })
+    const track = slider.getBoundingClientRect()
+    const pointerX = track.right - 1
+
+    await userEvent.pointer({
+      target: slider,
+      coords: { clientX: pointerX, clientY: track.top + track.height / 2 }
+    })
+
+    const tooltip = page.getByText('100%')
+    await expect(tooltip).toBeVisible()
+    const windowWidth = canvasElement.ownerDocument.documentElement.clientWidth
+    // Retried: the tooltip may first show in the fallback font, and moves once the app's font loads.
+    await waitFor(async () => {
+      await expect(tooltip.getBoundingClientRect().right).toBeCloseTo(
+        windowWidth - COLLISION_PADDING,
+        0
+      )
+      const arrow = tooltip.parentElement?.querySelector('svg')?.getBoundingClientRect()
+      await expect(arrow && arrow.left + arrow.width / 2).toBeCloseTo(pointerX, 0)
+    })
   }
 }

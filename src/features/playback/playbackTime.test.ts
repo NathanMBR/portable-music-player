@@ -3,6 +3,7 @@ import {
   formatCountdown,
   formatPlaybackTime,
   formatPreciseTime,
+  formatTenthsTime,
   remainingSeconds
 } from './playbackTime'
 
@@ -47,6 +48,21 @@ describe('remainingSeconds', () => {
 
   it('never goes below zero', () => {
     expect(remainingSeconds(275, 270)).toBe(0)
+  })
+})
+
+describe('formatTenthsTime', () => {
+  it('shows minutes and seconds like the player, then the tenths', () => {
+    expect(formatTenthsTime(0)).toBe('00:00.0')
+    expect(formatTenthsTime(83.44)).toBe('01:23.4')
+  })
+
+  it('keeps counting minutes past an hour', () => {
+    expect(formatTenthsTime(3725.2)).toBe('62:05.2')
+  })
+
+  it('carries a tenth rounded up into the seconds', () => {
+    expect(formatTenthsTime(59.96)).toBe('01:00.0')
   })
 })
 

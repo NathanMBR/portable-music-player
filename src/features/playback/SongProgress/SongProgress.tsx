@@ -8,6 +8,7 @@ import {
   formatCountdown,
   formatPlaybackTime,
   formatPreciseTime,
+  formatTenthsTime,
   remainingSeconds
 } from '../playbackTime'
 
@@ -41,8 +42,10 @@ const ARROW_KEY_STEP_SECONDS = 5
  * the elapsed time on its left and the song's length on its right, both as `mm:ss`. The bar is a
  * slider: clicking or dragging it jumps within the song, and so do the keyboard's arrows (5
  * seconds a press), Page Up and Down (a tenth of the song), Home and End. Clicking the left time
- * switches it to the time left, counted down as `-mm:ss`, and back. Until the song's length is
- * known, the bar stays empty and disabled, and the length shows dashes. Each jump on the bar is
+ * switches it to the time left, counted down as `-mm:ss`, and back. The mouse over the bar shows,
+ * in a tooltip above it, the time a click there would jump to, to the tenth of a second. Until the
+ * song's length is known, the bar stays empty and disabled, without the tooltip, and the length
+ * shows dashes. Each jump on the bar is
  * logged once it ends, with where it lands to the millisecond.
  *
  * @summary Seekable progress bar of the playing song, with its times
@@ -82,6 +85,7 @@ export const SongProgress = ({ elapsedSeconds, durationSeconds }: SongProgressPr
           isDisabled={!isLengthKnown}
           onChange={seek}
           onCommit={logJump}
+          formatPointerValue={formatTenthsTime}
         />
       </div>
       <span className="w-14 shrink-0">

@@ -1,6 +1,7 @@
 const SECONDS_PER_MINUTE = 60
 const MILLISECONDS_PER_SECOND = 1000
 const MILLISECOND_DIGITS = 3
+const TENTHS_PER_SECOND = 10
 const UNKNOWN_TIME = '--:--'
 
 const padToTwoDigits = (value: number) => String(value).padStart(2, '0')
@@ -24,6 +25,14 @@ export const formatPreciseTime = (seconds: number) => {
     '0'
   )
   return `${formatPlaybackTime(wholeSeconds)}.${millisecondsPart}`
+}
+
+/** `mm:ss.d`, the time down to the tenth of a second, the song's bar's step. */
+export const formatTenthsTime = (seconds: number) => {
+  // Rounded as a whole, so a tenth rounded up carries into the seconds.
+  const tenths = Math.round(seconds * TENTHS_PER_SECOND)
+  const wholeSeconds = Math.floor(tenths / TENTHS_PER_SECOND)
+  return `${formatPlaybackTime(wholeSeconds)}.${tenths % TENTHS_PER_SECOND}`
 }
 
 /** The time left counted down, as `-mm:ss`. */

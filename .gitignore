@@ -28,3 +28,6 @@ storybook-static
 
 # Vitest browser mode saves a screenshot of every failed story test here
 __screenshots__
+
+# The graphify knowledge graph, which its git hooks rebuild locally after every commit
+graphify-out

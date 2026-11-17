@@ -199,6 +199,68 @@ export const NotifiesAboveThePlayer: Story = {
   }
 }
 
+type Slide = { duration: EffectTiming['duration']; easing: EffectTiming['easing'] }
+
+/** How the element is moving right now through a CSS transition of the property, if it is. */
+const runningSlide = (element: Element, property: string): Slide | undefined => {
+  const transition = element
+    .getAnimations()
+    .find(
+      animation =>
+        animation instanceof CSSTransition &&
+        animation.transitionProperty === property &&
+        animation.playState === 'running'
+    )
+  const timing = transition?.effect?.getTiming()
+  return timing && { duration: timing.duration, easing: timing.easing }
+}
+
+/** Sonner's list holding the notifications, which its bottom offset moves as a whole. */
+const notificationsAround = (notificationText: Element) => {
+  const notifications = notificationText.closest('[data-sonner-toaster]')
+  if (notifications === null) {
+    throw new Error('The notification is outside Sonner’s list of notifications')
+  }
+  return notifications
+}
+
+// The player slides with the translate property (translate-y-full).
+const PLAYER_SLIDE_PROPERTY = 'translate'
+
+const expectToSlideWithThePlayer = async (notifications: Element, player: Element) => {
+  await waitFor(() => {
+    const playerSlide = runningSlide(player, PLAYER_SLIDE_PROPERTY)
+    expect(playerSlide).toBeDefined()
+    expect(runningSlide(notifications, 'bottom')).toEqual(playerSlide)
+  })
+}
+
+/**
+ * Notifications showing while the player slides up or away move with it, over the same time and
+ * curve, instead of jumping to their new place.
+ */
+export const NotificationsSlideWithThePlayer: Story = {
+  beforeEach: () => {
+    mockCommands({ open_songs_folder: failingCommand(OPEN_FOLDER_ERROR), read_cover: noCover })
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Open folder' }))
+    await waitFor(() => expect(page.getByText(OPEN_FOLDER_ERROR)).toBeVisible())
+    const notifications = notificationsAround(page.getByText(OPEN_FOLDER_ERROR))
+
+    await userEvent.click(canvas.getByRole('button', { name: `Play ${playingTrack.title}` }))
+    const player = await canvas.findByRole('region', { name: 'Player' })
+    await expectToSlideWithThePlayer(notifications, player)
+    // A slide cut short turns back almost at once, so the player is stopped once it's fully open.
+    await waitFor(() => expect(runningSlide(player, PLAYER_SLIDE_PROPERTY)).toBeUndefined())
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Stop' }))
+    await expectToSlideWithThePlayer(notifications, player)
+  }
+}
+
 // The app's own scrollbar, as thin as the sliders' track. The browser's own is wider.
 const SCROLLBAR_WIDTH = 6
 

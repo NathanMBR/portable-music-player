@@ -16,7 +16,8 @@ import {
 type NotificationAreaProps = {
   /**
    * Room to keep free at the bottom of the window, as a CSS length, so notifications pop up above
-   * what sits there, like the audio player. None by default.
+   * what sits there, like the audio player. When it changes, the notifications ease to their new
+   * place over the player's slide. None by default.
    */
   bottomClearance?: string
 }
@@ -40,6 +41,12 @@ const ICONS = {
   close: <XMarkIcon className="size-4" />
 }
 
+// The list of notifications. Sonner's stylesheet sits in no cascade layer, so it beats Tailwind's
+// utilities unless they're important. Its own transition, the lift of a hovered stack, stays as it
+// is, and the bottom offset eases like the audio player's slide, so notifications move with it.
+const LIST_CLASS_NAME =
+  'transition-[transform,bottom]! duration-[400ms,300ms]! ease-[ease,var(--ease-out)]! motion-reduce:transition-none!'
+
 const offsetAbove = (bottomClearance: string | undefined, edgeGap: string) =>
   bottomClearance === undefined ? edgeGap : `calc(${bottomClearance} + ${edgeGap})`
 
@@ -47,7 +54,8 @@ const offsetAbove = (bottomClearance: string | undefined, edgeGap: string) =>
  * The bottom-right corner where notifications pop up, raised from anywhere with `notifyError`,
  * `notifySuccess` or `notify` (`notify.ts`). Each one closes by itself after a few seconds, or earlier with its ×
  * button. Hovering the stack spreads it out and pauses the timers. The app shell renders it once,
- * raised above the audio player while the player is open.
+ * raised above the audio player while the player is open, so notifications slide with the player
+ * as it opens and closes.
  *
  * @summary Corner where notifications pop up
  */
@@ -60,6 +68,7 @@ export const NotificationArea = ({ bottomClearance }: NotificationAreaProps) => 
     {createPortal(
       <Toaster
         position="bottom-right"
+        className={LIST_CLASS_NAME}
         offset={{ bottom: offsetAbove(bottomClearance, WINDOW_EDGE_GAP) }}
         mobileOffset={{ bottom: offsetAbove(bottomClearance, NARROW_WINDOW_EDGE_GAP) }}
         duration={NOTIFICATION_DURATION_MS}

@@ -22,7 +22,9 @@ export const noCover: CommandHandler = () => new ArrayBuffer(0)
 export const drawCover = async (): Promise<ArrayBuffer> => {
   const canvas = new OffscreenCanvas(COVER_WIDTH, COVER_HEIGHT)
   const context = canvas.getContext('2d')
-  if (!context) throw new Error("This browser can't draw the stories' cover")
+  if (!context) {
+    throw new Error("This browser can't draw the stories' cover")
+  }
 
   const tokens = getComputedStyle(document.documentElement)
   const fade = context.createLinearGradient(0, 0, COVER_WIDTH, COVER_HEIGHT)

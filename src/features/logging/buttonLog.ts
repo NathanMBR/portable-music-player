@@ -37,10 +37,14 @@ const logButton = (button: Element) => {
 }
 
 const logClickedButton = (event: MouseEvent) => {
-  if (!(event.target instanceof Element)) return
+  if (!(event.target instanceof Element)) {
+    return
+  }
 
   const button = event.target.closest('button')
-  if (button && !logsItself(button)) logButton(button)
+  if (button && !logsItself(button)) {
+    logButton(button)
+  }
 }
 
 /**

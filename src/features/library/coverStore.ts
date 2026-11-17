@@ -33,7 +33,9 @@ const shownCover = (bytes: ArrayBuffer): Cover => ({
 })
 
 const free = (cover: Cover) => {
-  if (cover.kind === 'shown') URL.revokeObjectURL(cover.url)
+  if (cover.kind === 'shown') {
+    URL.revokeObjectURL(cover.url)
+  }
 }
 
 // A copy of `covers` with room for one more, freeing the ones asked for longest ago: a Map keeps
@@ -41,7 +43,9 @@ const free = (cover: Cover) => {
 const withRoomForOne = (covers: Map<string, Cover>) => {
   const kept = new Map(covers)
   for (const [path, cover] of kept) {
-    if (kept.size < MAX_CACHED_COVERS) break
+    if (kept.size < MAX_CACHED_COVERS) {
+      break
+    }
     free(cover)
     kept.delete(path)
   }
@@ -56,7 +60,9 @@ export const useCoverStore = create<CoverStore>()((set, get) => {
   return {
     covers: new Map(),
     loadCover: async path => {
-      if (get().covers.has(path)) return
+      if (get().covers.has(path)) {
+        return
+      }
 
       const reading: Cover = { kind: 'reading' }
       set({ covers: withRoomForOne(get().covers).set(path, reading) })
@@ -64,22 +70,30 @@ export const useCoverStore = create<CoverStore>()((set, get) => {
       const isStillWanted = () => get().covers.get(path) === reading
       try {
         const bytes = await readCover(path)
-        if (isStillWanted()) setCover(path, bytes ? shownCover(bytes) : NO_COVER)
+        if (isStillWanted()) {
+          setCover(path, bytes ? shownCover(bytes) : NO_COVER)
+        }
       } catch (error) {
-        if (!isStillWanted()) return
+        if (!isStillWanted()) {
+          return
+        }
         notifyError(COVER_FAILURE_TITLE, error)
         setCover(path, NO_COVER)
       }
     },
     dropUnreadableCover: path => {
       const cover = get().covers.get(path)
-      if (cover?.kind !== 'shown') return
+      if (cover?.kind !== 'shown') {
+        return
+      }
 
       free(cover)
       setCover(path, NO_COVER)
     },
     forgetCovers: () => {
-      for (const cover of get().covers.values()) free(cover)
+      for (const cover of get().covers.values()) {
+        free(cover)
+      }
       set({ covers: new Map() })
     }
   }

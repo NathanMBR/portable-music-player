@@ -25,7 +25,9 @@ const heldBytes = new Map<string, Blob>()
 beforeEach(() => {
   let urlCount = 0
   URL.createObjectURL = (bytes: Blob | MediaSource) => {
-    if (!(bytes instanceof Blob)) throw new Error('Covers are made from blobs')
+    if (!(bytes instanceof Blob)) {
+      throw new Error('Covers are made from blobs')
+    }
     urlCount += 1
     const url = `blob:cover-${urlCount}`
     heldBytes.set(url, bytes)
@@ -45,7 +47,9 @@ const coverOf = (path: string) => useCoverStore.getState().covers.get(path)
 /** The text of the bytes a song's cover shows, or `null` when it shows none. */
 const shownText = async (path: string) => {
   const cover = coverOf(path)
-  if (cover?.kind !== 'shown') return null
+  if (cover?.kind !== 'shown') {
+    return null
+  }
   return (await heldBytes.get(cover.url)?.text()) ?? null
 }
 
@@ -138,7 +142,9 @@ describe('loadCover', () => {
     const lastTrackNumber = MAX_CACHED_COVERS + 1
     mockCommands({ read_cover: readEachCover })
 
-    for (let number = 1; number <= lastTrackNumber; number++) await loadCover(trackNumbered(number))
+    for (let number = 1; number <= lastTrackNumber; number++) {
+      await loadCover(trackNumbered(number))
+    }
 
     expect(coverOf(trackNumbered(1))).toBeUndefined()
     expect(await shownText(trackNumbered(2))).toBe(`the front cover of ${trackNumbered(2)}`)

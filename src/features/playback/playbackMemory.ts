@@ -72,7 +72,9 @@ export const connectPlaybackMemory = () => {
   let pendingSave: ReturnType<typeof setTimeout> | null = null
 
   const cancelPendingSave = () => {
-    if (pendingSave !== null) clearTimeout(pendingSave)
+    if (pendingSave !== null) {
+      clearTimeout(pendingSave)
+    }
     pendingSave = null
   }
 
@@ -85,7 +87,9 @@ export const connectPlaybackMemory = () => {
 
   const followStore = (state: RememberedState) => {
     const newSettledState = settledStateOf(state)
-    if (newSettledState === settledState) return
+    if (newSettledState === settledState) {
+      return
+    }
 
     settledState = newSettledState
     cancelPendingSave()

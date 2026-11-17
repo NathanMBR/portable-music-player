@@ -14,7 +14,9 @@ const followDrag = (drag: DragDropEvent) => {
       break
     case 'drop':
       setDragging(false)
-      if (drag.paths.length > 0) void dropSongs(drag.paths)
+      if (drag.paths.length > 0) {
+        void dropSongs(drag.paths)
+      }
       break
     // Anywhere in the window takes the drop, so where the files are doesn't matter.
     case 'over':

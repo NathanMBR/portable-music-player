@@ -14,7 +14,9 @@ export const summarizeTakenNames = ({ songCount, conflicts }: DroppedSongs) => {
   if (takenCount < songCount) {
     return `${takenCount.toLocaleString()} of the ${songCount.toLocaleString()} dropped songs would replace ${replaced}:`
   }
-  if (songCount === 1) return `The dropped song would replace ${replaced}:`
+  if (songCount === 1) {
+    return `The dropped song would replace ${replaced}:`
+  }
   return `All ${songCount.toLocaleString()} dropped songs would replace ${replaced}:`
 }
 

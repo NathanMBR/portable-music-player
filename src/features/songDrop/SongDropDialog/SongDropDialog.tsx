@@ -14,7 +14,9 @@ const TITLE_CLASSES = 'text-base font-semibold text-ink'
 /** The step the dialog shows, which stays the last one while the dialog fades out after it. */
 const useShownStep = (step: SongDropStep) => {
   const [lastShownStep, setLastShownStep] = useState<ShownStep | null>(null)
-  if (step.kind !== 'idle' && step !== lastShownStep) setLastShownStep(step)
+  if (step.kind !== 'idle' && step !== lastShownStep) {
+    setLastShownStep(step)
+  }
   return step.kind === 'idle' ? lastShownStep : step
 }
 

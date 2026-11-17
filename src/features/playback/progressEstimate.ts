@@ -40,7 +40,9 @@ export const estimateProgress = (
  * audio's clock is only catching up, the progress keeps running from where it was.
  */
 export const anchorAfterReport = (anchor: TimedPosition | null, report: TimedPosition) => {
-  if (!anchor) return report
+  if (!anchor) {
+    return report
+  }
   const lead = runOn(anchor, report.atMs) - report.seconds
   return lead <= 0 || lead > MAX_LEAD_SECONDS ? report : anchor
 }

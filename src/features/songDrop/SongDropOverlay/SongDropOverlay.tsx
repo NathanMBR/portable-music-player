@@ -18,7 +18,9 @@ const useFittedPathLength = () => {
 
   useEffect(() => {
     const border = borderRef.current
-    if (!border) return
+    if (!border) {
+      return
+    }
 
     const observer = new ResizeObserver(() => {
       setPathLength(fittedPathLength(border.getTotalLength(), DASH_PATTERN_LENGTH))

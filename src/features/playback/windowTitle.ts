@@ -16,7 +16,9 @@ export const connectWindowTitle = () => {
 
   const followSession = ({ session }: { session: PlaybackSession | null }) => {
     const title = titleFor(session)
-    if (title === shownTitle) return
+    if (title === shownTitle) {
+      return
+    }
 
     shownTitle = title
     getCurrentWindow()

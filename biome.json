@@ -26,6 +26,9 @@
       },
       "nursery": {
         "noFloatingPromises": "error"
+      },
+      "style": {
+        "useBlockStatements": "error"
       }
     }
   },

@@ -130,7 +130,9 @@ const logSong = (event: SongEvent, track: Track) => log(`${event} playing song "
 export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
   const updateSession = (change: (session: PlaybackSession) => Partial<PlaybackSession>) => {
     const { session } = get()
-    if (session) set({ session: { ...session, ...change(session) } })
+    if (session) {
+      set({ session: { ...session, ...change(session) } })
+    }
   }
 
   const start = (session: PlaybackSession, track: Track) => {
@@ -140,16 +142,22 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
 
   const skipTo = (findTrack: TrackFinder) => {
     const { session, repeatMode } = get()
-    if (!session) return
+    if (!session) {
+      return
+    }
 
     const track = findTrack(session.playOrder, session.track, repeatMode)
-    if (track) start(session, track)
+    if (track) {
+      start(session, track)
+    }
   }
 
   // Only a change is logged: the audio and the media keys may ask for the state the song is in.
   const setPlaying = (isPlaying: boolean) => {
     const { session } = get()
-    if (!session || session.isPlaying === isPlaying) return
+    if (!session || session.isPlaying === isPlaying) {
+      return
+    }
 
     set({ session: { ...session, isPlaying } })
     logSong(isPlaying ? 'Resumed' : 'Paused', session.track)
@@ -179,12 +187,16 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     },
     togglePlaying: () => {
       const { session } = get()
-      if (session) setPlaying(!session.isPlaying)
+      if (session) {
+        setPlaying(!session.isPlaying)
+      }
     },
     stop: () => {
       const { session } = get()
       set({ session: null })
-      if (session) logSong('Stopped', session.track)
+      if (session) {
+        logSong('Stopped', session.track)
+      }
     },
     playNext: () => skipTo(findNextTrack),
     playPrevious: () => {
@@ -197,7 +209,9 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     },
     finishSong: () => {
       const { session, repeatMode } = get()
-      if (!session) return
+      if (!session) {
+        return
+      }
 
       const nextTrack =
         repeatMode === 'one'
@@ -216,7 +230,9 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     seek: seconds => {
       const { session } = get()
       // There's nowhere to jump to before the song's audio has loaded its length.
-      if (!session || session.durationSeconds === null) return
+      if (!session || session.durationSeconds === null) {
+        return
+      }
 
       set({ session: { ...session, elapsedSeconds: clamp(seconds, 0, session.durationSeconds) } })
     },

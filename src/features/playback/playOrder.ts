@@ -26,7 +26,9 @@ export const createPlayOrder = (
   isShuffled: boolean,
   random: () => number = Math.random
 ) => {
-  if (!isShuffled) return queue
+  if (!isShuffled) {
+    return queue
+  }
 
   const otherTracks = queue.filter(track => track.path !== firstTrack.path)
   return [firstTrack, ...shuffle(otherTracks, random)]
@@ -42,7 +44,9 @@ const findTrackOneStepAway = (
 ) => {
   const index = playOrder.findIndex(track => track.path === current.path) + step
   const isPastAnEnd = index < 0 || index >= playOrder.length
-  if (isPastAnEnd && repeatMode === 'off') return null
+  if (isPastAnEnd && repeatMode === 'off') {
+    return null
+  }
 
   const wrappedIndex = (index + playOrder.length) % playOrder.length
   return playOrder[wrappedIndex] ?? null

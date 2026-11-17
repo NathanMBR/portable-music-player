@@ -37,7 +37,9 @@ class FakeAudio extends EventTarget implements SongAudio {
   }
 
   pause() {
-    if (this.paused) return
+    if (this.paused) {
+      return
+    }
     this.paused = true
     this.dispatchEvent(new Event('pause'))
   }
@@ -49,7 +51,9 @@ class FakeAudio extends EventTarget implements SongAudio {
   }
 
   removeAttribute(name: string) {
-    if (name === 'src') this.src = ''
+    if (name === 'src') {
+      this.src = ''
+    }
   }
 
   /** Loads the song's length, like the element does once it has read the file's header. */

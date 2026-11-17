@@ -29,7 +29,9 @@ export const CoverThumbnail = ({ path }: CoverThumbnailProps) => {
 
   // Read only once the square has stayed on screen, so a fast scroll doesn't read every song.
   useEffect(() => {
-    if (!isOnScreen || !isUnread) return
+    if (!isOnScreen || !isUnread) {
+      return
+    }
 
     const reading = setTimeout(() => void loadCover(path), COVER_READ_DELAY_MS)
     return () => clearTimeout(reading)

@@ -15,7 +15,9 @@ const labelsOf = (element: Element) =>
  */
 export const accessibleNameOf = (element: Element) => {
   const labels = labelsOf(element)
-  if (labels.length > 0) return collapseSpaces(labels.map(textOf).join(' '))
+  if (labels.length > 0) {
+    return collapseSpaces(labels.map(textOf).join(' '))
+  }
 
   return (
     collapseSpaces(element.getAttribute('aria-label') ?? '') ||
@@ -30,7 +32,9 @@ export const accessibleNameOf = (element: Element) => {
  */
 export const labelOf = (element: Element) => {
   const labels = labelsOf(element).filter(label => label !== element)
-  if (labels.length > 0) return collapseSpaces(labels.map(textOf).join(' '))
+  if (labels.length > 0) {
+    return collapseSpaces(labels.map(textOf).join(' '))
+  }
 
   return collapseSpaces(element.getAttribute('aria-label') ?? '')
 }

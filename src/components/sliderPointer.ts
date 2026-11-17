@@ -26,7 +26,9 @@ export const valueAtPointer = ({
   step
 }: PointerOnSlider) => {
   const thumbTravel = trackWidth - thumbSize
-  if (thumbTravel <= 0) return 0
+  if (thumbTravel <= 0) {
+    return 0
+  }
 
   const share = clamp((pointerX - trackLeft - thumbSize / 2) / thumbTravel, 0, 1)
   return snapToStep(share * max, step)

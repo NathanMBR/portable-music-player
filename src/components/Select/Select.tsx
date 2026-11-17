@@ -32,7 +32,9 @@ const OpenStateLog = ({ isOpen, buttonRef }: OpenStateLogProps) => {
   const wasOpen = useRef(isOpen)
 
   useEffect(() => {
-    if (isOpen === wasOpen.current) return
+    if (isOpen === wasOpen.current) {
+      return
+    }
     wasOpen.current = isOpen
     if (buttonRef.current) {
       log(`${isOpen ? 'Opened' : 'Closed'} selector "${labelOf(buttonRef.current)}"`)

@@ -52,8 +52,11 @@ const fakeMediaSession = () => {
       playbackStates.push(state)
     },
     setActionHandler: (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
-      if (handler) handlers.set(action, handler)
-      else handlers.delete(action)
+      if (handler) {
+        handlers.set(action, handler)
+      } else {
+        handlers.delete(action)
+      }
     }
   }
   vi.stubGlobal('MediaMetadata', FakeMediaMetadata)
@@ -64,7 +67,9 @@ const fakeMediaSession = () => {
     details: Omit<MediaSessionActionDetails, 'action'> = {}
   ) => {
     const handler = handlers.get(action)
-    if (!handler) throw new Error(`The OS's ${action} control does nothing`)
+    if (!handler) {
+      throw new Error(`The OS's ${action} control does nothing`)
+    }
     handler({ action, ...details })
   }
 

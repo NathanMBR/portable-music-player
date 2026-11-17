@@ -108,7 +108,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   }
 
   const showEstimate = () => {
-    if (!anchor || !lastReport) return
+    if (!anchor || !lastReport) {
+      return
+    }
     const clock = { anchor, reportedSeconds: lastReport.seconds, durationSeconds: knownLength() }
     showProgress(estimateProgress(clock, performance.now()))
   }
@@ -119,7 +121,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   }
 
   const stopRunningOn = () => {
-    if (ticker !== null) clearInterval(ticker)
+    if (ticker !== null) {
+      clearInterval(ticker)
+    }
     ticker = null
     anchor = null
     lastReport = null
@@ -130,13 +134,20 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     const isClockMoving =
       !audio.paused && lastReport !== null && report.seconds > lastReport.seconds
     lastReport = report
-    if (isClockMoving) runOnFrom(report)
-    if (anchor) showEstimate()
-    else showProgress(report.seconds)
+    if (isClockMoving) {
+      runOnFrom(report)
+    }
+    if (anchor) {
+      showEstimate()
+    } else {
+      showProgress(report.seconds)
+    }
   }
 
   const fail = (track: Track, reason: unknown) => {
-    if (loadedSong) loadedSong.status = 'failed'
+    if (loadedSong) {
+      loadedSong.status = 'failed'
+    }
     notifyError(`Couldn't play ${track.title}`, reason)
     playback().pause()
   }
@@ -145,7 +156,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     if (isPlaying && audio.paused) {
       audio.play().catch((error: unknown) => {
         const track = playback().session?.track
-        if (track && !isCutShort(error)) fail(track, error)
+        if (track && !isCutShort(error)) {
+          fail(track, error)
+        }
       })
     } else if (!isPlaying && !audio.paused) {
       audio.pause()
@@ -159,7 +172,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     audio.pause()
     audio.removeAttribute('src')
     audio.load()
-    if (objectUrl) objectUrls.revokeObjectURL(objectUrl)
+    if (objectUrl) {
+      objectUrls.revokeObjectURL(objectUrl)
+    }
     objectUrl = null
   }
 
@@ -169,7 +184,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
 
   // Made only for the song that is still current, so no stale song's bytes are left unfreed.
   const addressOf = (song: PlayableSong) => {
-    if ('url' in song) return song.url
+    if ('url' in song) {
+      return song.url
+    }
     objectUrl = objectUrls.createObjectURL(new Blob([song.bytes], { type: SONG_TYPE }))
     return objectUrl
   }
@@ -186,14 +203,18 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     try {
       const playableSong = await fetchPlayableSong(track)
       // Another song started, or the player was stopped, while Rust was answering for this one.
-      if (loadedSong !== song) return
+      if (loadedSong !== song) {
+        return
+      }
 
       audio.src = addressOf(playableSong)
       song.status = 'ready'
       // From the store's position, which isn't the start for a song put back when the app opens.
       followStore(playback())
     } catch (error) {
-      if (loadedSong === song) fail(track, error)
+      if (loadedSong === song) {
+        fail(track, error)
+      }
     }
   }
 
@@ -208,7 +229,9 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     const { session } = state
     audio.volume = audibleVolume(state)
     if (!session) {
-      if (loadedSong) releaseSource()
+      if (loadedSong) {
+        releaseSource()
+      }
       loadedSong = null
       return
     }
@@ -219,20 +242,28 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
       void load(session.track)
       return
     }
-    if (loadedSong?.status !== 'ready') return
+    if (loadedSong?.status !== 'ready') {
+      return
+    }
 
-    if (session.elapsedSeconds !== agreedSeconds) jumpTo(session.elapsedSeconds)
+    if (session.elapsedSeconds !== agreedSeconds) {
+      jumpTo(session.elapsedSeconds)
+    }
     followPlaying(session.isPlaying)
   }
 
   audio.addEventListener('timeupdate', followReport)
   // Whenever the audio stops playing on, so does the progress, until its clock moves again.
-  for (const stop of ['pause', 'waiting', 'ended']) audio.addEventListener(stop, stopRunningOn)
+  for (const stop of ['pause', 'waiting', 'ended']) {
+    audio.addEventListener(stop, stopRunningOn)
+  }
   audio.addEventListener('durationchange', () => playback().reportDuration(knownLength()))
   audio.addEventListener('ended', () => playback().finishSong())
   audio.addEventListener('error', () => {
     const track = playback().session?.track
-    if (track && loadedSong?.status === 'ready') fail(track, describeMediaError(audio.error))
+    if (track && loadedSong?.status === 'ready') {
+      fail(track, describeMediaError(audio.error))
+    }
   })
 
   followStore(playback())

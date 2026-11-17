@@ -37,7 +37,9 @@ const IDLE: SongDropStep = { kind: 'idle' }
 
 // The first failure says why, and the count says how far it went, like a drive filling up.
 const notifyFailures = (title: string, [firstFailure, ...otherFailures]: DropFailure[]) => {
-  if (!firstFailure) return
+  if (!firstFailure) {
+    return
+  }
 
   const firstReason = `${firstFailure.path}: ${firstFailure.reason}`
   const othersCount = otherFailures.length
@@ -45,15 +47,22 @@ const notifyFailures = (title: string, [firstFailure, ...otherFailures]: DropFai
 }
 
 const tellNothingToAdd = ({ failures }: DroppedSongs) => {
-  if (failures.length > 0) notifyFailures(DROP_FAILURE_TITLE, failures)
-  else notify('No songs to add', 'Only MP3 files can be added to the Songs folder')
+  if (failures.length > 0) {
+    notifyFailures(DROP_FAILURE_TITLE, failures)
+  } else {
+    notify('No songs to add', 'Only MP3 files can be added to the Songs folder')
+  }
 }
 
 const untilScanEnds = () =>
   new Promise<void>(resolve => {
-    if (!useLibraryStore.getState().isScanning) return resolve()
+    if (!useLibraryStore.getState().isScanning) {
+      return resolve()
+    }
     const stopWatching = useLibraryStore.subscribe(({ isScanning }) => {
-      if (isScanning) return
+      if (isScanning) {
+        return
+      }
       stopWatching()
       resolve()
     })
@@ -97,11 +106,15 @@ export const useSongDropStore = create<SongDropStore>()((set, get) => {
     step: IDLE,
     setDragging: isDragging => set({ isDragging }),
     dropSongs: async paths => {
-      if (get().step.kind !== 'idle') return
+      if (get().step.kind !== 'idle') {
+        return
+      }
 
       set({ step: { kind: 'checking' } })
       const droppedSongs = await checkDrop(paths)
-      if (droppedSongs === null) return set({ step: IDLE })
+      if (droppedSongs === null) {
+        return set({ step: IDLE })
+      }
 
       log(`Dropped ${formatSongCount(droppedSongs.songCount)}`)
       if (droppedSongs.songCount === 0) {
@@ -115,12 +128,16 @@ export const useSongDropStore = create<SongDropStore>()((set, get) => {
     },
     copyTakenNames: async choice => {
       const { step } = get()
-      if (step.kind !== 'asking') return
+      if (step.kind !== 'asking') {
+        return
+      }
 
       await copySongs(step.paths, choice, songCountCopied(step.droppedSongs, choice))
     },
     cancel: () => {
-      if (get().step.kind === 'asking') set({ step: IDLE })
+      if (get().step.kind === 'asking') {
+        set({ step: IDLE })
+      }
     }
   }
 })

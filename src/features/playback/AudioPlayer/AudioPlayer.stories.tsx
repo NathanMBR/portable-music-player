@@ -112,7 +112,9 @@ export const WideWindow: Story = {
     const controls = canvas.getByRole('button', { name: 'Shuffle' }).parentElement
     const progress = canvas.getByText(secondTrack.title).parentElement
     const volume = canvas.getByRole('button', { name: 'Mute' }).parentElement
-    if (!controls || !progress || !volume) throw new Error('The player lost one of its parts')
+    if (!controls || !progress || !volume) {
+      throw new Error('The player lost one of its parts')
+    }
     const controlsBox = controls.getBoundingClientRect()
     const progressBox = progress.getBoundingClientRect()
     const volumeBox = volume.getBoundingClientRect()

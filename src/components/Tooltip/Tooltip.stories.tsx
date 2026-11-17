@@ -31,7 +31,9 @@ const expectPlacement = async (
   const page = within(canvasElement.ownerDocument.body)
   const tooltip = await page.findByText(text)
   const arrow = tooltip.parentElement?.querySelector('svg')
-  if (!arrow) throw new Error('The tooltip has no arrow')
+  if (!arrow) {
+    throw new Error('The tooltip has no arrow')
+  }
   await waitFor(() =>
     check({ tooltip: tooltip.getBoundingClientRect(), arrow: arrow.getBoundingClientRect() })
   )

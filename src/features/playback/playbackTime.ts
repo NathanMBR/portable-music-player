@@ -8,7 +8,9 @@ const padToTwoDigits = (value: number) => String(value).padStart(2, '0')
 
 /** `mm:ss`, with minutes that keep counting past an hour, or dashes while the time is unknown. */
 export const formatPlaybackTime = (seconds: number | null) => {
-  if (seconds === null) return UNKNOWN_TIME
+  if (seconds === null) {
+    return UNKNOWN_TIME
+  }
 
   const wholeSeconds = Math.floor(seconds)
   const minutes = Math.floor(wholeSeconds / SECONDS_PER_MINUTE)

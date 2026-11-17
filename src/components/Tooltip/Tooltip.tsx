@@ -44,14 +44,18 @@ export const Tooltip = ({ text, x, y }: TooltipProps) => {
   // can change its width at every render, like "9%" turning into "10%".
   useLayoutEffect(() => {
     const width = tooltipRef.current?.getBoundingClientRect().width ?? 0
-    if (width !== tooltipWidth) setTooltipWidth(width)
+    if (width !== tooltipWidth) {
+      setTooltipWidth(width)
+    }
   })
 
   // And again whenever its width changes between renders, as when the app's font finishes loading
   // after the tooltip first showed in the fallback font.
   useEffect(() => {
     const tooltip = tooltipRef.current
-    if (!tooltip) return
+    if (!tooltip) {
+      return
+    }
 
     const observer = new ResizeObserver(() =>
       setTooltipWidth(tooltip.getBoundingClientRect().width)

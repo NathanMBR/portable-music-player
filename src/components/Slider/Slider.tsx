@@ -126,7 +126,9 @@ export const Slider = ({
   // change event, sent once a click or a drag is released.
   useEffect(() => {
     const input = inputRef.current
-    if (!input || !onCommit) return
+    if (!input || !onCommit) {
+      return
+    }
 
     const commit = () => onCommit(Number(input.value))
     input.addEventListener('change', commit)
@@ -134,22 +136,30 @@ export const Slider = ({
   }, [onCommit])
 
   const moveBy = (change: number) => {
-    if (isDisabled) return
+    if (isDisabled) {
+      return
+    }
     const movedValue = clamp(value + change, 0, max)
-    if (movedValue === value) return
+    if (movedValue === value) {
+      return
+    }
     onChange(movedValue)
     onCommit?.(movedValue)
   }
 
   // Wheeling up raises the value, like turning a knob. A turn that only scrolls sideways is no move.
   const moveWithWheel = (event: WheelEvent<HTMLInputElement>) => {
-    if (!wheelStep || event.deltaY === 0) return
+    if (!wheelStep || event.deltaY === 0) {
+      return
+    }
     moveBy(event.deltaY < 0 ? wheelStep : -wheelStep)
   }
 
   // The tooltip's arrow points at the pointer, just above the thumb, which is taller than the track.
   const followPointer = (event: PointerEvent<HTMLInputElement>) => {
-    if (!formatPointerValue || !POINTERS_WITH_HOVER.has(event.pointerType)) return
+    if (!formatPointerValue || !POINTERS_WITH_HOVER.has(event.pointerType)) {
+      return
+    }
 
     const track = event.currentTarget.getBoundingClientRect()
     setPointerValue({
@@ -169,7 +179,9 @@ export const Slider = ({
   // Taken over from the browser, which would move the slider one step.
   const moveWithArrowKey = (event: KeyboardEvent<HTMLInputElement>) => {
     const direction = ARROW_KEY_DIRECTIONS[event.key]
-    if (!arrowKeyStep || direction === undefined) return
+    if (!arrowKeyStep || direction === undefined) {
+      return
+    }
     event.preventDefault()
     moveBy(direction * arrowKeyStep)
   }

@@ -10,7 +10,9 @@ import { VolumeSlider } from '../VolumeSlider/VolumeSlider'
 // the last song meanwhile instead of going blank.
 const useSessionShownWhileClosing = (session: PlaybackSession | null) => {
   const [lastSession, setLastSession] = useState(session)
-  if (session !== null && session !== lastSession) setLastSession(session)
+  if (session !== null && session !== lastSession) {
+    setLastSession(session)
+  }
   return session ?? lastSession
 }
 

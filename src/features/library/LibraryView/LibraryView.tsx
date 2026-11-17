@@ -21,9 +21,15 @@ const SortedTrackList = ({ tracks }: { tracks: Track[] }) => {
 const LibraryContent = () => {
   const lastScan = useLibraryStore(state => state.lastScan)
 
-  if (lastScan === null) return null
-  if (lastScan.kind === 'failed') return <ScanFailure />
-  if (lastScan.tracks.length === 0) return <EmptyLibrary />
+  if (lastScan === null) {
+    return null
+  }
+  if (lastScan.kind === 'failed') {
+    return <ScanFailure />
+  }
+  if (lastScan.tracks.length === 0) {
+    return <EmptyLibrary />
+  }
   return <SortedTrackList tracks={lastScan.tracks} />
 }
 

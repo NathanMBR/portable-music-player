@@ -31,7 +31,9 @@ export const Switch = ({ checked, onChange, label, knobIcon: KnobIcon }: SwitchP
 
   // Logged here rather than from clicks, since Space toggles a switch without one.
   const toggle = (isOn: boolean) => {
-    if (switchRef.current) logToggle(accessibleNameOf(switchRef.current), isOn)
+    if (switchRef.current) {
+      logToggle(accessibleNameOf(switchRef.current), isOn)
+    }
     onChange(isOn)
   }
 

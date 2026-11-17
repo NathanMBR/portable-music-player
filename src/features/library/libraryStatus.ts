@@ -6,7 +6,11 @@ export const formatSongCount = (count: number) =>
 
 // Without songs, the view's notice below the status line says why, so the line says nothing.
 export const describeLibraryStatus = (lastScan: ScanOutcome | null, isScanning: boolean) => {
-  if (isScanning) return 'Scanning…'
-  if (lastScan?.kind !== 'loaded' || lastScan.tracks.length === 0) return ''
+  if (isScanning) {
+    return 'Scanning…'
+  }
+  if (lastScan?.kind !== 'loaded' || lastScan.tracks.length === 0) {
+    return ''
+  }
   return formatSongCount(lastScan.tracks.length)
 }

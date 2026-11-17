@@ -20,7 +20,9 @@ export const mockCommands = (handlers: Record<string, CommandHandler>) => {
   mockIPC(
     (command, args) => {
       const handler = handlers[command] ?? DEFAULT_HANDLERS[command]
-      if (!handler) throw new Error(`Unmocked command: ${command}`)
+      if (!handler) {
+        throw new Error(`Unmocked command: ${command}`)
+      }
       return handler(args)
     },
     { shouldMockEvents: true }

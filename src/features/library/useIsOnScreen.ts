@@ -9,11 +9,15 @@ export const useIsOnScreen = () => {
 
   // React calls the function a ref returns once the element leaves the page.
   const observeOnScreen = useCallback((element: Element | null) => {
-    if (!element) return
+    if (!element) {
+      return
+    }
 
     const observer = new IntersectionObserver(entries => {
       const latest = entries[entries.length - 1]
-      if (latest) setIsOnScreen(latest.isIntersecting)
+      if (latest) {
+        setIsOnScreen(latest.isIntersecting)
+      }
     })
     observer.observe(element)
     return () => observer.disconnect()

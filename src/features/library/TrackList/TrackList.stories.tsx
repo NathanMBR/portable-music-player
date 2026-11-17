@@ -23,7 +23,9 @@ const secondTrack: Track = { path: 'Songs/Rebirth.mp3', title: 'Rebirth', artist
 /** The square between a row's play button and its title, which holds the song's cover. */
 const coverSquareAfter = (playButton: HTMLElement) => {
   const square = playButton.nextElementSibling
-  if (!square) throw new Error('The play button has nothing after it')
+  if (!square) {
+    throw new Error('The play button has nothing after it')
+  }
   return square
 }
 

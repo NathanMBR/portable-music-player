@@ -92,8 +92,8 @@ src/
 ```
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
-- Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`.
-- Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
+- Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`. A plain element that needs those states, like a song's row, gets them from Headless UI's `DataInteractive`, never from `hover:`: stories can hover it with `userEvent`, and synthetic events don't trigger `:hover`.
+- Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song's button and row, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
 - Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
@@ -231,6 +231,7 @@ These follow from the project goal and are easy to get wrong:
   - It must render, its `play` function must pass, and the axe accessibility check must find no violations. That check is `a11y.test: 'error'` in `.storybook/preview.tsx`, run on the whole `<body>` so portaled dialogs are included.
   - Write a `play` only when it proves something the render doesn't: an interaction, async content, an aria state.
   - In a `play`, use the `canvas` and `userEvent` it receives. Query portaled content, like the side menu, with `within(canvasElement.ownerDocument.body)`.
+  - In some runs the browser's real pointer rests on the story's top-left corner and, a frame after the story renders, hovers whatever is there, for `:hover` and Headless UI's `data-hover` alike. That hover also ends any `data-hover` the story started elsewhere, so never assert that an element there is unhovered, and let two frames pass before hovering (see `HoveredSong` in `TrackList.stories.tsx`).
   - The `CssCheck` story in `Button.stories.tsx` proves the app's CSS loads in Storybook; there is only one.
 - **Rust commands stay thin**:
   - a command resolves its path from `portable::root_dir()` and delegates to a function that takes it (`ensure_songs_dir_in`, `read_settings`, `write_settings`);

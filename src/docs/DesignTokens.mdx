@@ -105,10 +105,14 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   Sliders use `outline-offset-4`, so the ring clears their thumb. They also hide the ring after a click,
   because Headless UI rings inputs on any focus, like text fields.
 - **Active:** whatever is on right now, like a pressed toggle (shuffle, repeat), the playing
-  song's button or the current category, shows `pen` on a pen tint (`bg-pen/15 text-pen`,
-  `bg-pen/20` on hover; `ACTIVE_CLASSES`). The pen color alone would barely differ from the faded
-  icons on the light paper. Toggles also set `aria-pressed`, and the current category
-  `aria-current="page"`.
+  song's button, the row of the song in the player or the current category, shows `pen` on a pen
+  tint (`bg-pen/15 text-pen`, `bg-pen/20` on hover; `ACTIVE_CLASSES`). The pen color alone would
+  barely differ from the faded icons on the light paper. Faded text loses its contrast on the tint,
+  so the artist of the song in the player turns `pen` too. Toggles also set `aria-pressed`, the
+  current category `aria-current="page"`, and the row of the song in the player `aria-current`.
+- **Rows:** a song's row, which isn't a Headless UI component, gets `data-hover` from Headless UI's
+  `DataInteractive`, so it takes the same `data-hover:bg-rule/60` tint as the menu's other
+  categories.
 - **Disabled:** a button or slider that can't act right now fades with `data-disabled:opacity-40`
   (`DISABLED_CLASSES`).
 - **Cursors:** buttons, a select's options and sliders show a pointer, and disabled buttons and

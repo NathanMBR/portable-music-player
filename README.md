@@ -11,6 +11,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Song titles and artists from their tags
 - Song cover miniatures from their tags
 - Songs sorted by title or by filename
+- Song list highlights the hovered song and the song in the player
 - Open the `Songs` folder
 - Scan the library again, with a notification counting the songs
 - Add songs by dropping files or folders on the window

@@ -19,14 +19,32 @@ const queue = [firstTrack, secondTrack, thirdTrack]
 
 const MEDIA_ERR_DECODE = 3
 
+// The element's ready states: nothing read of its source yet, then the song's length known.
+const HAVE_NOTHING = 0
+const HAVE_METADATA = 1
+
 /** Stands in for an `<audio>` element, since jsdom can't play media. Tests play it by hand. */
 class FakeAudio extends EventTarget implements SongAudio {
-  src = ''
   currentTime = 0
   duration = Number.NaN
   volume = 1
   paused = true
   error: MediaError | null = null
+  readyState = HAVE_NOTHING
+  /** Every source the audio was given, in order: each one loads its song from the start. */
+  readonly loadedSources: string[] = []
+  private source = ''
+
+  get src() {
+    return this.source
+  }
+
+  // Like the element, a new source stops what played and starts loading over.
+  set src(source: string) {
+    this.load()
+    this.source = source
+    this.loadedSources.push(source)
+  }
 
   // What WebKitGTK answers once GStreamer has every plugin it needs for MP3.
   canPlayType = (): CanPlayTypeResult => 'maybe'
@@ -45,20 +63,26 @@ class FakeAudio extends EventTarget implements SongAudio {
   }
 
   load() {
+    this.paused = true
     this.currentTime = 0
-    this.duration = Number.NaN
     this.error = null
+    this.readyState = HAVE_NOTHING
+    if (!Number.isNaN(this.duration)) {
+      this.duration = Number.NaN
+      this.dispatchEvent(new Event('durationchange'))
+    }
   }
 
   removeAttribute(name: string) {
     if (name === 'src') {
-      this.src = ''
+      this.source = ''
     }
   }
 
   /** Loads the song's length, like the element does once it has read the file's header. */
   loadLength(seconds: number) {
     this.duration = seconds
+    this.readyState = HAVE_METADATA
     this.dispatchEvent(new Event('durationchange'))
   }
 
@@ -313,6 +337,74 @@ describe('connectSongAudio', () => {
     await waitUntilStreaming(connected, boatSong)
     expect(connected.audio.currentTime).toBe(95.5)
     expect(connected.audio.paused).toBe(true)
+  })
+
+  it('plays a song put back in the player from a new load of it, where it was', async () => {
+    const theUnforgiven = trackTitled('The Unforgiven', 'Metallica')
+    const songUrl = streamUrlOf(theUnforgiven.path)
+    mockCommands(streamedSongs)
+    const connected = connectAudio()
+    const { audio } = connected
+    playback().restore({
+      volume: 1,
+      isMuted: false,
+      repeatMode: 'off',
+      isShuffled: false,
+      song: { track: theUnforgiven, queue: [theUnforgiven], elapsedSeconds: 95.5 }
+    })
+    await waitUntilStreaming(connected, theUnforgiven)
+    audio.loadLength(386)
+
+    playback().play()
+
+    expect(audio.loadedSources).toEqual([songUrl, songUrl])
+    expect(audio.currentTime).toBe(95.5)
+    expect(audio.paused).toBe(false)
+  })
+
+  it('resumes a paused song from a new load of it, where it was paused', async () => {
+    const cochise = trackTitled('Cochise', 'Audioslave')
+    mockCommands(songsFromMemory)
+    const connected = connectAudio()
+    const { audio } = connected
+    playback().playTrack(cochise, [cochise])
+    await waitUntilPlaying(connected, cochise)
+    audio.loadLength(222)
+    audio.playTo(80)
+    playback().pause()
+
+    playback().play()
+
+    expect(audio.loadedSources).toHaveLength(2)
+    expect(await playedBytes(connected)).toBe(bytesOf(cochise))
+    expect(audio.currentTime).toBe(80)
+    expect(audio.paused).toBe(false)
+  })
+
+  it('starts a new song from the one load it was given', async () => {
+    const aMonsterInHerEyes = trackTitled('A Monster in Her Eyes', 'Angra')
+    mockCommands(streamedSongs)
+    const connected = connectAudio()
+
+    playback().playTrack(aMonsterInHerEyes, [aMonsterInHerEyes])
+
+    await waitUntilStreaming(connected, aMonsterInHerEyes)
+    expect(connected.audio.loadedSources).toEqual([streamUrlOf(aMonsterInHerEyes.path)])
+    expect(connected.audio.paused).toBe(false)
+  })
+
+  it('keeps the length of a song while it loads again to resume', async () => {
+    const angelsCry = trackTitled('Angels Cry', 'Angra')
+    mockCommands(songsFromMemory)
+    const connected = connectAudio()
+    playback().playTrack(angelsCry, [angelsCry])
+    await waitUntilPlaying(connected, angelsCry)
+    connected.audio.loadLength(380)
+    playback().pause()
+
+    playback().play()
+
+    expect(session()?.durationSeconds).toBe(380)
   })
 
   it("doesn't pull the audio back to the time it last reported", async () => {

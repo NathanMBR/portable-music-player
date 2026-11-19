@@ -14,6 +14,7 @@ export type SongAudio = Pick<
   | 'volume'
   | 'paused'
   | 'error'
+  | 'readyState'
   | 'canPlayType'
   | 'play'
   | 'pause'
@@ -42,6 +43,10 @@ const MISSING_MP3_SUPPORT =
 
 // MediaError doesn't exist outside browsers, so its codes are spelled out here.
 const MEDIA_ERROR_CODES = { aborted: 1, network: 2, decode: 3, unsupported: 4 } as const
+
+// The audio's readyState until it reads something of the source it was given, and so the only
+// one it starts playing from.
+const HAVE_NOTHING = 0
 
 // The browsers' own messages are empty or cryptic, so each kind of failure gets a sentence.
 const MEDIA_ERROR_REASONS: Record<number, string> = {
@@ -80,6 +85,11 @@ const fetchPlayableSong = async (track: Track): Promise<PlayableSong> => {
  * On Linux the audio's clock can hold still for seconds and then catch up while the song plays on.
  * So once that clock is seen moving, the progress runs on with the wall clock between the audio's
  * reports (`progressEstimate.ts`), and stops whenever the audio pauses, waits for data or jumps.
+ *
+ * On Linux, WebKitGTK playing through PulseAudio can freeze the whole app, or stay silent, when it
+ * starts a song it has held paused for a few seconds. So the audio only starts a source it hasn't
+ * read yet: playing a paused song, like one put back when the app opens, loads it again first,
+ * from where it was.
  *
  * Rust decides where each song plays from (`song_source`). On Linux it streams from the song
  * server Rust runs on this computer, since WebKitGTK skips ahead in songs over 2 MiB played from
@@ -152,30 +162,52 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     playback().pause()
   }
 
-  const followPlaying = (isPlaying: boolean) => {
-    if (isPlaying && audio.paused) {
-      audio.play().catch((error: unknown) => {
-        const track = playback().session?.track
-        if (track && !isCutShort(error)) {
-          fail(track, error)
-        }
-      })
-    } else if (!isPlaying && !audio.paused) {
-      audio.pause()
-    }
-  }
-
-  // Stops the audio at once, so the old song sends no more progress, and lets go of its stream or
-  // frees its bytes.
-  const releaseSource = () => {
+  // Stops the audio at once, so its song sends no more progress, and drops what it had read.
+  const emptyAudio = () => {
     stopRunningOn()
     audio.pause()
     audio.removeAttribute('src')
     audio.load()
+  }
+
+  // Lets go of the song's stream or frees its bytes.
+  const releaseSource = () => {
+    emptyAudio()
     if (objectUrl) {
       objectUrls.revokeObjectURL(objectUrl)
     }
     objectUrl = null
+  }
+
+  // The same stream or bytes, read again from the start, ready to play from `seconds`.
+  const reloadFrom = (seconds: number) => {
+    const source = audio.src
+    emptyAudio()
+    audio.src = source
+    audio.currentTime = seconds
+  }
+
+  // WebKitGTK, playing through PulseAudio, can freeze the whole app or stay silent when it starts a
+  // song it has held paused for a few seconds, like one put back when the app opens. So the audio
+  // only starts a source it hasn't read yet: a song it holds paused loads again before playing.
+  const play = () => {
+    if (audio.readyState !== HAVE_NOTHING) {
+      reloadFrom(agreedSeconds)
+    }
+    audio.play().catch((error: unknown) => {
+      const track = playback().session?.track
+      if (track && !isCutShort(error)) {
+        fail(track, error)
+      }
+    })
+  }
+
+  const followPlaying = (isPlaying: boolean) => {
+    if (isPlaying && audio.paused) {
+      play()
+    } else if (!isPlaying && !audio.paused) {
+      audio.pause()
+    }
   }
 
   // Asked before the audio gets a source: given one GStreamer lacks the plugins for, WebKitGTK
@@ -257,7 +289,14 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
   for (const stop of ['pause', 'waiting', 'ended']) {
     audio.addEventListener(stop, stopRunningOn)
   }
-  audio.addEventListener('durationchange', () => playback().reportDuration(knownLength()))
+  // The store forgets a song's length when another song starts, so only a known length is reported:
+  // a song loading again to play keeps the one on screen.
+  audio.addEventListener('durationchange', () => {
+    const length = knownLength()
+    if (length !== null) {
+      playback().reportDuration(length)
+    }
+  })
   audio.addEventListener('ended', () => playback().finishSong())
   audio.addEventListener('error', () => {
     const track = playback().session?.track

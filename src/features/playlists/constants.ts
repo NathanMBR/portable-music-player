@@ -7,3 +7,11 @@ export const PLAYLISTS_ICON = QueueListIcon
 // The alert after a playlist's title, on its row and in its page's header, while its file says
 // songs are missing.
 export const MISSING_SONGS_LABEL = 'Some songs are missing'
+
+// Long enough for any title, short enough that a playlist's file name stays far below the 255
+// characters file systems allow.
+export const MAX_TITLE_LENGTH = 100
+
+// The room the New playlist button takes below the notifications: its height and the gap above
+// it. Sonner adds its own edge gap, the button's gap from the window's bottom.
+export const NEW_PLAYLIST_BUTTON_CLEARANCE = '3.5rem'

@@ -57,3 +57,8 @@ export const ClosesOnEscape: Story = {
     await expect(close).toHaveBeenCalled()
   }
 }
+
+/** A wider panel, for content with lists. */
+export const Wide: Story = {
+  args: { isWide: true }
+}

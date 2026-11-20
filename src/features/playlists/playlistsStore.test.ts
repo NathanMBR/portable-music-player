@@ -1,5 +1,5 @@
 import type { InvokeArgs } from '@tauri-apps/api/core'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { loggedMessages } from '../../testing/logs'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { clickNotificationAction, shownNotifications } from '../../testing/notifications'
@@ -84,6 +84,61 @@ describe('loadPlaylists', () => {
     expect(playlists().loadStatus).toBe('failed')
     expect(shownNotifications()).toEqual([
       { type: 'error', title: "Couldn't load your playlists", description: LIST_ERROR }
+    ])
+  })
+})
+
+describe('createPlaylist', () => {
+  const nightDrive: SavedPlaylist = {
+    fileName: '1763581234567-Night_drive.json',
+    title: 'Night drive',
+    description: 'Windows down',
+    allSongsFound: true,
+    songs: ['In the Night.mp3', 'Exploder.mp3', 'Show Me How to Live.mp3']
+  }
+  const contents = {
+    title: nightDrive.title,
+    description: nightDrive.description,
+    songs: nightDrive.songs
+  }
+
+  it('writes a file named after when it was created and its title', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1763581234567)
+    onTestFinished(() => {
+      clock.mockRestore()
+    })
+    const createPlaylist = vi.fn((_args?: InvokeArgs) => nightDrive)
+    mockCommands({ create_playlist: createPlaylist })
+
+    await playlists().createPlaylist(contents)
+
+    expect(createPlaylist).toHaveBeenCalledWith({
+      fileName: '1763581234567-Night_drive.json',
+      playlist: contents
+    })
+  })
+
+  it('adds it to the list, sorted by title, and logs it with its song count', async () => {
+    listed(calmEvening, roadTrip)
+    mockCommands({ create_playlist: () => nightDrive })
+
+    const isCreated = await playlists().createPlaylist(contents)
+
+    expect(isCreated).toBe(true)
+    expect(playlists().playlists).toEqual([calmEvening, nightDrive, roadTrip])
+    expect(loggedMessages()).toEqual(['Created playlist "Night drive" with 3 songs'])
+  })
+
+  it("notifies when its file can't be written, and says it wasn't created", async () => {
+    listed(roadTrip)
+    mockCommands({ create_playlist: failingCommand(TAKEN_ERROR) })
+
+    const isCreated = await playlists().createPlaylist(contents)
+
+    expect(isCreated).toBe(false)
+    expect(playlists().playlists).toEqual([roadTrip])
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: `Couldn't create "Night drive"`, description: TAKEN_ERROR }
     ])
   })
 })

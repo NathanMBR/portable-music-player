@@ -4,11 +4,15 @@ import type { CategoryId } from './features/navigation/categories'
 import { MenuButton } from './features/navigation/MenuButton/MenuButton'
 import { useNavigationStore } from './features/navigation/navigationStore'
 import { SideMenu } from './features/navigation/SideMenu/SideMenu'
+import { stackClearances } from './features/notifications/bottomClearance'
 import { NotificationArea } from './features/notifications/NotificationArea/NotificationArea'
 import { AudioPlayer } from './features/playback/AudioPlayer/AudioPlayer'
 import { PLAYER_HEIGHT } from './features/playback/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
+import { NEW_PLAYLIST_BUTTON_CLEARANCE } from './features/playlists/constants'
+import { NewPlaylistButton } from './features/playlists/NewPlaylistButton/NewPlaylistButton'
 import { PlaylistsView } from './features/playlists/PlaylistsView/PlaylistsView'
+import { useIsNewPlaylistButtonShown } from './features/playlists/useIsNewPlaylistButtonShown'
 import { SettingsView } from './features/settings/SettingsView/SettingsView'
 import { SongDropDialog } from './features/songDrop/SongDropDialog/SongDropDialog'
 import { SongDropOverlay } from './features/songDrop/SongDropOverlay/SongDropOverlay'
@@ -21,11 +25,22 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
   settings: SettingsView
 }
 
+// Notifications pop up above whatever floats at the bottom of the window.
+const useNotificationClearance = () => {
+  const isPlayerOpen = usePlaybackStore(state => state.session !== null)
+  const isNewPlaylistButtonShown = useIsNewPlaylistButtonShown()
+  return stackClearances([
+    ...(isPlayerOpen ? [PLAYER_HEIGHT] : []),
+    ...(isNewPlaylistButtonShown ? [NEW_PLAYLIST_BUTTON_CLEARANCE] : [])
+  ])
+}
+
 /**
  * The page shell: the side menu, the current category's view filling the window, with the menu
- * button in its left margin, the audio player along the bottom while a song is loaded, where to
- * drop songs while files are dragged over the window, the dialog adding them, and the
- * notification area in the bottom-right corner. The window never scrolls: the view scrolls its own
+ * button in its left margin, the audio player along the bottom while a song is loaded, the New
+ * playlist button floating above it on the list of playlists, where to drop songs while files are
+ * dragged over the window, the dialog adding them, and the notification area in the bottom-right
+ * corner, above the player and the button. The window never scrolls: the view scrolls its own
  * content, which reaches the window's bottom edge, or ends above the player while it's open. The
  * player sits outside the views, so a song keeps playing when the category changes.
  *
@@ -34,6 +49,7 @@ const viewByCategory: Record<CategoryId, ComponentType> = {
 export const App = () => {
   const currentCategory = useNavigationStore(state => state.currentCategory)
   const isPlayerOpen = usePlaybackStore(state => state.session !== null)
+  const notificationClearance = useNotificationClearance()
   const CurrentView = viewByCategory[currentCategory]
 
   return (
@@ -51,9 +67,10 @@ export const App = () => {
         <CurrentView />
       </div>
       <AudioPlayer />
+      <NewPlaylistButton />
       <SongDropOverlay />
       <SongDropDialog />
-      <NotificationArea bottomClearance={isPlayerOpen ? PLAYER_HEIGHT : undefined} />
+      <NotificationArea bottomClearance={notificationClearance} />
     </>
   )
 }

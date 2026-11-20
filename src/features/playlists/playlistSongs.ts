@@ -25,3 +25,7 @@ export const songNameOf = ({ fileName, track }: PlaylistSong) =>
 
 /** The songs of a playlist that can be played, in its order: those the scan found. */
 export const playableTracksOf = (songs: PlaylistSong[]) => songs.flatMap(({ track }) => track ?? [])
+
+/** The file names of the picked songs, by their paths, in the order of `tracks`. */
+export const pickedFileNames = (tracks: Track[], pickedPaths: ReadonlySet<string>) =>
+  tracks.filter(track => pickedPaths.has(track.path)).map(fileNameOf)

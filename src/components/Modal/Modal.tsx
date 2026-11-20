@@ -8,17 +8,20 @@ type ModalProps = {
   onClose: () => void
   /** The panel's content, starting with a `ModalTitle`, and its buttons in `ModalButtons`. */
   children: ReactNode
+  /** A wider panel, for content with lists, like the New playlist dialog's songs. */
+  isWide?: boolean
 }
 
 /**
  * Modal dialog over a dimmed page: a panel in the middle of the window, which fades and grows in,
  * then back out. While it's open, the page behind it can't be reached, and Escape or a click
  * outside the panel call `onClose`. Its content starts with a `ModalTitle`, the dialog's name for
- * screen readers, and ends with its buttons in a `ModalButtons`.
+ * screen readers, and ends with its buttons in a `ModalButtons`. The panel is never taller than the
+ * window: its content is a column, in which a list can scroll.
  *
  * @summary Modal dialog over a dimmed page
  */
-export const Modal = ({ isOpen, onClose, children }: ModalProps) => (
+export const Modal = ({ isOpen, onClose, children, isWide = false }: ModalProps) => (
   <Dialog open={isOpen} onClose={onClose} className="relative z-20">
     <DialogBackdrop
       transition
@@ -27,7 +30,7 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => (
     <div className="fixed inset-0 flex items-center justify-center p-4">
       <DialogPanel
         transition
-        className="w-full max-w-md rounded-xl border border-rule bg-paper p-6 shadow-lg shadow-shade/15 transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 motion-reduce:transition-none"
+        className={`flex max-h-full w-full flex-col rounded-xl border border-rule bg-paper p-6 shadow-lg shadow-shade/15 transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 motion-reduce:transition-none ${isWide ? 'max-w-xl' : 'max-w-md'}`}
       >
         {children}
       </DialogPanel>

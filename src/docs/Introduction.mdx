@@ -96,6 +96,13 @@ large play button that starts from its first song, and its songs below, each wit
 button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. The open
 playlist stays open while other pages are on screen.
 
+On the list of playlists, a round + button (`NewPlaylistButton`) floats in the bottom-right
+corner, slides in and out like a notification, and keeps above the player and below the
+notifications. It opens the New playlist dialog (`NewPlaylistDialog`): a title, required, a
+description (`TextField`), and the songs of the Songs folder, each with a `Checkbox`, found by a
+search over their title, artist and file name that ignores case and accents. The playlist keeps
+the picked songs in the list's order.
+
 **Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default
 (nothing searches yet: only the choice is saved), and a choice to sort the songs by filename or by
 title (`Select`). Each option is a card (`SettingCard`), its label at the left and its control at
@@ -104,9 +111,9 @@ still applies and a notification says why.
 
 ## Where the code lives
 
-- `src/components/`: feature-agnostic building blocks (`AlertMark`, `Button`, `ConfirmDialog`,
-  `EmptyState`, `IconButton`, `ListRow`, `Modal`, `Notice`, `Select`, `Slider`, `StatusLine`,
-  `Switch`, `Tooltip`, `ViewHeader`, `ViewLayout`),
+- `src/components/`: feature-agnostic building blocks (`AlertMark`, `Button`, `Checkbox`,
+  `ConfirmDialog`, `EmptyState`, `IconButton`, `ListRow`, `Modal`, `Notice`, `Select`, `Slider`,
+  `StatusLine`, `Switch`, `TextField`, `Tooltip`, `ViewHeader`, `ViewLayout`),
   built on Headless UI and styled with Tailwind, each in a folder of its own with its stories.
   `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
   `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.

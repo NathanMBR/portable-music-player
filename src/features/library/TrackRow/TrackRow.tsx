@@ -2,12 +2,8 @@ import { ListRow } from '../../../components/ListRow/ListRow'
 import { PlayButton } from '../../playback/PlayButton/PlayButton'
 import { usePlaybackStore } from '../../playback/playbackStore'
 import { CoverThumbnail } from '../CoverThumbnail/CoverThumbnail'
-import { fullTrackName, TITLE_ARTIST_SEPARATOR } from '../trackName'
+import { TrackName } from '../TrackName/TrackName'
 import type { Track } from '../types'
-
-// On the pen tint of the song in the player, the artist's faded ink falls below a readable
-// contrast, so the artist takes the row's pen there.
-const artistClassesFor = (isInPlayer: boolean) => (isInPlayer ? undefined : 'text-ink-faded')
 
 type TrackRowProps = {
   /** The song the row shows. */
@@ -35,15 +31,7 @@ export const TrackRow = ({ track, onPlay, isPlayDisabled }: TrackRowProps) => {
     <ListRow isCurrent={isInPlayer}>
       <PlayButton track={track} onPlay={onPlay} isDisabled={isPlayDisabled} />
       <CoverThumbnail path={track.path} />
-      <span title={fullTrackName(track)} className="truncate font-stretch-semi-condensed">
-        {track.title}
-        {track.artist && (
-          <span className={artistClassesFor(isInPlayer)}>
-            {TITLE_ARTIST_SEPARATOR}
-            {track.artist}
-          </span>
-        )}
-      </span>
+      <TrackName track={track} isInPlayer={isInPlayer} />
     </ListRow>
   )
 }

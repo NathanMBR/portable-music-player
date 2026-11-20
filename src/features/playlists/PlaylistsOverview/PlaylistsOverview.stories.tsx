@@ -91,13 +91,14 @@ export const Loading: Story = {
   }
 }
 
-/** Without playlists, a message in the middle of the view says where they'll show up. */
+/** Without playlists, a message in the middle of the view says how to create one. */
 export const Empty: Story = {
   beforeEach: () => {
     listed()
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('heading', { level: 2, name: 'No playlists yet' })).toBeVisible()
+    await expect(canvas.getByText('Create one with the + button.')).toBeVisible()
   }
 }
 

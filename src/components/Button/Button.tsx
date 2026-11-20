@@ -1,6 +1,11 @@
 import { Button as HeadlessButton } from '@headlessui/react'
 import type { ReactNode } from 'react'
-import { type ButtonVariant, FOCUS_CLASSES, VARIANT_CLASSES } from '../buttonStyles'
+import {
+  type ButtonVariant,
+  DISABLED_CLASSES,
+  FOCUS_CLASSES,
+  VARIANT_CLASSES
+} from '../buttonStyles'
 
 type ButtonProps = {
   /** The button's text. */
@@ -12,19 +17,27 @@ type ButtonProps = {
    * the one main action on screen, `quiet` or `outlined` for the others.
    */
   variant?: ButtonVariant
+  /** Fades the button and ignores clicks, like Save before a new playlist has a title. */
+  isDisabled?: boolean
 }
 
 /**
  * Button with text, like "Try again" under a failed scan. By default it's `filled`, for the one
  * main action on screen, so it stands out from the quiet icon buttons around it. It shares its
- * looks with `IconButton`.
+ * looks with `IconButton`. It can be disabled.
  *
  * @summary Text button, filled for the main action of a view or notice
  */
-export const Button = ({ children, onClick, variant = 'filled' }: ButtonProps) => (
+export const Button = ({
+  children,
+  onClick,
+  variant = 'filled',
+  isDisabled = false
+}: ButtonProps) => (
   <HeadlessButton
+    disabled={isDisabled}
     onClick={onClick}
-    className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold ${VARIANT_CLASSES[variant]} ${FOCUS_CLASSES}`}
+    className={`inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold ${VARIANT_CLASSES[variant]} ${DISABLED_CLASSES} ${FOCUS_CLASSES}`}
   >
     {children}
   </HeadlessButton>

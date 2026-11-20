@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Track } from '../library/types'
-import { findPlaylistSongs, playableTracksOf, songNameOf } from './playlistSongs'
+import { findPlaylistSongs, pickedFileNames, playableTracksOf, songNameOf } from './playlistSongs'
 
 const overYourHead: Track = {
   path: 'Songs/Over Your Head.mp3',
@@ -68,5 +68,16 @@ describe('playableTracksOf', () => {
     ])
 
     expect(tracks).toEqual([getawayCar, soldierSide])
+  })
+})
+
+describe('pickedFileNames', () => {
+  it("lists the picked songs' file names in the list's order, whatever order they were picked in", () => {
+    const picked = new Set([soldierSide.path, overYourHead.path])
+
+    expect(pickedFileNames([overYourHead, getawayCar, soldierSide], picked)).toEqual([
+      'Over Your Head.mp3',
+      'Soldier Side.mp3'
+    ])
   })
 })

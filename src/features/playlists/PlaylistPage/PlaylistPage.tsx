@@ -6,9 +6,8 @@ import { ListRow } from '../../../components/ListRow/ListRow'
 import { StatusLine } from '../../../components/StatusLine/StatusLine'
 import { ViewHeader } from '../../../components/ViewHeader/ViewHeader'
 import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
-import { useLibraryStore } from '../../library/libraryStore'
+import { useScannedTracks } from '../../library/scannedTracks'
 import { TrackRow } from '../../library/TrackRow/TrackRow'
-import type { Track } from '../../library/types'
 import { MISSING_SONGS_LABEL, PLAYLISTS_ICON } from '../constants'
 import { PlaylistPlayButton } from '../PlaylistPlayButton/PlaylistPlayButton'
 import { findPlaylistSongs, type PlaylistSong, songNameOf } from '../playlistSongs'
@@ -21,12 +20,6 @@ type PlaylistPageProps = {
   /** The playlist on screen. */
   playlist: SavedPlaylist
 }
-
-// The same empty list every time, so the selector below doesn't make a new one at each render.
-const NO_TRACKS: Track[] = []
-
-const useScannedTracks = () =>
-  useLibraryStore(state => (state.lastScan?.kind === 'loaded' ? state.lastScan.tracks : NO_TRACKS))
 
 // The alert and the square sit where a found song's play button and cover go, so the names of
 // every row line up.

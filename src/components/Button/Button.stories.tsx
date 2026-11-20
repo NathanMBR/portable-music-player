@@ -32,6 +32,19 @@ export const Outlined: Story = {
 }
 
 /** Proves the app's Tailwind theme loaded in Storybook: the button is filled with `pen`. */
+/** An action that can't run yet, like Save before a new playlist has a title: faded, ignoring clicks. */
+export const Disabled: Story = {
+  args: { children: 'Save', isDisabled: true },
+  play: async ({ args, canvas, userEvent }) => {
+    const button = canvas.getByRole('button', { name: 'Save' })
+    await expect(button).toBeDisabled()
+
+    await userEvent.click(button)
+
+    await expect(args.onClick).not.toHaveBeenCalled()
+  }
+}
+
 export const CssCheck: Story = {
   tags: ['!autodocs', '!manifest'],
   globals: { theme: 'light' },

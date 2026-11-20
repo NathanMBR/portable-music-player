@@ -49,7 +49,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 - Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notifySuccess(title, description?)` for what went well, `notifyUndoable(title, undo)` for what was just done, with an Undo button (Sonner's `action`, styled by `NotificationArea`), and `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
 - Logs: what the user does and what plays goes to the log through `log(message)` (`src/features/logging/log.ts`), which hands it to Rust's `write_log` (`logs.rs`) without waiting: Rust prints it to stdout and saves it in the Logs folder, under the `webview` target. A failed write notifies. The messages follow **Logging** below, each logged where it's known for sure:
   - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so a plain click is logged before what it does. A toggle (`aria-pressed`, `IconButton`'s `isPressed`) or a button with three or more states (`data-state`, `IconButton`'s `state`) is logged a task later, once React has drawn the state the click left, with the name the button had when clicked;
-  - switches: `Switch` logs itself (`logToggle`), though it's otherwise feature-agnostic, because Space toggles a Headless switch without a click; `buttonLog.ts` skips them;
+  - switches and checkboxes: `Switch` and `Checkbox` log themselves (`logToggle`), though they're otherwise feature-agnostic, because Space toggles them without a click; `buttonLog.ts` skips switches, and a Headless checkbox isn't a `<button>`;
   - selects: `Select` logs its list opening and closing (from Headless UI's `open`, skipping the first render) and the option chosen, from the pointer or the keyboard alike, by the select's label alone (`labelOf`), without the chosen option its button's accessible name includes. `buttonLog.ts` skips a select's button (`aria-haspopup="listbox"`), since the keyboard opens it without a click;
   - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
   - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
@@ -76,9 +76,9 @@ src/
   clamp.ts              keeps a number within a range, for the stores and the components alike
   compareNames.ts       compares names for sorting the same way on every computer (songs, playlists)
   components/           feature-agnostic UI built on Headless UI
-    <Component>/        one folder per component (AlertMark, Button, ConfirmDialog, EmptyState, IconButton,
-                        ListRow, Modal, Notice, Select, Slider, StatusLine, Switch, Tooltip, ViewHeader,
-                        ViewLayout): <Component>.tsx
+    <Component>/        one folder per component (AlertMark, Button, Checkbox, ConfirmDialog, EmptyState,
+                        IconButton, ListRow, Modal, Notice, Select, Slider, StatusLine, Switch, TextField,
+                        Tooltip, ViewHeader, ViewLayout): <Component>.tsx
                         and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
@@ -116,7 +116,7 @@ src/
   - `read_cover` (`library.rs`) sends the picture's bytes as they are (`tauri::ipc::Response`), the same way on both OSes, or no bytes when the song has none; `readCover` in `libraryApi.ts` turns no bytes into `null`. The webview scales the full picture down into the square (`object-cover`), so no image crate is needed. A custom URI scheme could serve the images instead, but a command can be mocked in stories and tells a song without a cover from a failure.
   - `coverStore.ts` keeps each cover as an object URL, by track path. It frees the ones asked for longest ago past `MAX_CACHED_COVERS`, and all of them after every scan (`forgetCovers`), so changed covers are read again. A read that finishes after its cover was freed is dropped.
   - A song without a picture, or whose tags can't be read, shows the placeholder: Heroicons' `PhotoIcon` (it has no crossed-out photo) in `ink-faded` on `rule`. So does a picture the webview can't draw, through the image's `error` event. Only a cover Rust can't read at all, because the song vanished or the drive was pulled, is a failure: it shows the placeholder too, and notifies under one title, so failing rows replace one notification instead of stacking one each.
-- Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, and, only while it's open, the space kept for it at the bottom of the window (`pb-player`, eased with the player's slide) and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`, eased the same way), so nothing hides behind it.
+- Playback: `App.tsx` renders `AudioPlayer` after the views, never inside one, so a song keeps playing when the category changes. The `player` spacing token in `src/index.css` sets the player's height, and, only while it's open, the space kept for it at the bottom of the window (`pb-player`, eased with the player's slide) and the notifications' bottom offset (`NotificationArea`'s `bottomClearance`, eased the same way), so nothing hides behind it. `App.tsx` adds up the room of everything floating at the bottom for the notifications (`stackClearances`): the player and the New playlist button.
   - The notifications' easing is in important utilities (`!`) on Sonner's list: Sonner's stylesheet sits in no cascade layer, so it beats Tailwind's layered utilities otherwise. They keep Sonner's own `transform` transition, the lift of a hovered stack. `App.stories.tsx` checks that the list moves with the player's own timing and curve, so a change to the player's slide shows up there.
   - The audio plays from `src/features/playback/songAudio.ts`, the only module that touches it. `main.tsx` connects it once to an `Audio` element, which then follows the playback store (song, play state, position, volume) and reports the song's length, progress and end back to it. Stories never connect it, so they stay silent.
     - The progress follows the wall clock between the audio's reports (`progressEstimate.ts`), from the moment the audio's clock is seen moving until it pauses, waits for data or jumps. On Linux, PulseAudio's clock can hold still for seconds and then catch up while the song plays on (seen in WSL and on Linux Mint, and with plain GStreamer), which froze the progress bar.
@@ -145,6 +145,9 @@ src/
   - `allSongsFound` is what the file says: Rust works it out only when a playlist is created, saved or checked (see `playlists.rs`). Playing a playlist, from its row, its page's large play button or one of its songs, calls `check_playlist` first: if songs are missing, nothing plays, `notifyError` says how many, and the store takes the playlist as Rust rewrote it. While it's false, every play button of the playlist is disabled, and a Recheck button (`RecheckButton`) shows on its row and in its page's header.
   - The songs are matched to the last scan by file name, ignoring case like FAT and NTFS (`playlistSongs.ts`). A playlist plays the songs the scan has, in its order, and a song the scan lacks is listed under its file name in `ink-faded`, with an alert where its play button would be.
   - Delete asks first (`ConfirmDialog`, on `Modal`, like the song drop's dialog), and `notifyUndoable`'s Undo writes the file again under its old name, with its old contents (`create_playlist`).
+  - A round + button (`NewPlaylistButton`), rendered from `App.tsx` outside the views so it can slide out when the page changes, floats in the bottom-right corner only while the list of playlists is on screen (`useIsNewPlaylistButtonShown`). It slides and fades like Sonner's notifications (400ms `ease`), rides above the player with the player's slide (300ms ease-out), and keeps its room below the notifications (`NEW_PLAYLIST_BUTTON_CLEARANCE`). The list's bottom padding lets its last row scroll clear of it.
+  - It opens `NewPlaylistDialog`: a required title (at most `MAX_TITLE_LENGTH`), a description, and the scanned songs in the Songs view's order (`useSortedTracks`), each with a `Checkbox`. The search (`songSearch.ts`) matches title, artist and file name, with case and accents folded on both sides (`plainText.ts`); picked songs stay picked while it hides them, and are saved in the list's order. The form lives inside the dialog's panel, which Headless UI unmounts once it closes, so each opening starts empty. It doesn't submit on Enter, which would save from the search box. A failed save keeps it open.
+  - The file name is `<Date.now()>-<title>.json` (`playlistFileName.ts`): the title with its accents folded, keeping only `A-Z`, `a-z`, `0-9` and spaces, trimmed, spaces turned into `_`, or `playlist` when nothing is left, as for a title in another script. Rust checks the same pattern.
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 
@@ -314,7 +317,7 @@ Every feature logs what the user does and what the app does in response, followi
 | A button is clicked | `Clicked at button "<name>"` |
 | A toggle button (on/off, not a switch) is clicked | `"<name>" is on` or `"<name>" is off`, its state after the click |
 | A button with three or more states is clicked | `Clicked at button "<name>" State: "<state>"`, its state after the click |
-| A switch is toggled | `"<name>" is on` or `"<name>" is off` |
+| A switch or checkbox is toggled | `"<name>" is on` or `"<name>" is off` |
 | A select's list opens | `Opened selector "<label>"` |
 | An option is chosen in a select | `Selector "<label>" set value to "<option>"`, the option's visible text |
 | A select's list closes, by a choice or not | `Closed selector "<label>"`, after the choice if there is one |
@@ -323,6 +326,7 @@ Every feature logs what the user does and what the app does in response, followi
 | The volume slider is moved | `Set volume to <percent>%` |
 | The current page changes | `Changing to page "<page name>"`, the category's name in the menu |
 | A song is put back in the player when the app opens | `Restored song "<title>" at mm:ss.mmm` |
+| A playlist is created | `Created playlist "<title>" with <count> songs`, e.g. `Created playlist "Road trip" with 1 song` |
 | A playlist is opened with See | `Opened playlist "<title>"` |
 | A playlist is deleted | `Deleted playlist "<title>"` |
 | A deleted playlist comes back with Undo | `Restored playlist "<title>"` |
@@ -333,7 +337,7 @@ Every feature logs what the user does and what the app does in response, followi
 | Rust finds every song of a playlist whose file said some were missing | `Found every song of playlist "<title>"` |
 
 - `<name>` is the control's accessible name, as screen readers hear it.
-- Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own.
+- Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own, and checkboxes built on `Checkbox` their toggles.
 - A slider logs the value a move ends on, through `onCommit`, never at every step of a drag.
 - A new kind of situation gets a message in the same style, a short sentence starting with a capitalized verb with names in double quotes, and its test asserts the exact message. Say which message was chosen when proposing the change.
 - Test each message where it's logged: `loggedMessages()` lists them in unit tests and stories.

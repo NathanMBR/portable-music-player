@@ -3,8 +3,11 @@ import { expect, waitFor, within } from 'storybook/test'
 import { App } from './App'
 import { useLibraryStore } from './features/library/libraryStore'
 import type { Track } from './features/library/types'
+import { useNavigationStore } from './features/navigation/navigationStore'
 import { DISMISS_LABEL } from './features/notifications/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
+import { usePlaylistsStore } from './features/playlists/playlistsStore'
+import type { SavedPlaylist } from './features/playlists/types'
 import { noCover } from './testing/covers'
 import { failingCommand, mockCommands } from './testing/mockCommands'
 import { renderInOwnFrame } from './testing/storyParameters'
@@ -61,6 +64,20 @@ const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
 
 const OPEN_FOLDER_ERROR = "Couldn't open the Songs folder: no application can open folders"
+
+const stormyWeather: SavedPlaylist = {
+  fileName: '1763600066666-Stormy_weather.json',
+  title: 'Stormy weather',
+  description: '',
+  allSongsFound: true,
+  songs: ['Ride Into The Storm.mp3', 'Streets of Tomorrow.mp3']
+}
+
+/** The list of playlists on screen. */
+const onThePlaylists = () => {
+  useNavigationStore.setState({ currentCategory: 'playlists' })
+  usePlaylistsStore.setState({ playlists: [stormyWeather], loadStatus: 'loaded' })
+}
 
 /** A song of the list loaded in the player, as if played from its row. */
 const loadPlayingSong = () => {
@@ -196,6 +213,50 @@ export const NotifiesAboveThePlayer: Story = {
         player.getBoundingClientRect().top
       )
     })
+  }
+}
+
+/**
+ * On the list of playlists, notifications pop up above the New playlist button, like this play
+ * blocked by missing songs.
+ */
+export const NotifiesAboveTheNewPlaylistButton: Story = {
+  beforeEach: () => {
+    onThePlaylists()
+    mockCommands({ check_playlist: () => ({ playlist: stormyWeather, missingCount: 1 }) })
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Play Stormy weather' }))
+
+    const newPlaylist = canvas.getByRole('button', { name: 'New playlist' })
+    await waitFor(() => {
+      const notification = page
+        .getByText('1 song is missing from the Songs folder.')
+        .closest('[data-sonner-toast]')
+      expect(notification?.getBoundingClientRect().bottom).toBeLessThan(
+        newPlaylist.getBoundingClientRect().top
+      )
+    })
+  }
+}
+
+/** While the player is open, the New playlist button floats above it. */
+export const KeepsTheNewPlaylistButtonAboveThePlayer: Story = {
+  beforeEach: () => {
+    onThePlaylists()
+    loadPlayingSong()
+  },
+  play: async ({ canvas }) => {
+    const player = canvas.getByRole('region', { name: 'Player' })
+    const newPlaylist = canvas.getByRole('button', { name: 'New playlist' })
+
+    await waitFor(() =>
+      expect(newPlaylist.getBoundingClientRect().bottom).toBeLessThan(
+        player.getBoundingClientRect().top
+      )
+    )
   }
 }
 

@@ -5,6 +5,7 @@ import { useLibraryStore } from '../library/libraryStore'
 import { log } from '../logging/log'
 import { notifyError, notifySuccess, notifyUndoable } from '../notifications/notify'
 import { usePlaybackStore } from '../playback/playbackStore'
+import { playlistFileName } from './playlistFileName'
 import { findPlaylistSongs, playableTracksOf } from './playlistSongs'
 import {
   checkPlaylistSongs,
@@ -27,6 +28,8 @@ type PlaylistsStore = {
    */
   shownPlaylist: string | null
   loadPlaylists: () => Promise<void>
+  /** Writes a new playlist's file, and resolves to whether it was created. */
+  createPlaylist: (contents: PlaylistContents) => Promise<boolean>
   showPlaylist: (fileName: string) => void
   showList: () => void
   /**
@@ -71,6 +74,10 @@ const playSongsOf = (playlist: SavedPlaylist, fromSong: string | undefined) => {
   }
   usePlaybackStore.getState().playTrack(firstTrack, queue)
 }
+
+/** The playlist on screen, or `undefined` while the list is, as when the open one was deleted. */
+export const selectShownPlaylist = ({ playlists, shownPlaylist }: PlaylistsStore) =>
+  playlists.find(playlist => playlist.fileName === shownPlaylist)
 
 export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
   const playlistNamed = (fileName: string) =>
@@ -119,6 +126,20 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
       } catch (error) {
         notifyError("Couldn't load your playlists", error)
         set({ loadStatus: 'failed' })
+      }
+    },
+    createPlaylist: async contents => {
+      try {
+        const created = await createPlaylistFile(
+          playlistFileName(contents.title, Date.now()),
+          contents
+        )
+        set({ playlists: sortByTitle([...get().playlists, created]) })
+        log(`Created playlist "${created.title}" with ${formatSongCount(created.songs.length)}`)
+        return true
+      } catch (error) {
+        notifyError(`Couldn't create "${contents.title}"`, error)
+        return false
       }
     },
     showPlaylist: fileName => {

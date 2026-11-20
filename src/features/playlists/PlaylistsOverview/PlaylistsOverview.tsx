@@ -28,7 +28,7 @@ const NoPlaylists = () => (
   <EmptyState
     icon={PLAYLISTS_ICON}
     title="No playlists yet"
-    description="Playlists you create show up here."
+    description="Create one with the + button."
   />
 )
 
@@ -36,7 +36,8 @@ const PlaylistList = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => voi
   const playlists = usePlaylistsStore(state => state.playlists)
 
   return (
-    <ul aria-label={PLAYLISTS_TITLE} className="pb-8">
+    // Room below the last row, so it can scroll clear of the New playlist button.
+    <ul aria-label={PLAYLISTS_TITLE} className="pb-24">
       {playlists.map(playlist => (
         <PlaylistRow
           key={playlist.fileName}
@@ -71,7 +72,8 @@ const OverviewStatus = () => {
  * The Playlists view's list of every playlist, sorted by title. Below the header's rule, the
  * status line counts them, and below it the view shows nothing until the Playlists folder is
  * read, then a row per playlist, the failure notice with a "Try again" button, or, without
- * playlists, a message in the middle of the view. Deleting a playlist asks first, then a
+ * playlists, a message in the middle of the view pointing at the New playlist button. The last row
+ * can scroll clear of that button. Deleting a playlist asks first, then a
  * notification says it was deleted, with an Undo button that brings it back.
  *
  * @summary Playlists view's list of playlists

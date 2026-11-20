@@ -1,22 +1,16 @@
-import { useMemo } from 'react'
 import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
-import { useSettingsStore } from '../../settings/settingsStore'
 import { EmptyLibrary } from '../EmptyLibrary/EmptyLibrary'
 import { LibraryHeader } from '../LibraryHeader/LibraryHeader'
 import { LibraryStatus } from '../LibraryStatus/LibraryStatus'
 import { useLibraryStore } from '../libraryStore'
 import { ScanFailure } from '../ScanFailure/ScanFailure'
-import { sortTracks } from '../sortTracks'
+import { useSortedTracks } from '../scannedTracks'
 import { TrackList } from '../TrackList/TrackList'
 import type { Track } from '../types'
 
-// Sorted here rather than in the store, so a new song order applies at once, and the settings
-// restored after the first scan still sort its songs.
-const SortedTrackList = ({ tracks }: { tracks: Track[] }) => {
-  const songOrder = useSettingsStore(state => state.settings.songOrder)
-  const sortedTracks = useMemo(() => sortTracks(tracks, songOrder), [tracks, songOrder])
-  return <TrackList tracks={sortedTracks} />
-}
+const SortedTrackList = ({ tracks }: { tracks: Track[] }) => (
+  <TrackList tracks={useSortedTracks(tracks)} />
+)
 
 const LibraryContent = () => {
   const lastScan = useLibraryStore(state => state.lastScan)

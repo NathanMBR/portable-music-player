@@ -1,6 +1,8 @@
+mod atomic_write;
 mod library;
 mod logs;
 mod main_window;
+mod playlists;
 mod portable;
 mod settings;
 mod song_drop;
@@ -25,6 +27,11 @@ pub fn run() {
             library::read_song,
             library::read_cover,
             logs::write_log,
+            playlists::list_playlists,
+            playlists::create_playlist,
+            playlists::save_playlist,
+            playlists::check_playlist,
+            playlists::delete_playlist,
             settings::load_settings,
             settings::save_settings,
             song_drop::check_dropped_songs,

@@ -5,7 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize, Serializer};
 
-use crate::portable;
+use crate::{atomic_write::write_atomically, portable};
 
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const FULL_VOLUME: f64 = 1.0;
@@ -147,8 +147,7 @@ fn read_settings(path: &Path) -> Result<Settings, SettingsError> {
     })
 }
 
-/// Writes a temporary file and renames it over the old one, so pulling the drive mid-save can't
-/// leave a half-written settings file.
+/// Pulling the drive mid-save can't leave a half-written settings file (`write_atomically`).
 fn write_settings(path: &Path, settings: &Settings) -> Result<(), SettingsError> {
     let write_error = |source: io::Error| SettingsError::Write {
         path: path.to_path_buf(),
@@ -156,9 +155,7 @@ fn write_settings(path: &Path, settings: &Settings) -> Result<(), SettingsError>
     };
     let contents =
         serde_json::to_string_pretty(settings).map_err(|error| write_error(error.into()))?;
-    let temporary_path = path.with_extension("json.tmp");
-    fs::write(&temporary_path, contents).map_err(write_error)?;
-    fs::rename(&temporary_path, path).map_err(write_error)
+    write_atomically(path, contents).map_err(write_error)
 }
 
 #[cfg(test)]

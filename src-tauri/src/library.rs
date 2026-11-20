@@ -164,12 +164,9 @@ pub(crate) fn find_song_in(root: &Path, track_path: &str) -> Result<PathBuf, Lib
     let file_name = track_path
         .strip_prefix(SONGS_FOLDER_NAME)
         .and_then(|rest| rest.strip_prefix('/'))
-        .filter(|name| is_plain_file_name(name))
+        .filter(|name| is_song_file_name(name))
         .ok_or_else(not_a_song)?;
     let song = root.join(SONGS_FOLDER_NAME).join(file_name);
-    if !has_mp3_name(&song) {
-        return Err(not_a_song());
-    }
     if !song.is_file() {
         return Err(LibraryError::SongMissing {
             path: track_path.to_owned(),
@@ -220,6 +217,17 @@ fn cover_among(tags: &[Tag]) -> Option<&Picture> {
     pictures()
         .find(|picture| picture.pic_type() == PictureType::CoverFront)
         .or_else(|| pictures().next())
+}
+
+/// Whether `file_name` names a song of `root`'s Songs folder that is there now. The drive's file
+/// system applies its own case rules, as FAT and NTFS ignore case.
+pub(crate) fn has_song_in(root: &Path, file_name: &str) -> bool {
+    is_song_file_name(file_name) && root.join(SONGS_FOLDER_NAME).join(file_name).is_file()
+}
+
+/// A name the scan would list as a song: a plain file name, not hidden, ending in `.mp3`.
+pub(crate) fn is_song_file_name(name: &str) -> bool {
+    is_plain_file_name(name) && has_mp3_name(Path::new(name))
 }
 
 /// `\` is checked on every OS: it's a separator on Windows, where it could climb out of the folder.

@@ -161,11 +161,24 @@ src/
 - `settings.rs`: user settings in `settings.json` next to the executable.
   - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name and position, `SavedSong`).
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
-  - Saves write a temporary file and rename it over the old one, so pulling the drive mid-save can't corrupt it.
+  - Saves go through `write_atomically` (`atomic_write.rs`), so pulling the drive mid-save can't corrupt it.
 - `song_drop.rs`: adds the songs of a drop to the Songs folder, through `check_dropped_songs` and `copy_dropped_songs`.
   - It walks each dropped folder with its subfolders, each folder's names sorted, so which of two songs of the same name is copied never depends on how the OS lists them. It doesn't follow links to folders, so a link back up can't loop, and it skips hidden subfolders (dot names, and Windows' hidden attribute): on a dropped drive they're the trash and the system's folders.
   - A name is taken by a file of that name in the Songs folder (`exists()`, so the drive's file system applies its own case rules, as FAT and NTFS ignore case) or by an earlier dropped song (compared lowercase). The copy checks each name as it goes, so skipping keeps the first song of a name and replacing keeps the last.
   - Each song is copied under a hidden `.<name>.part`, which the scan skips, then renamed over its own name, so pulling the drive never leaves half a song. A path that can't be read or copied is reported (`DropFailure`), and the other songs are still copied.
+- `playlists.rs`: the playlists, one JSON file each in the `Playlists` folder next to the executable, created when missing like `Songs`, through `list_playlists`, `create_playlist`, `save_playlist`, `check_playlist` and `delete_playlist`.
+  - A file is named `<Date.now()>-<normalized title>.json`: digits, a dash, then at least one of `A-Z`, `a-z`, `0-9` and `_` (`is_playlist_file_name`). The webview builds the name from the title, and Rust refuses any other name before touching a file, so the webview can't reach other files through it.
+  - It holds exactly `title`, `description`, `allSongsFound` and `songs`, the songs' file names in the Songs folder (`deny_unknown_fields`).
+  - Listing sorts the files by name, so by the time they were created, and skips with a warning in the log:
+    - a file whose name doesn't fit, or a folder;
+    - a file that isn't valid JSON, or holds a missing, mistyped or unknown field;
+    - a blank title;
+    - a song that isn't a plain `.mp3` file name (`library::is_song_file_name`);
+    - a song listed twice, compared lowercase like the drive's file system may.
+  - Hidden files, like a save's temporary file, are skipped quietly. Create and save refuse the same contents (`ContentsProblem`), so the player never writes a file it would then skip.
+  - `allSongsFound` is worked out only when a playlist is created, saved or checked (`check_playlist`), by looking for each song in the Songs folder (`library::has_song_in`), never by a listing or a scan. Checking rewrites the file only when the value changes, and Rust logs each change of it.
+  - Create never overwrites a file (`Taken`), and can recreate a deleted playlist under its old name. Every write goes through `write_atomically`.
+- `atomic_write.rs`: `write_atomically` writes a file under a hidden temporary name next to it, `.<name>.tmp`, then renames it over the file, so pulling the drive mid-write leaves the old file or the new one, never half of one. The settings and the playlists save through it.
 - `logs.rs`: the log, through the official `tauri-plugin-log`, printed to stdout and saved in `Logs/portable-music-player.log` next to the executable (its `Folder` target: the plugin's default `LogDir` is in the user's profile, off the drive). It takes everything logged through the `log` crate, which the plugin re-exports (`tauri_plugin_log::log`).
   - A full file (`MAX_LOG_FILE_BYTES`, 1 MB, instead of the plugin's 40 KB) is renamed with its date and a new one starts; the 3 newest full files are kept (`FULL_LOG_FILES_KEPT`).
   - `writable_logs_dir` creates the folder and opens the log file before the plugin starts, because the plugin opens it in its setup, and an error there would stop the app from starting, as on a write-protected drive. If it can't, the log goes only to stdout, and a warning says why once the plugin runs (`warn_if_unsaved`).
@@ -304,6 +317,8 @@ Every feature logs what the user does and what the app does in response, followi
 | Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
 | The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |
+| Rust finds songs of a playlist missing, when its file said they were all there or is new | `Found <count> songs missing from playlist "<title>"`, e.g. `Found 1 song missing from playlist "Road trip"` |
+| Rust finds every song of a playlist whose file said some were missing | `Found every song of playlist "<title>"` |
 
 - `<name>` is the control's accessible name, as screen readers hear it.
 - Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own.

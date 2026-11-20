@@ -22,12 +22,15 @@ type NotificationAreaProps = {
   bottomClearance?: string
 }
 
-// Sonner's close button isn't a Headless UI one, so it takes hover: and focus-visible:, not data-*.
+// Sonner's buttons aren't Headless UI ones, so they take hover: and focus-visible:, not data-*.
+// The action button, like Undo, looks like an outlined Button.
 const CLASS_NAMES = {
   toast:
     'flex w-full items-start gap-3 rounded-lg border border-rule bg-paper py-3 pr-11 pl-4 text-ink shadow-lg shadow-shade/15',
   icon: 'mt-px shrink-0',
-  content: 'min-w-0',
+  content: 'min-w-0 flex-1',
+  actionButton:
+    'shrink-0 self-center rounded-md border border-rule px-3 py-1.5 text-sm font-semibold text-ink hover:bg-rule/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pen',
   title: 'text-sm font-semibold',
   description: 'mt-1 text-sm break-words text-ink-faded',
   closeButton:
@@ -52,8 +55,8 @@ const offsetAbove = (bottomClearance: string | undefined, edgeGap: string) =>
 
 /**
  * The bottom-right corner where notifications pop up, raised from anywhere with `notifyError`,
- * `notifySuccess` or `notify` (`notify.ts`). Each one closes by itself after a few seconds, or earlier with its ×
- * button. Hovering the stack spreads it out and pauses the timers. The app shell renders it once,
+ * `notifySuccess`, `notify` or `notifyUndoable` (`notify.ts`), the last with an Undo button. Each one
+ * closes by itself after a few seconds, or earlier with its × button. Hovering the stack spreads it out and pauses the timers. The app shell renders it once,
  * raised above the audio player while the player is open, so notifications slide with the player
  * as it opens and closes.
  *

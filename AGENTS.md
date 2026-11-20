@@ -46,7 +46,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 - `src/`: React frontend, bundled by Vite into `dist/`, which Tauri embeds into the binary (`frontendDist`). The frontend calls Rust through `invoke()` from `@tauri-apps/api`.
 - Styling is Tailwind CSS v4 via the `@tailwindcss/vite` plugin. Configuration is CSS-first: there is no `tailwind.config.js`; theme customization goes in `@theme` blocks in `src/index.css`, which is imported by `main.tsx`. Biome's `css.parser.tailwindDirectives` is enabled so `@theme`, `@apply`, etc. parse.
 - UI primitives come from Headless UI (`@headlessui/react`, unstyled and accessible; style it with Tailwind) and icons from Heroicons (`@heroicons/react/24/outline`, `/24/solid`, `/20/solid`, `/16/solid`).
-- Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notifySuccess(title, description?)` for what went well, and `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
+- Notifications in the bottom-right corner come from Sonner (`sonner`), only through `src/features/notifications/notify.ts`: `notifyError(title, error)` for failures, `notifySuccess(title, description?)` for what went well, `notifyUndoable(title, undo)` for what was just done, with an Undo button (Sonner's `action`, styled by `NotificationArea`), and `notify(title, description?)` for anything else. Features never import `sonner` directly. `NotificationArea` renders Sonner's `Toaster` once, from `App.tsx`, as a portal on `<body>`: the side menu's modal dialog makes the app's root inert, and a notification raised from the menu must stay reachable.
 - Logs: what the user does and what plays goes to the log through `log(message)` (`src/features/logging/log.ts`), which hands it to Rust's `write_log` (`logs.rs`) without waiting: Rust prints it to stdout and saves it in the Logs folder, under the `webview` target. A failed write notifies. The messages follow **Logging** below, each logged where it's known for sure:
   - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so a plain click is logged before what it does. A toggle (`aria-pressed`, `IconButton`'s `isPressed`) or a button with three or more states (`data-state`, `IconButton`'s `state`) is logged a task later, once React has drawn the state the click left, with the name the button had when clicked;
   - switches: `Switch` logs itself (`logToggle`), though it's otherwise feature-agnostic, because Space toggles a Headless switch without a click; `buttonLog.ts` skips them;
@@ -54,6 +54,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
   - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
   - pages: the navigation store logs them when the category changes;
+  - playlists: the playlists store logs one opened, deleted or brought back;
   - drops: the song drop store logs the songs a drop holds and the songs it copied;
   - Rust logs the app's opening and closing (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
@@ -67,14 +68,17 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 .storybook/             Storybook config: main.ts (addons, components manifest), preview.tsx (app CSS,
                         theme toolbar, fake Rust commands, store reset, a11y checks)
 src/
-  main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, renders <App />
+  main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, lists the
+                        playlists, renders <App />
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
   clamp.ts              keeps a number within a range, for the stores and the components alike
+  compareNames.ts       compares names for sorting the same way on every computer (songs, playlists)
   components/           feature-agnostic UI built on Headless UI
-    <Component>/        one folder per component (Button, IconButton, Notice, Select, Slider, Switch,
-                        Tooltip, ViewHeader, ViewLayout): <Component>.tsx
+    <Component>/        one folder per component (AlertMark, Button, ConfirmDialog, EmptyState, IconButton,
+                        ListRow, Modal, Notice, Select, Slider, StatusLine, Switch, Tooltip, ViewHeader,
+                        ViewLayout): <Component>.tsx
                         and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
@@ -92,7 +96,7 @@ src/
 ```
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
-- Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`. A plain element that needs those states, like a song's row, gets them from Headless UI's `DataInteractive`, never from `hover:`: stories can hover it with `userEvent`, and synthetic events don't trigger `:hover`.
+- Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`. A plain element that needs those states, like a list's row (`ListRow`), gets them from Headless UI's `DataInteractive`, never from `hover:`: stories can hover it with `userEvent`, and synthetic events don't trigger `:hover`.
 - Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song's button and row, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
 - Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
@@ -101,7 +105,7 @@ src/
 - Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
   - Nothing searches for updates yet: `checksForUpdates` (on by default) is only a saved choice.
   - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
-- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. Every header looks the same: the view's icon, title and buttons above the rule, nothing else; anything more about the view, like the Songs view's song count, goes below the rule, at the top of its content. A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
+- Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. Every header looks the same: the view's icon, title and buttons above the rule, nothing else; anything more about the view, like the Songs view's song count, goes below the rule, at the top of its content (`StatusLine`). A page inside a category, like a playlist, has a back button in the icon's place (`back`), and may follow its title with a mark (`titleMark`), like an `AlertMark`. A view with nothing to list says so in its middle (`EmptyState`). A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`main`).
   - The app draws every scrollbar itself: `::-webkit-scrollbar` base styles in `src/index.css`, `scrollbar` spacing token for the width. WebKitGTK and WebView2 both draw those, and WebView2 would ignore them if `scrollbar-color` or `scrollbar-width` were set.
   - The scrollbar sits in the right gutter, beside the content, and the content keeps the width between the gutters, like the header (`px-gutter`). The scroll area stops inside the right gutter (see `ViewLayout.tsx`) and uses `overflow-y-scroll`, so the scrollbar always keeps its room and only hides while nothing scrolls: WebKitGTK ignores `scrollbar-gutter`.
@@ -136,6 +140,11 @@ src/
   - Tauri's `dragDropEnabled` is on by default, and on Windows its drop handling replaces WebView2's, so the page gets no HTML5 drag and drop events: dragging within the page, like reordering songs, would need pointer events.
   - The drop's paths, absolute as the OS gives them, go straight back to Rust (`song_drop.rs`), which copies only the MP3s among them, and only into the Songs folder.
   - `songDropStore.ts` takes a drop through the steps `SongDropDialog` shows: `check_dropped_songs` counts the MP3s of the drop, subfolders included, and names those whose file name is taken; if any is, the dialog lists them all, in a box that scrolls when they're many, and asks to skip them, replace the songs already there, or cancel; `copy_dropped_songs` copies them flat into the Songs folder; then the Songs folder is scanned again, once any scan already running ends, and that rescan notifies. The dialog stays open, with a loader, until the rescan ends. A drop without songs notifies instead, and a drop while another is added is ignored.
+- Playlists: the Playlists view (`PlaylistsView`) shows the list of playlists (`PlaylistsOverview`), sorted by title with `compareNames` and no setting to change it, or the one opened with See (`PlaylistPage`). The playlists store keeps the open one (`shownPlaylist`), so it stays open while other pages are on screen.
+  - `main.tsx` lists them once at launch. Scans never list them again, since nothing in a playlist's file changes with the Songs folder until Rust checks it.
+  - `allSongsFound` is what the file says: Rust works it out only when a playlist is created, saved or checked (see `playlists.rs`). Playing a playlist, from its row, its page's large play button or one of its songs, calls `check_playlist` first: if songs are missing, nothing plays, `notifyError` says how many, and the store takes the playlist as Rust rewrote it. While it's false, every play button of the playlist is disabled, and a Recheck button (`RecheckButton`) shows on its row and in its page's header.
+  - The songs are matched to the last scan by file name, ignoring case like FAT and NTFS (`playlistSongs.ts`). A playlist plays the songs the scan has, in its order, and a song the scan lacks is listed under its file name in `ink-faded`, with an alert where its play button would be.
+  - Delete asks first (`ConfirmDialog`, on `Modal`, like the song drop's dialog), and `notifyUndoable`'s Undo writes the file again under its old name, with its old contents (`create_playlist`).
 - Type is Archivo Variable (weight and `font-stretch` width axes), bundled through `@fontsource-variable/archivo`. Never load fonts or other assets from a CDN: the app must work offline on any computer.
 - Work that runs once per launch is started in `main.tsx`, not in a mount effect, because StrictMode runs effects twice in dev.
 
@@ -197,7 +206,7 @@ These follow from the project goal and are easy to get wrong:
 - The portable artifact is the bare binary (`src-tauri/target/release/portable-music-player[.exe]`), not the installers/bundles `tauri build` produces (`bundle.targets` lists `appimage`, `msi` and `nsis`; the bundler keeps those of the OS it builds on, so there are no `.deb` or `.rpm` packages). An AppImage works too: it runs the executable from a temporary read-only mount, so `root_dir()` uses the folder of the AppImage file (`APPIMAGE`) while the executable is inside that mount (`APPDIR`). Programs started from an AppImage inherit both variables, so outside the mount they're ignored.
 - Each OS executable has to be built on (or cross-compiled for) that OS. Development here happens in WSL2, which produces the Linux binary.
 - Runtime dependencies are on the host: Windows needs WebView2 (preinstalled on Win 10/11), and Linux needs webkit2gtk plus GStreamer's good plugins (`gstreamer1.0-plugins-good`), which decode MP3 for the webview. An AppImage can't use the host's plugins: its bundled GStreamer is relocatable and looks for them only in `usr/lib/gstreamer-1.0` next to itself, so `bundle.linux.appimage.bundleMediaFramework` copies the build machine's plugins into it. That setting only touches the AppImage: Windows plays MP3 through WebView2, without GStreamer.
-- Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/features/library/sortTracks.ts`).
+- Don't rely on the host's locale for anything order-sensitive. With `LANG=C` (WSL's default), the Linux webview's default `Intl` locale is `en-US-u-va-posix`, whose collation puts every uppercase letter before any lowercase one. Pass an explicit locale (see `src/compareNames.ts`).
 - Don't canonicalize paths shown to the user: on Windows, `canonicalize` adds a `\\?\` prefix.
 
 ## Documentation
@@ -239,7 +248,7 @@ These follow from the project goal and are easy to get wrong:
   - fake a Rust error with `failingCommand(message)`, since errors reach the frontend as strings.
 - Stores reset automatically before every story and after every unit test (`src/testing/resetStores.ts`). A new store must be added there. The reset also dismisses every notification and forgets the logged messages.
 - Notifications are checked through what the user sees:
-  - in unit tests, `shownNotifications()` (`src/testing/notifications.ts`) lists the ones on screen as `{ type, title, description }`;
+  - in unit tests, `shownNotifications()` (`src/testing/notifications.ts`) lists the ones on screen as `{ type, title, description, action }`, `action` being the label of its button, like Undo, which `clickNotificationAction(title)` clicks;
   - stories of a component that raises them add the `withNotificationArea` decorator and find the text in `<body>`. Notifications fade in, so wait for them with `waitFor(() => expect(...).toBeVisible())`.
 - **Every story is a test**:
   - It must render, its `play` function must pass, and the axe accessibility check must find no violations. That check is `a11y.test: 'error'` in `.storybook/preview.tsx`, run on the whole `<body>` so portaled dialogs are included.
@@ -314,6 +323,9 @@ Every feature logs what the user does and what the app does in response, followi
 | The volume slider is moved | `Set volume to <percent>%` |
 | The current page changes | `Changing to page "<page name>"`, the category's name in the menu |
 | A song is put back in the player when the app opens | `Restored song "<title>" at mm:ss.mmm` |
+| A playlist is opened with See | `Opened playlist "<title>"` |
+| A playlist is deleted | `Deleted playlist "<title>"` |
+| A deleted playlist comes back with Undo | `Restored playlist "<title>"` |
 | Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
 | The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |

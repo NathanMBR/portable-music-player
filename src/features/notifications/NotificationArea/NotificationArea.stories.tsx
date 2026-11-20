@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, waitFor, within } from 'storybook/test'
+import { expect, fn, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { PLAYER_HEIGHT } from '../../playback/constants'
 import { DISMISS_LABEL } from '../constants'
-import { notify, notifyError, notifySuccess } from '../notify'
+import { notify, notifyError, notifySuccess, notifyUndoable } from '../notify'
 import { NotificationArea } from './NotificationArea'
 
 const SAVE_ERROR =
@@ -47,6 +47,28 @@ export const Success: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body)
     await waitFor(() => expect(page.getByText('214 songs in the Songs folder')).toBeVisible())
+  }
+}
+
+const undo = fn()
+
+/**
+ * Something was just done, like a deleted playlist, with an Undo button at the right end that
+ * takes it back and closes the notification.
+ */
+export const Undoable: Story = {
+  beforeEach: () => {
+    notifyUndoable('"Road trip" deleted', undo)
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const undoButton = await page.findByRole('button', { name: 'Undo' })
+    await waitFor(() => expect(undoButton).toBeVisible())
+
+    await userEvent.click(undoButton)
+
+    await expect(undo).toHaveBeenCalledOnce()
+    await waitFor(() => expect(page.queryByText('"Road trip" deleted')).toBeNull())
   }
 }
 

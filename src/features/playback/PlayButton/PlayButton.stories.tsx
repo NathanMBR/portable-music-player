@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, fn } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
 import { usePlaybackStore } from '../playbackStore'
@@ -13,9 +13,23 @@ const otherTrack: Track = {
 }
 const queue = [track, otherTrack]
 
+/** The song in the player, playing. */
+const playingTheSong = () => {
+  usePlaybackStore.setState({
+    session: {
+      track,
+      queue,
+      playOrder: queue,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: null
+    }
+  })
+}
+
 const meta = {
   component: PlayButton,
-  args: { track, queue }
+  args: { track, onPlay: fn() }
 } satisfies Meta<typeof PlayButton>
 
 export default meta
@@ -34,18 +48,7 @@ export const Idle: Story = {
  */
 export const Playing: Story = {
   parameters: renderInOwnFrame(80),
-  beforeEach: () => {
-    usePlaybackStore.setState({
-      session: {
-        track,
-        queue,
-        playOrder: queue,
-        isPlaying: true,
-        elapsedSeconds: 0,
-        durationSeconds: null
-      }
-    })
-  },
+  beforeEach: playingTheSong,
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('button', { name: `Pause ${track.title}` })).toHaveAttribute(
       'aria-pressed',
@@ -54,21 +57,23 @@ export const Playing: Story = {
   }
 }
 
-/** Playing the song loads it in the audio player, with the list it's in as the queue. */
-export const PlaysWithItsListAsTheQueue: Story = {
-  parameters: renderInOwnFrame(80),
-  play: async ({ canvas, userEvent }) => {
+/** A song that isn't in the player plays the way its list says. */
+export const PlaysTheWayItsListSays: Story = {
+  play: async ({ args, canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: `Play ${track.title}` }))
 
-    await expect(usePlaybackStore.getState().session).toMatchObject({ track, queue })
+    await expect(args.onPlay).toHaveBeenCalledOnce()
   }
 }
 
-/** Clicking the button plays the song, clicking it again pauses it, and once more resumes it. */
+/**
+ * Clicking the song in the player pauses it, and once more resumes it, without playing it again
+ * from the start.
+ */
 export const PausesAndResumes: Story = {
   parameters: renderInOwnFrame(80),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole('button', { name: `Play ${track.title}` }))
+  beforeEach: playingTheSong,
+  play: async ({ args, canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: `Pause ${track.title}` }))
     await expect(usePlaybackStore.getState().session?.isPlaying).toBe(false)
     await expect(canvas.getByRole('button', { name: `Play ${track.title}` })).toHaveAttribute(
@@ -78,5 +83,14 @@ export const PausesAndResumes: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: `Play ${track.title}` }))
     await expect(canvas.getByRole('button', { name: `Pause ${track.title}` })).toBeVisible()
+    await expect(args.onPlay).not.toHaveBeenCalled()
+  }
+}
+
+/** A song that can't be played right now, like in a playlist whose songs aren't all found. */
+export const Disabled: Story = {
+  args: { isDisabled: true },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('button', { name: `Play ${track.title}` })).toBeDisabled()
   }
 }

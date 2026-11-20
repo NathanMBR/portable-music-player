@@ -8,6 +8,7 @@ import { NotificationArea } from './features/notifications/NotificationArea/Noti
 import { AudioPlayer } from './features/playback/AudioPlayer/AudioPlayer'
 import { PLAYER_HEIGHT } from './features/playback/constants'
 import { usePlaybackStore } from './features/playback/playbackStore'
+import { PlaylistsView } from './features/playlists/PlaylistsView/PlaylistsView'
 import { SettingsView } from './features/settings/SettingsView/SettingsView'
 import { SongDropDialog } from './features/songDrop/SongDropDialog/SongDropDialog'
 import { SongDropOverlay } from './features/songDrop/SongDropOverlay/SongDropOverlay'
@@ -16,6 +17,7 @@ import { SongDropOverlay } from './features/songDrop/SongDropOverlay/SongDropOve
 // switches between.
 const viewByCategory: Record<CategoryId, ComponentType> = {
   songs: LibraryView,
+  playlists: PlaylistsView,
   settings: SettingsView
 }
 

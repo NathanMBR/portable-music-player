@@ -1,3 +1,4 @@
+import { StatusLine } from '../../../components/StatusLine/StatusLine'
 import { describeLibraryStatus } from '../libraryStatus'
 import { useLibraryStore } from '../libraryStore'
 
@@ -13,11 +14,5 @@ export const LibraryStatus = () => {
   const lastScan = useLibraryStore(state => state.lastScan)
   const isScanning = useLibraryStore(state => state.isScanning)
 
-  // Always on the page, even empty: screen readers only announce changes to a live region that
-  // was already there.
-  return (
-    <p role="status" className="truncate pt-3 pb-1.5 text-sm text-ink-faded empty:p-0">
-      {describeLibraryStatus(lastScan, isScanning)}
-    </p>
-  )
+  return <StatusLine>{describeLibraryStatus(lastScan, isScanning)}</StatusLine>
 }

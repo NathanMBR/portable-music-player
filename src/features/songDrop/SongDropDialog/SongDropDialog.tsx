@@ -1,22 +1,14 @@
-import {
-  DataInteractive,
-  Description,
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
-  DialogTitle
-} from '@headlessui/react'
+import { DataInteractive, Description } from '@headlessui/react'
 import { ArrowPathIcon } from '@heroicons/react/20/solid'
 import { useState } from 'react'
 import { Button } from '../../../components/Button/Button'
+import { Modal, ModalButtons, ModalTitle } from '../../../components/Modal/Modal'
 import { formatSongCount } from '../../library/libraryStatus'
 import { type SongDropStep, useSongDropStore } from '../songDropStore'
 import { listTakenNames, summarizeTakenNames } from '../takenNames'
 import type { DroppedSongs } from '../types'
 
 type ShownStep = Exclude<SongDropStep, { kind: 'idle' }>
-
-const TITLE_CLASSES = 'text-base font-semibold text-ink'
 
 /** The step the dialog shows, which stays the last one while the dialog fades out after it. */
 const useShownStep = (step: SongDropStep) => {
@@ -29,7 +21,7 @@ const useShownStep = (step: SongDropStep) => {
 
 const BusyStep = ({ message }: { message: string }) => (
   <>
-    <DialogTitle className={TITLE_CLASSES}>Adding songs</DialogTitle>
+    <ModalTitle>Adding songs</ModalTitle>
     <div className="mt-4 flex items-center gap-3">
       <ArrowPathIcon className="size-5 shrink-0 text-pen motion-safe:animate-spin" />
       <Description aria-live="polite" className="text-sm text-ink-faded">
@@ -76,12 +68,12 @@ const TakenNamesQuestion = ({ droppedSongs }: { droppedSongs: DroppedSongs }) =>
 
   return (
     <>
-      <DialogTitle className={TITLE_CLASSES}>Replace songs with the same name?</DialogTitle>
+      <ModalTitle>Replace songs with the same name?</ModalTitle>
       <Description className="mt-2 text-sm text-ink-faded">
         {summarizeTakenNames(droppedSongs)}
       </Description>
       <TakenNamesList conflicts={droppedSongs.conflicts} />
-      <div className="mt-6 flex flex-wrap justify-end gap-2">
+      <ModalButtons>
         <Button variant="quiet" onClick={cancel}>
           Cancel
         </Button>
@@ -89,7 +81,7 @@ const TakenNamesQuestion = ({ droppedSongs }: { droppedSongs: DroppedSongs }) =>
           Replace them
         </Button>
         <Button onClick={() => void copyTakenNames('skip')}>Skip them</Button>
-      </div>
+      </ModalButtons>
     </>
   )
 }
@@ -123,19 +115,8 @@ export const SongDropDialog = () => {
   const shownStep = useShownStep(step)
 
   return (
-    <Dialog open={step.kind !== 'idle'} onClose={cancel} className="relative z-20">
-      <DialogBackdrop
-        transition
-        className="fixed inset-0 bg-shade/30 transition duration-200 ease-out data-closed:opacity-0 motion-reduce:transition-none"
-      />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel
-          transition
-          className="w-full max-w-md rounded-xl border border-rule bg-paper p-6 shadow-lg shadow-shade/15 transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 motion-reduce:transition-none"
-        >
-          {shownStep && <StepContent step={shownStep} />}
-        </DialogPanel>
-      </div>
-    </Dialog>
+    <Modal isOpen={step.kind !== 'idle'} onClose={cancel}>
+      {shownStep && <StepContent step={shownStep} />}
+    </Modal>
   )
 }

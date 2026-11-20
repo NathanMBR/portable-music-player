@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { shownNotifications } from '../../testing/notifications'
-import { notify, notifyError, notifySuccess } from './notify'
+import { describe, expect, it, vi } from 'vitest'
+import { clickNotificationAction, shownNotifications } from '../../testing/notifications'
+import { notify, notifyError, notifySuccess, notifyUndoable } from './notify'
 
 const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
@@ -39,5 +39,24 @@ describe('notifySuccess', () => {
     expect(shownNotifications()).toEqual([
       { type: 'success', title: 'Song list updated', description: '3 songs in the Songs folder' }
     ])
+  })
+})
+
+describe('notifyUndoable', () => {
+  it('shows what was just done, with an Undo button', () => {
+    notifyUndoable('"Road trip" deleted', vi.fn())
+
+    expect(shownNotifications()).toEqual([
+      { type: 'info', title: '"Road trip" deleted', description: undefined, action: 'Undo' }
+    ])
+  })
+
+  it('takes it back when Undo is clicked', () => {
+    const undo = vi.fn()
+    notifyUndoable('"Road trip" deleted', undo)
+
+    clickNotificationAction('"Road trip" deleted')
+
+    expect(undo).toHaveBeenCalledOnce()
   })
 })

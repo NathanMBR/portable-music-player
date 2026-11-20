@@ -1,4 +1,5 @@
 import { FolderIcon } from '@heroicons/react/20/solid'
+import { EmptyState } from '../../../components/EmptyState/EmptyState'
 import { SONGS_FOLDER_NAME } from '../constants'
 
 /**
@@ -9,13 +10,9 @@ import { SONGS_FOLDER_NAME } from '../constants'
  * @summary Notice for a Songs folder without songs
  */
 export const EmptyLibrary = () => (
-  <section className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-    <FolderIcon className="size-16 text-ink-faded" />
-    <h2 className="mt-4 text-2xl leading-tight font-extrabold tracking-tight text-ink font-stretch-expanded">
-      Your {SONGS_FOLDER_NAME} folder is empty
-    </h2>
-    <p className="mt-2 max-w-prose text-base text-ink-faded">
-      Copy .mp3 files into it, then scan again.
-    </p>
-  </section>
+  <EmptyState
+    icon={FolderIcon}
+    title={`Your ${SONGS_FOLDER_NAME} folder is empty`}
+    description="Copy .mp3 files into it, then scan again."
+  />
 )

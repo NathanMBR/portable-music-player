@@ -59,7 +59,8 @@ songs, to replace the songs already there, or to cancel.
 
 The **notification area** (`NotificationArea`) sits in the bottom-right corner, above everything,
 the side menu included. Notifications pop up there, close by themselves after a few seconds or
-earlier with their × button, and pause while hovered.
+earlier with their × button, and pause while hovered. Some say what was just done, like a deleted
+playlist, with an Undo button that takes it back.
 
 The **side menu** is an overlay drawer (`SideMenu`) opened by the menu button. It lists the
 categories from `src/features/navigation/categories.ts` and holds the theme toggle. Choosing a
@@ -67,7 +68,10 @@ category switches the view and closes the drawer. Adding a category takes one en
 and one view in `viewByCategory`.
 
 Every category's view is a `ViewLayout`: a `ViewHeader` with the category's icon and title stays in
-place while the content below it scrolls.
+place while the content below it scrolls. A page inside a category, like a playlist, has a back
+button in the icon's place. Below the header's rule, a `StatusLine` says something about the view,
+like how many songs it lists, and a view with nothing to list says so in its middle (`EmptyState`).
+Lists, of songs or of playlists, are rows between thin rules (`ListRow`), tinted under the mouse.
 
 **Songs** (`LibraryView`) has a header, and below its rule the song count (`LibraryStatus`), then
 the song list, a folder in the middle of the view saying the Songs folder is empty (`EmptyLibrary`),
@@ -80,6 +84,18 @@ than You · Metallica". The row under the mouse is tinted, and the song in the p
 paused, has its row on a pen tint with its title and artist in pen, like the current category in
 the menu. The songs are sorted as the Settings view says: by title, the default, or by filename.
 
+**Playlists** (`PlaylistsView`) lists the playlists of the `Playlists` folder, sorted by title
+(`PlaylistsOverview`), or, without any, says so in the middle of the view. Each row
+(`PlaylistRow`) has a play button, then the playlist's title and description, and at its right end
+See, which opens the playlist, and Delete, which asks first (`ConfirmDialog`), then notifies with
+an Undo. Playing a playlist first has Rust look for its songs in the `Songs` folder: if some are
+missing, nothing plays, a notification says how many, and its file remembers it. Until a Recheck
+(`RecheckButton`) finds them all, a red alert follows its title (`AlertMark`) and its plays are
+disabled. An open playlist (`PlaylistPage`) has its title in the header, with a back button, a
+large play button that starts from its first song, and its songs below, each with its own play
+button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. The open
+playlist stays open while other pages are on screen.
+
 **Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default
 (nothing searches yet: only the choice is saved), and a choice to sort the songs by filename or by
 title (`Select`). Each option is a card (`SettingCard`), its label at the left and its control at
@@ -88,8 +104,9 @@ still applies and a notification says why.
 
 ## Where the code lives
 
-- `src/components/`: feature-agnostic building blocks (`Button`, `IconButton`, `Notice`,
-  `Select`, `Slider`, `Switch`, `ViewHeader`, `ViewLayout`),
+- `src/components/`: feature-agnostic building blocks (`AlertMark`, `Button`, `ConfirmDialog`,
+  `EmptyState`, `IconButton`, `ListRow`, `Modal`, `Notice`, `Select`, `Slider`, `StatusLine`,
+  `Switch`, `Tooltip`, `ViewHeader`, `ViewLayout`),
   built on Headless UI and styled with Tailwind, each in a folder of its own with its stories.
   `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
   `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
@@ -103,7 +120,7 @@ still applies and a notification says why.
 
 A component reads its state from a Zustand store and calls the store's actions. The store calls its
 feature's `*Api.ts`, which uses Tauri's `invoke()` to run a Rust command. The Rust commands read
-and write the `Songs` folder and the `.json` files next to the executable, so everything stays on the
+and write the `Songs` and `Playlists` folders and the `.json` files next to the executable, so everything stays on the
 flash drive.
 
 The library scan reads each song's tags in Rust, and only its tags, since the drive may be slow. A

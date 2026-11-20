@@ -1,22 +1,6 @@
-import { DataInteractive } from '@headlessui/react'
-import { ACTIVE_CLASSES } from '../../../components/buttonStyles'
-import { PlayButton } from '../../playback/PlayButton/PlayButton'
 import { usePlaybackStore } from '../../playback/playbackStore'
-import { CoverThumbnail } from '../CoverThumbnail/CoverThumbnail'
-import { fullTrackName, TITLE_ARTIST_SEPARATOR } from '../trackName'
+import { TrackRow } from '../TrackRow/TrackRow'
 import type { Track } from '../types'
-
-// The right padding matches the play button's own, so a cut title ends as far from the edge of a
-// highlighted row as the button's icon starts.
-const ROW_CLASSES = 'flex items-center gap-2 border-b border-rule py-1.5 pr-2 first:border-t'
-
-// Highlighted like the menu's categories: the current one is on, the others tint under the pointer.
-const SONG_IN_PLAYER_CLASSES = ACTIVE_CLASSES
-const OTHER_SONG_CLASSES = 'data-hover:bg-rule/60'
-
-// On the pen tint of the song in the player, the artist's faded ink falls below a readable
-// contrast, so the artist takes the row's pen there.
-const artistClassesFor = (isInPlayer: boolean) => (isInPlayer ? undefined : 'text-ink-faded')
 
 type TrackListProps = {
   /** The songs to list, in the order given (the Songs view sorts them as the settings ask). */
@@ -37,33 +21,13 @@ type TrackListProps = {
  * @summary List of songs
  */
 export const TrackList = ({ tracks }: TrackListProps) => {
-  const pathInPlayer = usePlaybackStore(state => state.session?.track.path)
+  const playTrack = usePlaybackStore(state => state.playTrack)
 
   return (
     <ul aria-label="Songs" className="pb-8">
-      {tracks.map(track => {
-        const isInPlayer = track.path === pathInPlayer
-        return (
-          <DataInteractive
-            as="li"
-            key={track.path}
-            aria-current={isInPlayer || undefined}
-            className={`${ROW_CLASSES} ${isInPlayer ? SONG_IN_PLAYER_CLASSES : OTHER_SONG_CLASSES}`}
-          >
-            <PlayButton track={track} queue={tracks} />
-            <CoverThumbnail path={track.path} />
-            <span title={fullTrackName(track)} className="truncate font-stretch-semi-condensed">
-              {track.title}
-              {track.artist && (
-                <span className={artistClassesFor(isInPlayer)}>
-                  {TITLE_ARTIST_SEPARATOR}
-                  {track.artist}
-                </span>
-              )}
-            </span>
-          </DataInteractive>
-        )
-      })}
+      {tracks.map(track => (
+        <TrackRow key={track.path} track={track} onPlay={() => playTrack(track, tracks)} />
+      ))}
     </ul>
   )
 }

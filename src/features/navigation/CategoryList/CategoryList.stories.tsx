@@ -20,11 +20,13 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Every category, each with its icon: Songs, then Settings. The current one, Songs at launch, is
- * highlighted and announced as the current page.
+ * Every category, each with its icon: Songs, Playlists, then Settings. The current one, Songs at
+ * launch, is highlighted and announced as the current page.
  */
 export const Default: Story = {
   play: async ({ canvas }) => {
+    const names = canvas.getAllByRole('button').map(button => button.textContent)
+    await expect(names).toEqual(['Songs', 'Playlists', 'Settings'])
     await expect(canvas.getByRole('button', { name: 'Songs' })).toHaveAttribute(
       'aria-current',
       'page'

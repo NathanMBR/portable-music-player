@@ -4,6 +4,7 @@ import { useCoverStore } from '../features/library/coverStore'
 import { useLibraryStore } from '../features/library/libraryStore'
 import { useNavigationStore } from '../features/navigation/navigationStore'
 import { usePlaybackStore } from '../features/playback/playbackStore'
+import { usePlaylistsStore } from '../features/playlists/playlistsStore'
 import { useSettingsStore } from '../features/settings/settingsStore'
 import { useSongDropStore } from '../features/songDrop/songDropStore'
 import { forgetLoggedMessages } from './logs'
@@ -20,6 +21,7 @@ export const resetStores = () => {
   resetStore(useLibraryStore)
   resetStore(useNavigationStore)
   resetStore(usePlaybackStore)
+  resetStore(usePlaylistsStore)
   resetStore(useSettingsStore)
   resetStore(useSongDropStore)
   toast.dismiss()

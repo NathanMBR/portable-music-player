@@ -8,6 +8,7 @@ import { connectMediaSession } from './features/playback/mediaSession'
 import { connectPlaybackMemory, restorePlayback } from './features/playback/playbackMemory'
 import { connectSongAudio } from './features/playback/songAudio'
 import { connectWindowTitle } from './features/playback/windowTitle'
+import { usePlaylistsStore } from './features/playlists/playlistsStore'
 import { useSettingsStore } from './features/settings/settingsStore'
 import { connectSongDrop } from './features/songDrop/songDropEvents'
 import './index.css'
@@ -15,6 +16,8 @@ import './index.css'
 // Runs once per launch; a mount effect would run twice in development under StrictMode.
 const settingsLoaded = useSettingsStore.getState().restoreSettings()
 const libraryScanned = useLibraryStore.getState().scanLibrary()
+// Scans never list them again: whether their songs are all there is checked when they're played.
+void usePlaylistsStore.getState().loadPlaylists()
 connectSongAudio(new Audio())
 connectWindowTitle()
 connectMediaSession()

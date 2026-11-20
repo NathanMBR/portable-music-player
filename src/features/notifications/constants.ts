@@ -3,6 +3,9 @@ export const NOTIFICATION_DURATION_MS = 8000
 
 export const DISMISS_LABEL = 'Dismiss notification'
 
+// The button of a notification that takes back what was just done.
+export const UNDO_LABEL = 'Undo'
+
 // Sonner's own gaps between the notifications and the window's edges, kept on top of a bottom
 // clearance. The narrow one applies to windows up to 600px wide.
 export const WINDOW_EDGE_GAP = '24px'

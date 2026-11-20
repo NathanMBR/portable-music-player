@@ -1,4 +1,3 @@
-import { MAX_LISTED_TAKEN_NAMES } from './constants'
 import type { DroppedSongs } from './types'
 
 const whatTheyWouldReplace = (takenCount: number) =>
@@ -20,14 +19,5 @@ export const summarizeTakenNames = ({ songCount, conflicts }: DroppedSongs) => {
   return `All ${songCount.toLocaleString()} dropped songs would replace ${replaced}:`
 }
 
-/**
- * The taken file names the dialog lists, each once even when two dropped songs share it, up to
- * `MAX_LISTED_TAKEN_NAMES`, and how many more there are.
- */
-export const listTakenNames = (conflicts: string[]) => {
-  const names = [...new Set(conflicts)]
-  return {
-    listedNames: names.slice(0, MAX_LISTED_TAKEN_NAMES),
-    unlistedCount: Math.max(0, names.length - MAX_LISTED_TAKEN_NAMES)
-  }
-}
+/** The taken file names the dialog lists, each once even when two dropped songs share it. */
+export const listTakenNames = (conflicts: string[]) => [...new Set(conflicts)]

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_LISTED_TAKEN_NAMES } from './constants'
 import { listTakenNames, summarizeTakenNames } from './takenNames'
 
 describe('summarizeTakenNames', () => {
@@ -36,26 +35,24 @@ describe('summarizeTakenNames', () => {
 
 describe('listTakenNames', () => {
   it('lists each taken name once, even when two dropped songs share it', () => {
-    expect(listTakenNames(['More.mp3', 'Bad Seed.mp3', 'More.mp3'])).toEqual({
-      listedNames: ['More.mp3', 'Bad Seed.mp3'],
-      unlistedCount: 0
-    })
+    expect(listTakenNames(['More.mp3', 'Bad Seed.mp3', 'More.mp3'])).toEqual([
+      'More.mp3',
+      'Bad Seed.mp3'
+    ])
   })
 
-  it('lists the first names only, counting the others', () => {
+  it('lists every taken name, however many there are', () => {
     const conflicts = [
-      'Deer Dance.mp3',
-      'Soldier Side.mp3',
-      'Sprouts of Time.mp3',
-      'Somedays.mp3',
-      'The Rage of the Waters.mp3',
-      'Metal Icarus.mp3',
-      'Bad Seed.mp3'
+      'Wherever I May Roam.mp3',
+      'Over Your Head.mp3',
+      'Until It Sleeps.mp3',
+      'Ego Brain.mp3',
+      'Iron Soul.mp3',
+      'Deep Blue.mp3',
+      "Bring 'Em Back Alive.mp3",
+      'Your Time Has Come.mp3'
     ]
 
-    expect(listTakenNames(conflicts)).toEqual({
-      listedNames: conflicts.slice(0, MAX_LISTED_TAKEN_NAMES),
-      unlistedCount: conflicts.length - MAX_LISTED_TAKEN_NAMES
-    })
+    expect(listTakenNames(conflicts)).toEqual(conflicts)
   })
 })

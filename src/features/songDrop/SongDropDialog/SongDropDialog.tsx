@@ -1,4 +1,11 @@
-import { Description, Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
+import {
+  DataInteractive,
+  Description,
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle
+} from '@headlessui/react'
 import { ArrowPathIcon } from '@heroicons/react/20/solid'
 import { useState } from 'react'
 import { Button } from '../../../components/Button/Button'
@@ -32,19 +39,36 @@ const BusyStep = ({ message }: { message: string }) => (
   </>
 )
 
-const TakenNamesList = ({ conflicts }: { conflicts: string[] }) => {
-  const { listedNames, unlistedCount } = listTakenNames(conflicts)
-  return (
-    <ul className="mt-3 rounded-md border border-rule px-3 py-2 text-sm text-ink">
-      {listedNames.map(name => (
+// The box keeps the scrollbar off its border: as far from its top as from its bottom, so the
+// scrollbar's usual space at the bottom is dropped, and a little from its right side.
+const TAKEN_NAMES_BOX_CLASSES = 'mt-3 rounded-md border border-rule py-2 pr-1'
+
+// The list in the box has the focus, but the ring goes around the box, like FOCUS_CLASSES' ring.
+const BOX_FOCUS_CLASSES =
+  'has-data-focus:outline-2 has-data-focus:outline-solid has-data-focus:outline-offset-2 has-data-focus:outline-pen'
+
+// Room for six names and part of a seventh, so a longer list shows it scrolls, even in a small
+// window.
+const TAKEN_NAMES_LIST_CLASSES =
+  'max-h-40 overflow-y-auto px-3 text-sm text-ink outline-none [&::-webkit-scrollbar-track]:mb-0'
+
+// Focusable, since WebKitGTK scrolls a box from the keyboard only while it has the focus.
+const TakenNamesList = ({ conflicts }: { conflicts: string[] }) => (
+  <div className={`${TAKEN_NAMES_BOX_CLASSES} ${BOX_FOCUS_CLASSES}`}>
+    <DataInteractive
+      as="ul"
+      aria-label="Songs with the same name"
+      tabIndex={0}
+      className={TAKEN_NAMES_LIST_CLASSES}
+    >
+      {listTakenNames(conflicts).map(name => (
         <li key={name} className="truncate py-0.5">
           {name}
         </li>
       ))}
-      {unlistedCount > 0 && <li className="py-0.5 text-ink-faded">and {unlistedCount} more</li>}
-    </ul>
-  )
-}
+    </DataInteractive>
+  </div>
+)
 
 const TakenNamesQuestion = ({ droppedSongs }: { droppedSongs: DroppedSongs }) => {
   const copyTakenNames = useSongDropStore(state => state.copyTakenNames)
@@ -86,9 +110,10 @@ const StepContent = ({ step }: { step: ShownStep }) => {
 /**
  * Modal dialog over a dimmed page while the songs of a drop are added: a loader while they're
  * looked for, then while they're copied and the Songs folder is scanned again. When file names of
- * the drop are taken, it first asks what to do with those songs, naming a few: skip them, replace
- * the songs already there, or cancel, which copies nothing. Escape and a click outside cancel only
- * that question: songs being copied can't be stopped.
+ * the drop are taken, it first asks what to do with those songs, listing them all in a box that
+ * scrolls when they're many: skip them, replace the songs already there, or cancel, which copies
+ * nothing. Escape and a click outside cancel only that question: songs being copied can't be
+ * stopped.
  *
  * @summary Dialog adding dropped songs, asking about taken file names
  */

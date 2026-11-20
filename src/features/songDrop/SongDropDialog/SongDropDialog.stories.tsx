@@ -20,6 +20,25 @@ const TWO_NAMES_TAKEN: DroppedSongs = {
   failures: []
 }
 
+// The border of the box listing the taken names.
+const BOX_BORDER_PX = 1
+
+// More than the dialog has room for.
+const MANY_TAKEN_NAMES = [
+  'Sad Statue.mp3',
+  'Rebirth.mp3',
+  'Forest.mp3',
+  'Generation Warriors.mp3',
+  'Disposable Heroes.mp3',
+  'Wide Awake.mp3',
+  'Drown Me Slowly.mp3',
+  'Evil Warning.mp3',
+  'Cochise.mp3',
+  'The Last Remaining Light.mp3',
+  'Yesterday to Tomorrow.mp3',
+  'Unholy Wars.mp3'
+]
+
 const TRACKS: Track[] = [
   { path: 'Songs/More.mp3', title: 'More', artist: 'Shaman' },
   { path: 'Songs/Hypnotize.mp3', title: 'Hypnotize', artist: 'Audioslave' },
@@ -104,26 +123,33 @@ export const AskingAboutTakenNames: Story = {
   }
 }
 
-/** With many taken names, it names a few and counts the others. */
+/**
+ * With more taken names than the dialog has room for, it lists them all in a box that scrolls, its
+ * scrollbar kept off the box's border. The first Tab focuses the list, so the arrow keys scroll it
+ * too.
+ */
 export const ManyTakenNames: Story = {
-  beforeEach: () =>
-    askAbout({
-      songCount: 7,
-      conflicts: [
-        'More.mp3',
-        'Hypnotize.mp3',
-        'Fade to Black.mp3',
-        'No Remorse.mp3',
-        'Dandelion.mp3',
-        'Never Understand.mp3',
-        'Gate XIII.mp3'
-      ],
-      failures: []
-    }),
-  play: async ({ canvasElement }) => {
+  beforeEach: () => askAbout({ songCount: 15, conflicts: MANY_TAKEN_NAMES, failures: [] }),
+  play: async ({ canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await expect(await page.findByText('and 2 more')).toBeVisible()
-    await expect(page.queryByText('Never Understand.mp3')).not.toBeInTheDocument()
+    const list = await page.findByRole('list', { name: 'Songs with the same name' })
+    const listedNames = within(list)
+      .getAllByRole('listitem')
+      .map(item => item.textContent)
+    await expect(listedNames).toEqual(MANY_TAKEN_NAMES)
+    await expect(list.scrollHeight).toBeGreaterThan(list.clientHeight)
+    // The scrollbar runs the height of the list: as far from the box's top as from its bottom, and
+    // a little away from its right side.
+    const box = list.parentElement as HTMLElement
+    const boxArea = box.getBoundingClientRect()
+    const scrollArea = list.getBoundingClientRect()
+    await expect(scrollArea.top - boxArea.top).toBeCloseTo(boxArea.bottom - scrollArea.bottom)
+    await expect(boxArea.right - scrollArea.right).toBeGreaterThan(BOX_BORDER_PX)
+
+    await userEvent.tab()
+    await expect(list).toHaveFocus()
+    // The focus ring goes around the whole box, border included.
+    await expect(getComputedStyle(box).outlineStyle).toBe('solid')
   }
 }
 

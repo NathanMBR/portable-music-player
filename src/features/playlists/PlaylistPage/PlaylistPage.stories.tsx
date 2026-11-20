@@ -72,9 +72,11 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('heading', { level: 1, name: 'Workout' })).toBeVisible()
-    await expect(canvas.getByRole('status')).toHaveTextContent('3 songs · Fast songs only')
+    // The list of songs has a live region of its own, for screen readers to hear songs move.
+    await expect(canvas.getByText('3 songs · Fast songs only')).toBeVisible()
     const songs = within(canvas.getByRole('list', { name: 'Songs of Workout' }))
-    await expect(songs.getAllByRole('button').map(button => button.ariaLabel)).toEqual([
+    const plays = songs.getAllByRole('button', { name: /^Play / })
+    await expect(plays.map(button => button.getAttribute('aria-label'))).toEqual([
       'Play Battery',
       'Play Where I Live',
       'Play 2 X 4'
@@ -86,7 +88,7 @@ export const Default: Story = {
 export const WithoutDescription: Story = {
   args: { playlist: { ...workout, description: '' } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('status')).toHaveTextContent(/^3 songs$/)
+    await expect(canvas.getByText('3 songs')).toBeVisible()
   }
 }
 

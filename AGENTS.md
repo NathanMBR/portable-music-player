@@ -54,7 +54,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
   - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
   - pages: the navigation store logs them when the category changes;
-  - playlists: the playlists store logs one opened, deleted or brought back;
+  - playlists: the playlists store logs one created, opened, deleted or brought back, and a song moved, removed or put back;
   - drops: the song drop store logs the songs a drop holds and the songs it copied;
   - Rust logs the app's opening and closing (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
@@ -77,8 +77,8 @@ src/
   compareNames.ts       compares names for sorting the same way on every computer (songs, playlists)
   components/           feature-agnostic UI built on Headless UI
     <Component>/        one folder per component (AlertMark, Button, Checkbox, ConfirmDialog, EmptyState,
-                        IconButton, ListRow, Modal, Notice, Select, Slider, StatusLine, Switch, TextField,
-                        Tooltip, ViewHeader, ViewLayout): <Component>.tsx
+                        IconButton, ListRow, Modal, Notice, Select, Slider, SortableList, StatusLine,
+                        Switch, TextField, Tooltip, ViewHeader, ViewLayout): <Component>.tsx
                         and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
   features/<feature>/   everything one feature owns
@@ -137,7 +137,7 @@ src/
   - Before loading a song, `songAudio.ts` checks `canPlayType('audio/mpeg')` and, if it's empty, notifies what to install instead. WebKitGTK freezes the whole app, with no `error` event, as soon as it gets a source that GStreamer lacks the plugins (`appsink`, `autoaudiosink`, an MP3 decoder) to play.
 - Song drop: files and folders dropped anywhere on the window add their songs to the Songs folder (`src/features/songDrop/`).
   - `songDropEvents.ts`, connected once from `main.tsx`, follows Tauri's drag events (`getCurrentWebview().onDragDropEvent`). While a drag holding files is over the window, `SongDropOverlay` fades in, blurs the whole page behind frosted glass (`backdrop-blur`) and covers it with a dashed box saying "Drop files here", its dashes marching clockwise (`animate-march`; the border is an SVG stroke, since CSS can't move a border's dashes); a drag without files, like a selected text, shows nothing. An app only learns of a drag once it enters its window: Windows and Wayland tell no other app, so the box can't show any earlier.
-  - Tauri's `dragDropEnabled` is on by default, and on Windows its drop handling replaces WebView2's, so the page gets no HTML5 drag and drop events: dragging within the page, like reordering songs, would need pointer events.
+  - Tauri's `dragDropEnabled` is on by default, and on Windows its drop handling replaces WebView2's, so the page gets no HTML5 drag and drop events: dragging within the page, like reordering a playlist's songs, goes through pointer events (`SortableList`, on dnd-kit).
   - The drop's paths, absolute as the OS gives them, go straight back to Rust (`song_drop.rs`), which copies only the MP3s among them, and only into the Songs folder.
   - `songDropStore.ts` takes a drop through the steps `SongDropDialog` shows: `check_dropped_songs` counts the MP3s of the drop, subfolders included, and names those whose file name is taken; if any is, the dialog lists them all, in a box that scrolls when they're many, and asks to skip them, replace the songs already there, or cancel; `copy_dropped_songs` copies them flat into the Songs folder; then the Songs folder is scanned again, once any scan already running ends, and that rescan notifies. The dialog stays open, with a loader, until the rescan ends. A drop without songs notifies instead, and a drop while another is added is ignored.
 - Playlists: the Playlists view (`PlaylistsView`) shows the list of playlists (`PlaylistsOverview`), sorted by title with `compareNames` and no setting to change it, or the one opened with See (`PlaylistPage`). The playlists store keeps the open one (`shownPlaylist`), so it stays open while other pages are on screen.
@@ -145,6 +145,9 @@ src/
   - `allSongsFound` is what the file says: Rust works it out only when a playlist is created, saved or checked (see `playlists.rs`). Playing a playlist, from its row, its page's large play button or one of its songs, calls `check_playlist` first: if songs are missing, nothing plays, `notifyError` says how many, and the store takes the playlist as Rust rewrote it. While it's false, every play button of the playlist is disabled, and a Recheck button (`RecheckButton`) shows on its row and in its page's header.
   - The songs are matched to the last scan by file name, ignoring case like FAT and NTFS (`playlistSongs.ts`). A playlist plays the songs the scan has, in its order, and a song the scan lacks is listed under its file name in `ink-faded`, with an alert where its play button would be.
   - Delete asks first (`ConfirmDialog`, on `Modal`, like the song drop's dialog), and `notifyUndoable`'s Undo writes the file again under its old name, with its old contents (`create_playlist`).
+  - A playlist's songs (`PlaylistSongList`) are reordered by dragging their Move handle, with the pointer or from the keyboard (`SortableList`, `src/components/`): dnd-kit (`@dnd-kit/core`, `@dnd-kit/sortable`) works on pointer and keyboard events, which the webviews still send while Tauri takes the window's drag and drop. The handle isn't a `<button>`, so `buttonLog.ts` logs no click for it; the store logs the move. A move shows at once, then `save_playlist` writes the file, which works `allSongsFound` out again; a failed save notifies and keeps the new order on screen.
+  - Remove asks first too, then `save_playlist` writes the playlist without the song, which stays in the Songs folder, and `notifyUndoable`'s Undo puts it back at its old place, or at the end of a playlist that got shorter since. Missing songs move and go like the others.
+  - dnd-kit renders its live region inline, a second `role="status"` beside the page's status line, so stories of a page with a sortable list find the status line by its text.
   - A round + button (`NewPlaylistButton`), rendered from `App.tsx` outside the views so it can slide out when the page changes, floats in the bottom-right corner only while the list of playlists is on screen (`useIsNewPlaylistButtonShown`). It slides and fades like Sonner's notifications (400ms `ease`), rides above the player with the player's slide (300ms ease-out), and keeps its room below the notifications (`NEW_PLAYLIST_BUTTON_CLEARANCE`). The list's bottom padding lets its last row scroll clear of it.
   - It opens `NewPlaylistDialog`: a required title (at most `MAX_TITLE_LENGTH`), a description, and the scanned songs in the Songs view's order (`useSortedTracks`), each with a `Checkbox`. The search (`songSearch.ts`) matches title, artist and file name, with case and accents folded on both sides (`plainText.ts`); picked songs stay picked while it hides them, and are saved in the list's order. The form lives inside the dialog's panel, which Headless UI unmounts once it closes, so each opening starts empty. It doesn't submit on Enter, which would save from the search box. A failed save keeps it open.
   - The file name is `<Date.now()>-<title>.json` (`playlistFileName.ts`): the title with its accents folded, keeping only `A-Z`, `a-z`, `0-9` and spaces, trimmed, spaces turned into `_`, or `playlist` when nothing is left, as for a title in another script. Rust checks the same pattern.
@@ -330,6 +333,9 @@ Every feature logs what the user does and what the app does in response, followi
 | A playlist is opened with See | `Opened playlist "<title>"` |
 | A playlist is deleted | `Deleted playlist "<title>"` |
 | A deleted playlist comes back with Undo | `Restored playlist "<title>"` |
+| A song of a playlist is moved | `Moved song "<song title>" to position <n> in playlist "<title>"`, counted from 1 |
+| A song is removed from a playlist | `Removed song "<song title>" from playlist "<title>"` |
+| A removed song comes back with Undo | `Put song "<song title>" back in playlist "<title>"` |
 | Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
 | The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |

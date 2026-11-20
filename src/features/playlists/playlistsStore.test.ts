@@ -38,6 +38,11 @@ const calmEvening: SavedPlaylist = {
   songs: ['Viderunt Te Aquae.mp3']
 }
 
+const withoutBlackened: SavedPlaylist = {
+  ...roadTrip,
+  songs: ['Make Believe.mp3', 'Sad Statue.mp3']
+}
+
 const LIST_ERROR =
   "Couldn't read the Playlists folder at /media/usb/Playlists: Input/output error (os error 5)"
 const MISSING_ERROR =
@@ -386,5 +391,197 @@ describe('Undo of a deleted playlist', () => {
       ])
     )
     expect(playlists().playlists).toEqual([])
+  })
+})
+
+describe('moveSong', () => {
+  it('saves the playlist with the song at its new place', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    const savePlaylist = vi.fn((_args?: InvokeArgs) => ({
+      ...roadTrip,
+      songs: ['Blackened.mp3', 'Sad Statue.mp3', 'Make Believe.mp3']
+    }))
+    mockCommands({ save_playlist: savePlaylist })
+
+    await playlists().moveSong(roadTrip.fileName, 0, 2)
+
+    expect(savePlaylist).toHaveBeenCalledWith({
+      fileName: roadTrip.fileName,
+      playlist: {
+        title: roadTrip.title,
+        description: roadTrip.description,
+        songs: ['Blackened.mp3', 'Sad Statue.mp3', 'Make Believe.mp3']
+      }
+    })
+    expect(loggedMessages()).toEqual([
+      'Moved song "Make Believe" to position 3 in playlist "Road trip"'
+    ])
+  })
+
+  it('shows the new order at once, before Rust answers', () => {
+    listed(roadTrip)
+    mockCommands({ save_playlist: () => new Promise(() => undefined) })
+
+    void playlists().moveSong(roadTrip.fileName, 2, 0)
+
+    expect(playlists().playlists[0]?.songs).toEqual([
+      'Sad Statue.mp3',
+      'Make Believe.mp3',
+      'Blackened.mp3'
+    ])
+  })
+
+  it('takes the playlist as Rust saved it, songs found or not', async () => {
+    listed(roadTrip)
+    const saved = {
+      ...roadTrip,
+      allSongsFound: false,
+      songs: ['Blackened.mp3', 'Make Believe.mp3', 'Sad Statue.mp3']
+    }
+    mockCommands({ save_playlist: () => saved })
+
+    await playlists().moveSong(roadTrip.fileName, 1, 0)
+
+    expect(playlists().playlists).toEqual([saved])
+  })
+
+  it("keeps the new order on screen when it can't be saved, and says why", async () => {
+    listed(roadTrip)
+    mockCommands({ save_playlist: failingCommand(MISSING_ERROR) })
+
+    await playlists().moveSong(roadTrip.fileName, 0, 1)
+
+    expect(playlists().playlists[0]?.songs).toEqual([
+      'Blackened.mp3',
+      'Make Believe.mp3',
+      'Sad Statue.mp3'
+    ])
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: `Couldn't save "Road trip"`, description: MISSING_ERROR }
+    ])
+  })
+})
+
+describe('removeSong', () => {
+  it('saves the playlist without the song, and logs it', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    const savePlaylist = vi.fn((_args?: InvokeArgs) => withoutBlackened)
+    mockCommands({ save_playlist: savePlaylist })
+
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+
+    expect(savePlaylist).toHaveBeenCalledWith({
+      fileName: roadTrip.fileName,
+      playlist: {
+        title: roadTrip.title,
+        description: roadTrip.description,
+        songs: withoutBlackened.songs
+      }
+    })
+    expect(playlists().playlists).toEqual([withoutBlackened])
+    expect(loggedMessages()).toEqual(['Removed song "Blackened" from playlist "Road trip"'])
+  })
+
+  it('says it was removed, with an Undo button', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCommands({ save_playlist: () => withoutBlackened })
+
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+
+    expect(shownNotifications()).toEqual([
+      {
+        type: 'info',
+        title: '"Blackened" removed from "Road trip"',
+        description: undefined,
+        action: 'Undo'
+      }
+    ])
+  })
+
+  it('names a song the last scan lacks by its file name', async () => {
+    listed({ ...roadTrip, songs: ['Make Believe.mp3', '02 Blackened.mp3', 'Sad Statue.mp3'] })
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCommands({ save_playlist: () => withoutBlackened })
+
+    await playlists().removeSong(roadTrip.fileName, '02 Blackened.mp3')
+
+    expect(loggedMessages()).toEqual(['Removed song "02 Blackened" from playlist "Road trip"'])
+  })
+
+  it("keeps the song when the playlist can't be saved, and says why", async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCommands({ save_playlist: failingCommand(MISSING_ERROR) })
+
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+
+    expect(playlists().playlists).toEqual([roadTrip])
+    expect(shownNotifications()).toEqual([
+      {
+        type: 'error',
+        title: `Couldn't remove "Blackened" from "Road trip"`,
+        description: MISSING_ERROR
+      }
+    ])
+  })
+})
+
+describe('Undo of a removed song', () => {
+  it('puts the song back where it was', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    const savePlaylist = vi.fn((args?: InvokeArgs) => {
+      const { playlist } = args as { playlist: { songs: string[] } }
+      return { ...roadTrip, songs: playlist.songs }
+    })
+    mockCommands({ save_playlist: savePlaylist })
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+
+    clickNotificationAction('"Blackened" removed from "Road trip"')
+
+    await vi.waitFor(() => expect(playlists().playlists).toEqual([roadTrip]))
+    expect(loggedMessages()).toEqual([
+      'Removed song "Blackened" from playlist "Road trip"',
+      'Put song "Blackened" back in playlist "Road trip"'
+    ])
+  })
+
+  it("notifies when the song can't be put back", async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCommands({ save_playlist: () => withoutBlackened })
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+    mockCommands({ save_playlist: failingCommand(MISSING_ERROR) })
+
+    clickNotificationAction('"Blackened" removed from "Road trip"')
+
+    await vi.waitFor(() =>
+      expect(shownNotifications()).toEqual([
+        {
+          type: 'error',
+          title: `Couldn't put "Blackened" back in "Road trip"`,
+          description: MISSING_ERROR
+        }
+      ])
+    )
+  })
+
+  it('notifies when the playlist was deleted since', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCommands({ save_playlist: () => withoutBlackened, delete_playlist: () => undefined })
+    await playlists().removeSong(roadTrip.fileName, 'Blackened.mp3')
+    await playlists().deletePlaylist(roadTrip.fileName)
+
+    clickNotificationAction('"Blackened" removed from "Road trip"')
+
+    expect(shownNotifications()).toContainEqual({
+      type: 'error',
+      title: `Couldn't put "Blackened" back in "Road trip"`,
+      description: 'The playlist was deleted.'
+    })
   })
 })

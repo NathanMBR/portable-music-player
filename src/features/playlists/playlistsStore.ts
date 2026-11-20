@@ -1,3 +1,4 @@
+import { arrayMove } from '@dnd-kit/sortable'
 import { create } from 'zustand'
 import { compareNames } from '../../compareNames'
 import { formatSongCount } from '../library/libraryStatus'
@@ -6,12 +7,13 @@ import { log } from '../logging/log'
 import { notifyError, notifySuccess, notifyUndoable } from '../notifications/notify'
 import { usePlaybackStore } from '../playback/playbackStore'
 import { playlistFileName } from './playlistFileName'
-import { findPlaylistSongs, playableTracksOf } from './playlistSongs'
+import { findPlaylistSongs, playableTracksOf, songNameOf } from './playlistSongs'
 import {
   checkPlaylistSongs,
   createPlaylistFile,
   deletePlaylistFile,
-  listPlaylists
+  listPlaylists,
+  savePlaylistFile
 } from './playlistsApi'
 import type { PlaylistCheck, PlaylistContents, SavedPlaylist } from './types'
 
@@ -41,6 +43,10 @@ type PlaylistsStore = {
   recheckPlaylist: (fileName: string) => Promise<void>
   /** Deletes the playlist's file, which the notification's Undo writes again. */
   deletePlaylist: (fileName: string) => Promise<void>
+  /** Moves a song from one place to another, at once on screen, then saves the playlist. */
+  moveSong: (fileName: string, from: number, to: number) => Promise<void>
+  /** Takes a song out of the playlist, never out of the Songs folder; Undo puts it back. */
+  removeSong: (fileName: string, songFileName: string) => Promise<void>
 }
 
 const NOT_SCANNED_YET = "Its songs aren't in the song list yet: scan the Songs folder again."
@@ -60,6 +66,12 @@ const describeMissingSongs = (missingCount: number) =>
 const scannedTracks = () => {
   const { lastScan } = useLibraryStore.getState()
   return lastScan?.kind === 'loaded' ? lastScan.tracks : []
+}
+
+/** A song of a playlist by its title, or by its file name when the last scan lacks it. */
+const nameOfSong = (songFileName: string) => {
+  const [song] = findPlaylistSongs([songFileName], scannedTracks())
+  return song ? songNameOf(song) : songFileName
 }
 
 /** Plays the songs of a playlist the last scan found, in its order, from `fromSong` or the first. */
@@ -102,6 +114,32 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
     } catch (error) {
       notifyError(failureTitle, error)
       return null
+    }
+  }
+
+  // A save may rewrite the file's allSongsFound, so the store takes the playlist it answers.
+  const saveSongs = async (playlist: SavedPlaylist, songs: string[]) => {
+    const saved = await savePlaylistFile(playlist.fileName, { ...contentsOf(playlist), songs })
+    replacePlaylist(saved)
+  }
+
+  // The song goes back where it was, or at the end if the playlist got shorter since.
+  const putSongBack = async (removed: SavedPlaylist, songFileName: string, index: number) => {
+    const songName = nameOfSong(songFileName)
+    const failureTitle = `Couldn't put "${songName}" back in "${removed.title}"`
+    const playlist = playlistNamed(removed.fileName)
+    if (!playlist) {
+      notifyError(failureTitle, 'The playlist was deleted.')
+      return
+    }
+
+    const songs = [...playlist.songs]
+    songs.splice(index, 0, songFileName)
+    try {
+      await saveSongs(playlist, songs)
+      log(`Put song "${songName}" back in playlist "${playlist.title}"`)
+    } catch (error) {
+      notifyError(failureTitle, error)
     }
   }
 
@@ -202,6 +240,48 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
       set({ playlists: get().playlists.filter(other => other.fileName !== fileName) })
       log(`Deleted playlist "${playlist.title}"`)
       notifyUndoable(`"${playlist.title}" deleted`, () => void restorePlaylist(playlist))
+    },
+    moveSong: async (fileName, from, to) => {
+      const playlist = playlistNamed(fileName)
+      const songFileName = playlist?.songs[from]
+      if (!playlist || songFileName === undefined) {
+        return
+      }
+
+      // The new order shows at once, so the dropped row doesn't jump back while Rust saves.
+      const songs = arrayMove(playlist.songs, from, to)
+      replacePlaylist({ ...playlist, songs })
+      try {
+        await saveSongs(playlist, songs)
+        log(
+          `Moved song "${nameOfSong(songFileName)}" to position ${to + 1} in playlist "${playlist.title}"`
+        )
+      } catch (error) {
+        notifyError(`Couldn't save "${playlist.title}"`, error)
+      }
+    },
+    removeSong: async (fileName, songFileName) => {
+      const playlist = playlistNamed(fileName)
+      if (!playlist) {
+        return
+      }
+
+      const songName = nameOfSong(songFileName)
+      try {
+        await saveSongs(
+          playlist,
+          playlist.songs.filter(song => song !== songFileName)
+        )
+      } catch (error) {
+        notifyError(`Couldn't remove "${songName}" from "${playlist.title}"`, error)
+        return
+      }
+      log(`Removed song "${songName}" from playlist "${playlist.title}"`)
+      const index = playlist.songs.indexOf(songFileName)
+      notifyUndoable(
+        `"${songName}" removed from "${playlist.title}"`,
+        () => void putSongBack(playlist, songFileName, index)
+      )
     }
   }
 })

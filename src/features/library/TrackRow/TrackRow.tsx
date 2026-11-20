@@ -10,8 +10,6 @@ type TrackRowProps = {
   track: Track
   /** Plays the song the way its list does, like with the whole song list as the queue. */
   onPlay: () => void
-  /** Fades the play button and ignores its clicks, like in a playlist whose songs aren't found. */
-  isPlayDisabled?: boolean
 }
 
 /**
@@ -24,12 +22,12 @@ type TrackRowProps = {
  *
  * @summary Row of one song, with its play button and cover
  */
-export const TrackRow = ({ track, onPlay, isPlayDisabled }: TrackRowProps) => {
+export const TrackRow = ({ track, onPlay }: TrackRowProps) => {
   const isInPlayer = usePlaybackStore(state => state.session?.track.path === track.path)
 
   return (
     <ListRow isCurrent={isInPlayer}>
-      <PlayButton track={track} onPlay={onPlay} isDisabled={isPlayDisabled} />
+      <PlayButton track={track} onPlay={onPlay} />
       <CoverThumbnail path={track.path} />
       <TrackName track={track} isInPlayer={isInPlayer} />
     </ListRow>

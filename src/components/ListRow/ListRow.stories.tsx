@@ -41,3 +41,8 @@ export const Current: Story = {
     await expect(canvas.getByRole('listitem', { current: true })).toBeVisible()
   }
 }
+
+/** A row being dragged in a sortable list is lifted above the others, on a shadow. */
+export const Lifted: Story = {
+  args: { children: 'One · Metallica', isLifted: true }
+}

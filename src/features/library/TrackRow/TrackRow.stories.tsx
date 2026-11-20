@@ -42,11 +42,3 @@ export const WithoutArtist: Story = {
     await expect(canvas.getByTitle('Deus Le Volt!')).toHaveTextContent(/^Deus Le Volt!$/)
   }
 }
-
-/** A song that can't be played right now, like in a playlist whose songs aren't all found. */
-export const PlayDisabled: Story = {
-  args: { isPlayDisabled: true },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole('button', { name: `Play ${track.title}` })).toBeDisabled()
-  }
-}

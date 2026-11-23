@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { DataInteractive } from '@headlessui/react'
-import { ArrowsUpDownIcon } from '@heroicons/react/20/solid'
+import { Bars2Icon } from '@heroicons/react/20/solid'
 import { type ReactNode, useRef } from 'react'
 import { FOCUS_CLASSES, VARIANT_CLASSES } from '../buttonStyles'
 import { ListRow } from '../ListRow/ListRow'
@@ -101,8 +101,8 @@ type SortableRowProps = {
 }
 
 /**
- * Row of a `SortableList`: a Move handle, then what the row shows. Dragging the handle moves the
- * row, lifted above the others; elsewhere the row works like a `ListRow`.
+ * Row of a `SortableList`: a Move handle, drawn as two bars, then what the row shows. Dragging the
+ * handle moves the row, lifted above the others; elsewhere the row works like a `ListRow`.
  *
  * @summary Row of a sortable list, with its Move handle
  */
@@ -134,7 +134,7 @@ export const SortableRow = ({ id, moveLabel, isCurrent, children }: SortableRowP
         title={moveLabel}
         className={HANDLE_CLASSES}
       >
-        <ArrowsUpDownIcon className="size-5" />
+        <Bars2Icon className="size-5" />
       </DataInteractive>
       {children}
     </ListRow>

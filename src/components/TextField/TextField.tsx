@@ -1,4 +1,5 @@
 import { Field, Input, Label } from '@headlessui/react'
+import type { Ref } from 'react'
 import { FOCUS_CLASSES } from '../buttonStyles'
 
 type TextFieldProps = {
@@ -16,6 +17,8 @@ type TextFieldProps = {
   maxLength?: number
   /** Screen readers hear it as required, like a new playlist's title. */
   isRequired?: boolean
+  /** The box itself, to focus it, like the first field of a dialog's step once it shows. */
+  ref?: Ref<HTMLInputElement>
 }
 
 /**
@@ -32,11 +35,13 @@ export const TextField = ({
   type = 'text',
   placeholder,
   maxLength,
-  isRequired = false
+  isRequired = false,
+  ref
 }: TextFieldProps) => (
   <Field className="flex flex-col gap-1.5">
     <Label className="text-sm font-semibold text-ink">{label}</Label>
     <Input
+      ref={ref}
       type={type}
       value={value}
       onChange={event => onChange(event.target.value)}

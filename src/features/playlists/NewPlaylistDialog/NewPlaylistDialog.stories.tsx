@@ -72,13 +72,64 @@ const meta = {
 
 export default meta
 type Story = StoryObj<typeof meta>
+type UserEvent = Parameters<NonNullable<Story['play']>>[0]['userEvent']
 
-/** The empty form: the songs in the Songs view's order, none picked, and Save disabled. */
+const findDialog = (canvasElement: HTMLElement) =>
+  within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'New playlist' })
+
+/** Fills in the first step with a title, then goes on to the songs. */
+const goToTheSongs = async (dialog: HTMLElement, userEvent: UserEvent, title = 'Road trip') => {
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Title' }), title)
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+  return within(dialog).findByRole('searchbox', { name: 'Search songs' })
+}
+
+/**
+ * The first step: the title, focused, and the description. Next is disabled until a title is
+ * typed, and the songs come in the second step.
+ */
 export const Empty: Story = {
   play: async ({ canvasElement }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog', {
-      name: 'New playlist'
-    })
+    const dialog = await findDialog(canvasElement)
+
+    await expect(dialog).toHaveAccessibleDescription('Step 1 of 2: Title and description')
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveFocus()
+    )
+    await expect(within(dialog).getByRole('textbox', { name: 'Description' })).toBeVisible()
+    await expect(within(dialog).getByRole('button', { name: 'Next' })).toBeDisabled()
+    await expect(within(dialog).queryByRole('searchbox')).toBeNull()
+  }
+}
+
+/** Next turns on once the title isn't blank: spaces alone aren't a title. */
+export const NextNeedsATitle: Story = {
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findDialog(canvasElement)
+    const title = within(dialog).getByRole('textbox', { name: 'Title' })
+    const next = within(dialog).getByRole('button', { name: 'Next' })
+
+    await userEvent.type(title, '   ')
+    await expect(next).toBeDisabled()
+
+    await userEvent.type(title, 'Road trip')
+    await expect(next).toBeEnabled()
+  }
+}
+
+/**
+ * The second step: the search, focused, then the songs in the Songs view's order, none picked,
+ * with Back and Save.
+ */
+export const TheSongsStep: Story = {
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findDialog(canvasElement)
+
+    const search = await goToTheSongs(dialog, userEvent)
+
+    await expect(dialog).toHaveAccessibleDescription('Step 2 of 2: Songs')
+    await waitFor(() => expect(search).toHaveFocus())
+    await expect(within(dialog).queryByRole('textbox', { name: 'Title' })).toBeNull()
     await expect(songNamesIn(dialog)).toEqual([
       'Boat Song · Woodkid',
       'Carpe Diem Baby · Metallica',
@@ -88,30 +139,46 @@ export const Empty: Story = {
       'Winds of Destination · Angra'
     ])
     await expect(within(dialog).getByText('0 songs picked')).toBeVisible()
-    await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+    await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
   }
 }
 
-/** Save turns on once the title isn't blank: spaces alone aren't a title. */
-export const SaveNeedsATitle: Story = {
+/**
+ * Back returns to the first step with the title and description as typed, focusing the title,
+ * and the search and the picked songs stay for when Next comes back to them.
+ */
+export const GoingBack: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
+    const dialog = await findDialog(canvasElement)
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Description' }),
+      'For the long drive'
+    )
+    const search = await goToTheSongs(dialog, userEvent)
+    await userEvent.type(search, 'angra')
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Back' }))
+
     const title = within(dialog).getByRole('textbox', { name: 'Title' })
-    const save = within(dialog).getByRole('button', { name: 'Save' })
+    await expect(title).toHaveValue('Road trip')
+    await waitFor(() => expect(title).toHaveFocus())
+    await expect(within(dialog).getByRole('textbox', { name: 'Description' })).toHaveValue(
+      'For the long drive'
+    )
 
-    await userEvent.type(title, '   ')
-    await expect(save).toBeDisabled()
-
-    await userEvent.type(title, 'Road trip')
-    await expect(save).toBeEnabled()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await expect(within(dialog).getByRole('searchbox')).toHaveValue('angra')
+    await expect(within(dialog).getByRole('checkbox', { name: /^Morning Star/ })).toBeChecked()
+    await expect(within(dialog).getByText('1 song picked')).toBeVisible()
   }
 }
 
 /** The search finds songs by their title, their artist or their file name. */
 export const Searching: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
-    const search = within(dialog).getByRole('searchbox', { name: 'Search songs' })
+    const dialog = await findDialog(canvasElement)
+    const search = await goToTheSongs(dialog, userEvent)
 
     await userEvent.type(search, 'star')
     await expect(songNamesIn(dialog)).toEqual(['Morning Star · Angra'])
@@ -132,9 +199,10 @@ export const Searching: Story = {
 /** Uppercase and accents count as their plain form. */
 export const SearchIgnoresCaseAndAccents: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
+    const dialog = await findDialog(canvasElement)
+    const search = await goToTheSongs(dialog, userEvent)
 
-    await userEvent.type(within(dialog).getByRole('searchbox'), 'WÓODKID')
+    await userEvent.type(search, 'WÓODKID')
 
     await expect(songNamesIn(dialog)).toEqual(['Boat Song · Woodkid', 'Drawn to You · Woodkid'])
   }
@@ -143,9 +211,10 @@ export const SearchIgnoresCaseAndAccents: Story = {
 /** A search that finds nothing says so. */
 export const NothingFound: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
+    const dialog = await findDialog(canvasElement)
+    const search = await goToTheSongs(dialog, userEvent)
 
-    await userEvent.type(within(dialog).getByRole('searchbox'), 'Audioslave')
+    await userEvent.type(search, 'Audioslave')
 
     await expect(within(dialog).getByText('No songs match "Audioslave".')).toBeVisible()
   }
@@ -154,8 +223,8 @@ export const NothingFound: Story = {
 /** Picked songs stay picked while the search hides them, and the count below the list says so. */
 export const KeepsPickedSongsWhileSearching: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
-    const search = within(dialog).getByRole('searchbox')
+    const dialog = await findDialog(canvasElement)
+    const search = await goToTheSongs(dialog, userEvent)
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Winds of Destination/ }))
 
     await userEvent.type(search, 'boat')
@@ -176,12 +245,12 @@ export const KeepsPickedSongsWhileSearching: Story = {
  */
 export const Saving: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Title' }), ' Road trip ')
+    const dialog = await findDialog(canvasElement)
     await userEvent.type(
       within(dialog).getByRole('textbox', { name: 'Description' }),
       'For the long drive'
     )
+    await goToTheSongs(dialog, userEvent, ' Road trip ')
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Winds of Destination/ }))
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Boat Song/ }))
 
@@ -203,8 +272,8 @@ export const Saving: Story = {
 /** A playlist may have no songs yet. */
 export const SavingWithoutSongs: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Title' }), 'Road trip')
+    const dialog = await findDialog(canvasElement)
+    await goToTheSongs(dialog, userEvent)
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
 
@@ -215,22 +284,25 @@ export const SavingWithoutSongs: Story = {
   }
 }
 
-/** When the file can't be written, the dialog stays open with what was typed, and a notification says why. */
+/**
+ * When the file can't be written, the dialog stays open on the songs, as they were picked, and a
+ * notification says why.
+ */
 export const SaveFailing: Story = {
   beforeEach: () => {
     mockCommands({ read_cover: noCover, create_playlist: failingCommand(TAKEN_ERROR) })
   },
   play: async ({ args, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    const dialog = await page.findByRole('dialog')
-    const title = within(dialog).getByRole('textbox', { name: 'Title' })
-    await userEvent.type(title, 'Road trip')
+    const dialog = await findDialog(canvasElement)
+    await goToTheSongs(dialog, userEvent)
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Boat Song/ }))
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(page.getByText(TAKEN_ERROR)).toBeVisible())
     await expect(args.onClose).not.toHaveBeenCalled()
-    await expect(title).toHaveValue('Road trip')
+    await expect(within(dialog).getByRole('checkbox', { name: /^Boat Song/ })).toBeChecked()
     await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
   }
 }
@@ -238,7 +310,7 @@ export const SaveFailing: Story = {
 /** Cancel closes the dialog without writing anything. */
 export const Cancelling: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
+    const dialog = await findDialog(canvasElement)
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Title' }), 'Road trip')
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
@@ -253,8 +325,11 @@ export const WithoutSongsInTheLibrary: Story = {
   beforeEach: () => {
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: [] } })
   },
-  play: async ({ canvasElement }) => {
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog')
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findDialog(canvasElement)
+    await goToTheSongs(dialog, userEvent)
+
     await expect(within(dialog).getByText('The Songs folder has no songs yet.')).toBeVisible()
+    await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
   }
 }

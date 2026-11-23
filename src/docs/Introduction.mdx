@@ -28,10 +28,9 @@ The **audio player** (`AudioPlayer`) slides up along the bottom of the window wh
 and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the
 category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
 song's title and artist, as in the song list, above its progress bar in the middle, and the speaker
-and volume on the right. The bar
-has the elapsed time on its left, which a click turns into the time left counted down, and the
-song's length on its right. The progress stops growing at a set width, so in wide windows the
-spaces around it widen instead.
+and volume on the right. The bar has the elapsed time on its left, which a click turns into the
+time left counted down, and the song's length on its right. The progress stops growing at a set
+width, so in wide windows the spaces around it widen instead.
 Clicking the speaker mutes, and clicking it again brings the volume back, and the mouse wheel over
 the volume turns it up or down by 5%. The song plays at the volume slider's value as it's dragged,
 but the volume is chosen only once it's released: released at zero, it mutes, so unmuting brings
@@ -102,9 +101,10 @@ screen.
 
 On the list of playlists, a round + button (`NewPlaylistButton`) floats in the bottom-right
 corner, slides in and out like a notification, and keeps above the player and below the
-notifications. It opens the New playlist dialog (`NewPlaylistDialog`): a title, required, a
-description (`TextField`), and the songs of the Songs folder, each with a `Checkbox`, found by a
-search over their title, artist and file name that ignores case and accents. The playlist keeps
+notifications. It opens the New playlist dialog (`NewPlaylistDialog`), in two steps: first a
+title, required, and a description (`TextField`), then, after Next, the songs of the Songs folder,
+each with a `Checkbox`, found by a search over their title, artist and file name that ignores case
+and accents. Back returns to the first step, keeping what was typed and picked. The playlist keeps
 the picked songs in the list's order.
 
 **Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default

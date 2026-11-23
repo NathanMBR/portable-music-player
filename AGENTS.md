@@ -51,6 +51,8 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - buttons: `buttonLog.ts`, connected once from `main.tsx`, logs every click on a `<button>`, by its accessible name (`accessibleNameOf`, `src/components/accessibleName.ts`). It listens in the capture phase, so a plain click is logged before what it does. A toggle (`aria-pressed`, `IconButton`'s `isPressed`) or a button with three or more states (`data-state`, `IconButton`'s `state`) is logged a task later, once React has drawn the state the click left, with the name the button had when clicked;
   - switches and checkboxes: `Switch` and `Checkbox` log themselves (`logToggle`), though they're otherwise feature-agnostic, because Space toggles them without a click; `buttonLog.ts` skips switches, and a Headless checkbox isn't a `<button>`;
   - selects: `Select` logs its list opening and closing (from Headless UI's `open`, skipping the first render) and the option chosen, from the pointer or the keyboard alike, by the select's label alone (`labelOf`), without the chosen option its button's accessible name includes. `buttonLog.ts` skips a select's button (`aria-haspopup="listbox"`), since the keyboard opens it without a click;
+  - menus: `ActionMenu` logs its opening and closing the same way (`useOpenStateLog`, shared with `Select`), by its label. `buttonLog.ts` skips its button (`aria-haspopup="menu"`) for the same reason, and logs its items, which are `<button>`s, like any other: Headless UI clicks the item on Enter and Space too;
+  - radio groups: `RadioGroup` logs the option chosen, from the pointer or the keyboard alike, by the group's label and the option's, since the arrows choose an option without a click;
   - songs: the playback store logs them only when the state changes, whether from a button, the media keys or the audio. A song that ends with nothing after it is `Stopped`;
   - jumps and the volume: the progress bar (`formatPreciseTime`) and the volume slider log from the slider's `onCommit`, at the end of a click or drag and at each key press or turn of the wheel, not at every step of a drag;
   - pages: the navigation store logs them when the category changes;
@@ -76,11 +78,13 @@ src/
   clamp.ts              keeps a number within a range, for the stores and the components alike
   compareNames.ts       compares names for sorting the same way on every computer (songs, playlists)
   components/           feature-agnostic UI built on Headless UI
-    <Component>/        one folder per component (AlertMark, Button, Checkbox, ConfirmDialog, EmptyState,
-                        IconButton, ListRow, Modal, Notice, Select, Slider, SortableList, StatusLine,
-                        Switch, TextField, Tooltip, ViewHeader, ViewLayout): <Component>.tsx
+    <Component>/        one folder per component (ActionMenu, AlertMark, Button, Checkbox,
+                        ConfirmDialog, EmptyState, IconButton, ListRow, Modal, Notice, RadioGroup,
+                        Select, Slider, SortableList, StatusLine, Switch, TextField, Tooltip,
+                        ViewHeader, ViewLayout): <Component>.tsx
                         and every <Component>.* file that belongs to it, like its stories
     buttonStyles.ts     the looks and states every button shares, so it sits outside any one component
+    useOpenStateLog.ts  logs a popup's opening and closing, for Select and ActionMenu alike
   features/<feature>/   everything one feature owns
     types.ts            data shapes returned by Rust (mirror the Rust structs)
     <feature>Api.ts     the only place that calls invoke() for the feature
@@ -97,7 +101,7 @@ src/
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
 - Styling is Tailwind utilities in JSX. Reuse goes through React components, not `@apply` (base styles in `index.css` are the exception). Style Headless UI states with `data-hover:`, `data-focus:` and `data-disabled:`. A plain element that needs those states, like a list's row (`ListRow`), gets them from Headless UI's `DataInteractive`, never from `hover:`: stories can hover it with `userEvent`, and synthetic events don't trigger `:hover`.
-- Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song's button and row, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
+- Buttons and other controls take their look and states from `src/components/buttonStyles.ts`: a `variant` named by look (`quiet`, `outlined`, `filled`), `ACTIVE_CLASSES` for whatever is on (pressed toggles, the playing song's button and row, the current category), `FOCUS_CLASSES` and `DISABLED_CLASSES`, and for the panel a button opens, a select's list or a menu, `POPUP_CLASSES` and `POPUP_OPTION_CLASSES`. Components own only their geometry. Add a new look there instead of hand-writing colors in a component.
 - Colors come only from the semantic tokens in `src/index.css` (`paper`, `ink`, `ink-faded`, `rule`, `pen`, `correction`, `shade`). Tailwind's default palette is disabled with `--color-*: initial`. Use `shade` for dimming overlays: `ink` turns light in dark mode, so it would brighten instead of dim.
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
@@ -148,7 +152,9 @@ src/
   - The songs are matched to the last scan by file name, ignoring case like FAT and NTFS (`playlistSongs.ts`). A playlist plays the songs the scan has, in its order, and a song the scan lacks is listed under its file name in `ink-faded`, with an alert where its play button would be.
   - Delete asks first (`ConfirmDialog`, on `Modal`, like the song drop's dialog), and `notifyUndoable`'s Undo writes the file again under its old name, with its old contents (`create_playlist`).
   - A playlist's songs (`PlaylistSongList`) are reordered by dragging their Move handle, with the pointer or from the keyboard (`SortableList`, `src/components/`): dnd-kit (`@dnd-kit/core`, `@dnd-kit/sortable`) works on pointer and keyboard events, which the webviews still send while Tauri takes the window's drag and drop. The handle isn't a `<button>`, so `buttonLog.ts` logs no click for it; the store logs the move. A move shows at once, then `save_playlist` writes the file, which works `allSongsFound` out again; a failed save notifies and keeps the new order on screen. Each row shows its song's position after the handle, from the order the list renders, so it changes at the drop, not while a row is dragged; it's hidden from screen readers, which hear each row's place from the list itself.
-  - Remove asks first too, then `save_playlist` writes the playlist without the song, which stays in the Songs folder, and `notifyUndoable`'s Undo puts it back at its old place, or at the end of a playlist that got shorter since. Missing songs move and go like the others.
+  - Each row ends with a menu of what can be done to its song (`ActionMenu`): Change position, then Remove from playlist.
+  - Change position opens `ChangePositionDialog`, on `Modal`: Before or After, on one line (`RadioGroup`, Before at first), then a search over the playlist's other songs, listed with their positions, which also finds a position whole (`matchesPlaylistSearch`: 4 finds the fourth song, not the fourteenth), and a single pick among them (`RadioGroup` in rows), kept while the search hides it. Confirm moves the song through the store's `moveSong`, like a drop, to the index `placementIndex` (`songPlacement.ts`) works out; placing it where it already is saves nothing.
+  - Remove from playlist asks first too, then `save_playlist` writes the playlist without the song, which stays in the Songs folder, and `notifyUndoable`'s Undo puts it back at its old place, or at the end of a playlist that got shorter since. Missing songs move and go like the others.
   - dnd-kit renders its live region inline, a second `role="status"` beside the page's status line, so stories of a page with a sortable list find the status line by its text.
   - A round + button (`NewPlaylistButton`), rendered from `App.tsx` outside the views so it can slide out when the page changes, floats in the bottom-right corner only while the list of playlists is on screen (`useIsNewPlaylistButtonShown`). It slides up from below the window's bottom edge, without fading, over Sonner's notification timing (400ms `ease`), rides above the player with the player's slide (300ms ease-out), and keeps its room below the notifications (`NEW_PLAYLIST_BUTTON_CLEARANCE`). Neither it nor the player has a z-index, and `App.tsx` renders it before `AudioPlayer`, so it slides in from behind an open player. The list's bottom padding lets its last row scroll clear of it.
   - It opens `PlaylistDialog`, in two steps, the one on screen named under the dialog's title (its description): first a required title (at most `MAX_TITLE_LENGTH`) and a description, then, after Next, the scanned songs in the Songs view's order (`useSortedTracks`), each with a `Checkbox`. The search (`songSearch.ts`) matches title, artist and file name, with case and accents folded on both sides (`plainText.ts`); picked songs stay picked while it hides them, and are saved in the list's order. The steps share the form's state, so Back keeps what was typed and picked, and each step focuses its first field when it shows (`TextField`'s `ref`). The form lives inside the dialog's panel, which Headless UI unmounts once it closes, so each opening starts over: empty, or from an edited playlist's values then. It doesn't submit on Enter, which would save from the search box. A failed save keeps it open.
@@ -327,6 +333,9 @@ Every feature logs what the user does and what the app does in response, followi
 | A select's list opens | `Opened selector "<label>"` |
 | An option is chosen in a select | `Selector "<label>" set value to "<option>"`, the option's visible text |
 | A select's list closes, by a choice or not | `Closed selector "<label>"`, after the choice if there is one |
+| A menu opens | `Opened menu "<label>"` |
+| A menu closes, by a choice or not | `Closed menu "<label>"`, after the chosen item's click if there is one |
+| An option is chosen in a radio group | `Radio group "<label>" set value to "<option>"`, the option's label |
 | A song starts, pauses, resumes or stops | `Started`, `Paused`, `Resumed` or `Stopped playing song "<title>"`: the title tag, else the file name without its extension |
 | The song's progress bar is clicked or dragged | `Jumping song to mm:ss.mmm` |
 | The volume slider is moved | `Set volume to <percent>%` |
@@ -347,7 +356,7 @@ Every feature logs what the user does and what the app does in response, followi
 | Rust finds every song of a playlist whose file said some were missing | `Found every song of playlist "<title>"` |
 
 - `<name>` is the control's accessible name, as screen readers hear it.
-- Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own, and checkboxes built on `Checkbox` their toggles.
+- Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own, menus built on `ActionMenu` their opening and closing, radio groups built on `RadioGroup` their choice, and checkboxes built on `Checkbox` their toggles.
 - A slider logs the value a move ends on, through `onCommit`, never at every step of a drag.
 - A new kind of situation gets a message in the same style, a short sentence starting with a capitalized verb with names in double quotes, and its test asserts the exact message. Say which message was chosen when proposing the change.
 - Test each message where it's logged: `loggedMessages()` lists them in unit tests and stories.

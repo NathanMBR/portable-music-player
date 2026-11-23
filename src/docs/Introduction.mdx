@@ -95,9 +95,11 @@ disabled. An open playlist (`PlaylistPage`) has its title in the header, with a 
 large play button that starts from its first song, and its songs below, each with its own play
 button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. The songs
 (`PlaylistSongList`) move by dragging their Move handle, with the pointer or from the keyboard
-(`SortableList`), each row shows its song's position after the handle, and each row ends with
-Remove, which asks first, then notifies with an Undo; a playlist is saved as soon as it changes. The open playlist stays open while other pages are on
-screen.
+(`SortableList`), each row shows its song's position after the handle, and each row ends with a
+menu (`ActionMenu`). Its Change position opens a dialog (`ChangePositionDialog`) that places the
+song before or after another, picked from a search that also finds positions; its Remove from
+playlist asks first, then notifies with an Undo. A playlist is saved as soon as it changes. The
+open playlist stays open while other pages are on screen.
 
 On the list of playlists, a round + button (`NewPlaylistButton`) floats in the bottom-right
 corner, slides up from below the window's bottom edge, from behind the player while it's open,
@@ -118,12 +120,13 @@ still applies and a notification says why.
 
 ## Where the code lives
 
-- `src/components/`: feature-agnostic building blocks (`AlertMark`, `Button`, `Checkbox`,
-  `ConfirmDialog`, `EmptyState`, `IconButton`, `ListRow`, `Modal`, `Notice`, `Select`, `Slider`,
-  `SortableList`, `StatusLine`, `Switch`, `TextField`, `Tooltip`, `ViewHeader`, `ViewLayout`),
-  built on Headless UI and styled with Tailwind, each in a folder of its own with its stories.
-  `buttonStyles.ts`, beside the folders, holds the looks and states every button shares: the
-  `quiet`, `outlined` and `filled` variants, the active look, focus and disabled.
+- `src/components/`: feature-agnostic building blocks (`ActionMenu`, `AlertMark`, `Button`,
+  `Checkbox`, `ConfirmDialog`, `EmptyState`, `IconButton`, `ListRow`, `Modal`, `Notice`,
+  `RadioGroup`, `Select`, `Slider`, `SortableList`, `StatusLine`, `Switch`, `TextField`, `Tooltip`,
+  `ViewHeader`, `ViewLayout`), built on Headless UI and styled with Tailwind, each in a folder of
+  its own with its stories. `buttonStyles.ts`, beside the folders, holds the looks and states every
+  button shares: the `quiet`, `outlined` and `filled` variants, the active look, focus and
+  disabled, and the panel a button opens, like a select's list or a menu.
 - `src/features/notifications/`: the notification area and `notify.ts`, the only module that calls
   Sonner, the toast library behind the notifications.
 - `src/features/<feature>/`: everything one feature owns. Its types mirror the Rust structs,

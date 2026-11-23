@@ -67,6 +67,18 @@ const rowsIn = (list: HTMLElement) =>
       return `${position}. ${row.textContent?.slice(position.length)}`
     })
 
+type Clicker = { click: (element: Element) => Promise<void> }
+
+/** Chooses an action from a song's menu, as the user does: opens it, then clicks the item. */
+const chooseFromMenu = async (
+  page: ReturnType<typeof within>,
+  user: Clicker,
+  { menu, item }: { menu: string; item: string }
+) => {
+  await user.click(page.getByRole('button', { name: menu }))
+  await user.click(await page.findByRole('menuitem', { name: item }))
+}
+
 const meta = {
   component: PlaylistSongList,
   args: { playlist: lateDrive },
@@ -86,8 +98,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * The songs in the playlist's order. Each row starts with its Move handle and ends with its
- * Remove button.
+ * The songs in the playlist's order. Each row starts with its Move handle and ends with its menu.
  */
 export const Default: Story = {
   play: async ({ canvas }) => {
@@ -95,7 +106,58 @@ export const Default: Story = {
 
     await expect(
       row.getAllByRole('button').map(button => button.getAttribute('aria-label'))
-    ).toEqual(['Move Darts', 'Play Darts', 'Remove Darts'])
+    ).toEqual(['Move Darts', 'Play Darts', 'More for Darts'])
+  }
+}
+
+/** A song's menu offers to change its position or to remove it from the playlist. */
+export const SongMenu: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'More for Cigaro' }))
+
+    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu')
+    await expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map(item => item.textContent)
+    ).toEqual(['Change position', 'Remove from playlist'])
+  }
+}
+
+/**
+ * Change position opens a dialog that places the song before or after another. Once it's
+ * confirmed, the song moves there, the positions follow, and the playlist is saved in that order.
+ */
+export const ChangingAPosition: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    await chooseFromMenu(page, userEvent, { menu: 'More for Darts', item: 'Change position' })
+    const dialog = within(
+      await page.findByRole('dialog', { name: 'Change the position of "Darts"' })
+    )
+
+    await userEvent.click(dialog.getByRole('radio', { name: 'After' }))
+    await userEvent.click(dialog.getByRole('radio', { name: '3. A Monster in Her Eyes · Angra' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Confirm' }))
+
+    await waitFor(() =>
+      expect(rowsIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
+        '1. Cigaro · System of a Down',
+        '2. A Monster in Her Eyes · Angra',
+        '3. Darts · System of a Down'
+      ])
+    )
+    await expect(savePlaylist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playlist: expect.objectContaining({
+          songs: ['Cigaro.mp3', 'A Monster in Her Eyes.mp3', 'Darts.mp3']
+        })
+      })
+    )
+    await expect(loggedMessages()).toContain(
+      'Moved song "Darts" to position 3 in playlist "Late drive"'
+    )
+    await waitFor(() => expect(page.queryByRole('dialog')).toBeNull())
   }
 }
 
@@ -169,14 +231,14 @@ export const MovingASong: Story = {
 }
 
 /**
- * Remove asks first. Once it's confirmed, the song leaves the playlist, though not the Songs
+ * Remove from playlist asks first. Once it's confirmed, the song leaves the playlist, though not the Songs
  * folder, the songs after it move up a position, and a notification says so, with an Undo button.
  */
 export const RemovingASong: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Remove Cigaro' }))
+    await chooseFromMenu(page, userEvent, { menu: 'More for Cigaro', item: 'Remove from playlist' })
     const dialog = await page.findByRole('dialog', { name: 'Remove "Cigaro" from "Late drive"?' })
     await expect(within(dialog).getByText('The song stays in the Songs folder.')).toBeVisible()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Remove' }))
@@ -199,7 +261,7 @@ export const RemovingASong: Story = {
 export const UndoingARemoval: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Remove Cigaro' }))
+    await chooseFromMenu(page, userEvent, { menu: 'More for Cigaro', item: 'Remove from playlist' })
     await userEvent.click(
       within(await page.findByRole('dialog')).getByRole('button', { name: 'Remove' })
     )
@@ -220,7 +282,7 @@ export const UndoingARemoval: Story = {
 export const CancellingARemoval: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Remove Cigaro' }))
+    await chooseFromMenu(page, userEvent, { menu: 'More for Cigaro', item: 'Remove from playlist' })
 
     await userEvent.click(
       within(await page.findByRole('dialog')).getByRole('button', { name: 'Cancel' })
@@ -228,7 +290,7 @@ export const CancellingARemoval: Story = {
 
     await waitFor(() => expect(page.queryByRole('dialog')).toBeNull())
     await expect(savePlaylist).not.toHaveBeenCalled()
-    await expect(canvas.getByRole('button', { name: 'Remove Cigaro' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'More for Cigaro' })).toBeVisible()
   }
 }
 
@@ -246,7 +308,10 @@ export const MissingSong: Story = {
     await expect(canvas.getByRole('img', { name: 'Not in the Songs folder' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Play Darts' })).toBeDisabled()
 
-    await userEvent.click(canvas.getByRole('button', { name: "Remove Don't Tread on Me" }))
+    await chooseFromMenu(page, userEvent, {
+      menu: "More for Don't Tread on Me",
+      item: 'Remove from playlist'
+    })
     await userEvent.click(
       within(
         await page.findByRole('dialog', { name: `Remove "Don't Tread on Me" from "Late drive"?` })
@@ -293,7 +358,7 @@ export const RemovingTheLastSong: Story = {
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Remove Darts' }))
+    await chooseFromMenu(page, userEvent, { menu: 'More for Darts', item: 'Remove from playlist' })
 
     await userEvent.click(
       within(await page.findByRole('dialog')).getByRole('button', { name: 'Remove' })

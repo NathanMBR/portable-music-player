@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Track } from '../library/types'
-import { matchesSearch } from './songSearch'
+import { matchesPlaylistSearch, matchesSearch } from './songSearch'
 
 const theOtherSide: Track = {
   path: 'Songs/The Other Side.mp3',
@@ -43,5 +43,43 @@ describe('matchesSearch', () => {
 
   it('finds every song while the search is blank', () => {
     expect(matchesSearch(petrifiedEyes, '   ')).toBe(true)
+  })
+})
+
+describe('matchesPlaylistSearch', () => {
+  const inTheNight: Track = {
+    path: 'Songs/In the Night.mp3',
+    title: 'In the Night',
+    artist: 'Shaman'
+  }
+
+  it('finds a song by its position in the playlist', () => {
+    expect(
+      matchesPlaylistSearch({ fileName: 'In the Night.mp3', track: inTheNight }, 3, ' 3 ')
+    ).toBe(true)
+  })
+
+  it('finds a position only whole, so 1 finds the first song and not the twelfth', () => {
+    expect(
+      matchesPlaylistSearch({ fileName: 'In the Night.mp3', track: inTheNight }, 12, '1')
+    ).toBe(false)
+  })
+
+  it('still finds a song by its title, artist or file name', () => {
+    expect(
+      matchesPlaylistSearch({ fileName: 'In the Night.mp3', track: inTheNight }, 2, 'SHAMAN')
+    ).toBe(true)
+  })
+
+  it('finds a song the last scan lacks by its file name, case and accents folded', () => {
+    expect(
+      matchesPlaylistSearch({ fileName: 'Viderunt Te Aquae.mp3', track: null }, 5, 'vídérunt')
+    ).toBe(true)
+  })
+
+  it('leaves out a song the last scan lacks when its file name holds nothing of the search', () => {
+    expect(
+      matchesPlaylistSearch({ fileName: 'Viderunt Te Aquae.mp3', track: null }, 5, 'night')
+    ).toBe(false)
   })
 })

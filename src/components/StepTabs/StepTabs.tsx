@@ -46,12 +46,12 @@ const TAB_GEOMETRY_CLASSES =
  * panel is on the page.
  *
  * Without `onStepChange`, the tabs only show where the form is, as when creating a playlist: they
- * can't be clicked and the keyboard never stops on them, since the form's own buttons, like Next
- * and Back, move between the steps. With it, as when editing a playlist, a click on a tab goes to
- * its step, unless the step is disabled; from the keyboard, Tab reaches the current tab, the arrows
- * move between the tabs, and Enter or Space goes to the focused one's step. The arrows alone never
- * change the step, since a step may focus its first field when it shows. A tab's click is logged
- * like any button's.
+ * can't be clicked, the pointer shows the not-allowed cursor over them, and the keyboard never
+ * stops on them, since the form's own buttons, like Next and Back, move between the steps. With
+ * it, as when editing a playlist, a click on a tab goes to its step, unless the step is disabled;
+ * from the keyboard, Tab reaches the current tab, the arrows move between the tabs, and Enter or
+ * Space goes to the focused one's step. The arrows alone never change the step, since a step may
+ * focus its first field when it shows. A tab's click is logged like any button's.
  *
  * @summary Tabs showing the current step of a form
  */
@@ -66,7 +66,7 @@ export const StepTabs = ({ label, tabs, stepIndex, onStepChange }: StepTabsProps
       className="flex min-h-0 flex-col"
     >
       <div className="border-b border-rule">
-        <div className="relative w-fit">
+        <div className={`relative w-fit ${isClickable ? '' : 'cursor-not-allowed'}`}>
           <TabList
             aria-label={label}
             className={`grid auto-cols-fr grid-flow-col ${isClickable ? '' : 'pointer-events-none'}`}
@@ -84,7 +84,7 @@ export const StepTabs = ({ label, tabs, stepIndex, onStepChange }: StepTabsProps
                 <Tab
                   key={tab.label}
                   as={UnfocusableTab}
-                  className={`cursor-default ${TAB_GEOMETRY_CLASSES} ${STEP_TAB_CLASSES}`}
+                  className={`${TAB_GEOMETRY_CLASSES} ${STEP_TAB_CLASSES}`}
                 >
                   {tab.label}
                 </Tab>

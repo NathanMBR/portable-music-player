@@ -84,13 +84,19 @@ export const LaterStep: Story = {
 
 /**
  * Without `onStepChange`, as when creating a playlist, only the form's buttons move between the
- * steps: the tabs can't be clicked, and the keyboard never stops on them.
+ * steps: the tabs can't be clicked, the pointer shows the not-allowed cursor over them, and the
+ * keyboard never stops on them.
  */
 export const NotClickable: Story = {
   play: async ({ canvas, userEvent }) => {
     for (const tab of canvas.getAllByRole('tab')) {
+      const box = tab.getBoundingClientRect()
+      const pointed = tab.ownerDocument.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2
+      )
       await expect(getComputedStyle(tab).pointerEvents).toBe('none')
-      await expect(getComputedStyle(tab).cursor).toBe('default')
+      await expect(pointed && getComputedStyle(pointed).cursor).toBe('not-allowed')
     }
 
     await userEvent.tab()

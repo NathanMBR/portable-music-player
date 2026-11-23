@@ -159,16 +159,15 @@ export const PlayingAPlaylist: Story = {
 }
 
 /**
- * A playlist whose file says songs are missing has an alert after its title, its play button
- * disabled, and a Recheck button. The others play as usual.
+ * A playlist whose file says songs are missing has an alert in its play button's place, and
+ * Recheck songs in its menu. The others play as usual.
  */
 export const SongsMissing: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getAllByRole('img', { name: 'Some songs are missing' })).toHaveLength(1)
-    await expect(canvas.getByRole('button', { name: 'Play Late night' })).toBeDisabled()
-    await expect(canvas.getByRole('button', { name: 'Recheck Late night' })).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Play Late night' })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: /^Recheck/ })).toBeNull()
     await expect(canvas.getByRole('button', { name: 'Play Road trip' })).toBeEnabled()
-    await expect(canvas.queryByRole('button', { name: 'Recheck Road trip' })).toBeNull()
   }
 }
 

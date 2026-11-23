@@ -58,11 +58,29 @@ export const Large: Story = {
   args: { isLarge: true }
 }
 
-/** While the playlist's file says songs are missing, it's disabled until a recheck finds them. */
+/**
+ * While the playlist's file says songs are missing, a red alert takes the button's place, in a box
+ * of the button's size, until a recheck finds them; the mouse resting on it says why.
+ */
 export const SongsMissing: Story = {
   args: { playlist: { ...sundayMorning, allSongsFound: false } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('button', { name: 'Play Sunday morning' })).toBeDisabled()
+    const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
+
+    await expect(canvas.queryByRole('button')).toBeNull()
+    await expect(alert).toHaveAttribute('title', 'Some songs are missing')
+    await expect(alert.parentElement?.getBoundingClientRect().width).toBe(36)
+  }
+}
+
+/** The large alert taking the place of the page's large play button, the same size. */
+export const LargeSongsMissing: Story = {
+  args: { playlist: { ...sundayMorning, allSongsFound: false }, isLarge: true },
+  play: async ({ canvas }) => {
+    const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
+
+    await expect(canvas.queryByRole('button')).toBeNull()
+    await expect(alert.parentElement?.getBoundingClientRect().width).toBe(40)
   }
 }
 

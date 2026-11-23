@@ -155,20 +155,30 @@ export const PlayingASong: Story = {
 }
 
 /**
- * While the playlist's file says songs are missing: a red alert follows the title, a Recheck
- * button comes before the play button, and every play button is disabled. A song the Songs folder
- * lacks is still listed, under its file name in a lighter ink, with an alert where its play button
- * would be.
+ * While the playlist's file says songs are missing: a red alert takes the large play button's
+ * place, after Recheck and Edit, nothing follows the title, and every song's play button is
+ * disabled. A song the Songs folder lacks is still listed, under its file name in a lighter ink,
+ * with an alert where its play button would be.
  */
 export const SongsMissing: Story = {
   args: { playlist: workoutMissingASong },
   beforeEach: () => {
     showing(workoutMissingASong)
   },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole('img', { name: 'Some songs are missing' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Recheck Workout' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Play Workout' })).toBeDisabled()
+  play: async ({ canvas, canvasElement }) => {
+    const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
+    const edit = canvas.getByRole('button', { name: 'Edit Workout' })
+
+    await expect(headerButtonNames(canvasElement)).toEqual([
+      'Back to playlists',
+      'Recheck Workout',
+      'Edit Workout'
+    ])
+    await expect(alert.getBoundingClientRect().left).toBeGreaterThan(
+      edit.getBoundingClientRect().right
+    )
+    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(/^Workout$/)
+    await expect(canvas.queryByRole('button', { name: 'Play Workout' })).toBeNull()
     await expect(canvas.getByRole('button', { name: 'Play Battery' })).toBeDisabled()
     await expect(canvas.getByRole('img', { name: 'Not in the Songs folder' })).toBeVisible()
     await expect(canvas.getByTitle('Arising Thunder')).toBeVisible()
@@ -187,19 +197,11 @@ export const WithoutSongs: Story = {
   }
 }
 
-/**
- * The Edit button sits right before the large play button, smaller than it, after Recheck when
- * songs are missing.
- */
+/** The Edit button sits right before the large play button, smaller than it. */
 export const EditButton: Story = {
-  args: { playlist: workoutMissingASong },
-  beforeEach: () => {
-    showing(workoutMissingASong)
-  },
   play: async ({ canvas, canvasElement }) => {
     await expect(headerButtonNames(canvasElement)).toEqual([
       'Back to playlists',
-      'Recheck Workout',
       'Edit Workout',
       'Play Workout'
     ])

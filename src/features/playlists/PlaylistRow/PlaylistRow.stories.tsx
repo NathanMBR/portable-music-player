@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { InvokeArgs } from '@tauri-apps/api/core'
 import { expect, fn, waitFor, within } from 'storybook/test'
 import { loggedMessages } from '../../../testing/logs'
 import { mockCommands } from '../../../testing/mockCommands'
@@ -15,6 +16,9 @@ const cityLights: SavedPlaylist = {
   allSongsFound: true,
   songs: ['Know.mp3', 'Stealing Society.mp3', 'Wuthering Heights.mp3', 'Shift.mp3']
 }
+
+// Rust finds every song again.
+const checkPlaylist = fn((_args?: InvokeArgs) => ({ playlist: cityLights, missingCount: 0 }))
 
 /** Where a real click at the middle of the element lands, whatever covers it. */
 const elementAtTheMiddleOf = (element: Element) => {
@@ -88,15 +92,22 @@ export const WithoutDescription: Story = {
 }
 
 /**
- * While its file says songs are missing: a red alert follows the title, the play button is
- * disabled, and a Recheck button follows it.
+ * While its file says songs are missing, a red alert takes the play button's place, before the
+ * square, and nothing follows the title. The alert sits above the row, so the mouse resting on it
+ * says why.
  */
 export const SongsMissing: Story = {
   args: { playlist: { ...cityLights, allSongsFound: false } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('img', { name: 'Some songs are missing' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Play City lights' })).toBeDisabled()
-    await expect(canvas.getByRole('button', { name: 'Recheck City lights' })).toBeVisible()
+    const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
+    const title = canvas.getByRole('button', { name: 'See City lights' })
+
+    await expect(canvas.queryByRole('button', { name: 'Play City lights' })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: /^Recheck/ })).toBeNull()
+    await expect(alert.getBoundingClientRect().right).toBeLessThan(
+      title.getBoundingClientRect().left
+    )
+    await expect(elementAtTheMiddleOf(alert).closest('[role="img"]')).toBe(alert)
   }
 }
 
@@ -166,7 +177,10 @@ export const ClickableAllOver: Story = {
   }
 }
 
-/** Its own buttons sit above the row: each does its own job and never opens the playlist. */
+/**
+ * Its own controls sit above the row: the menu does its own job, the alert only says why, and
+ * neither opens the playlist.
+ */
 export const ButtonsAboveTheRow: Story = {
   args: { playlist: { ...cityLights, allSongsFound: false } },
   beforeEach: () => {
@@ -176,20 +190,24 @@ export const ButtonsAboveTheRow: Story = {
     })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
-    for (const name of ['Play City lights', 'Recheck City lights', 'More for City lights']) {
-      const button = canvas.getByRole('button', { name })
-      await expect(elementAtTheMiddleOf(button).closest('button')).toBe(button)
-    }
+    const menu = canvas.getByRole('button', { name: 'More for City lights' })
+    await expect(elementAtTheMiddleOf(menu).closest('button')).toBe(menu)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Recheck City lights' }))
+    await userEvent.click(canvas.getByRole('img', { name: 'Some songs are missing' }))
+    await expect(usePlaylistsStore.getState().shownPlaylist).toBeNull()
     await userEvent.click(canvas.getByRole('button', { name: 'More for City lights' }))
 
-    await expect(await within(canvasElement.ownerDocument.body).findByRole('menu')).toBeVisible()
+    // The menu fades in.
+    const opened = await within(canvasElement.ownerDocument.body).findByRole('menu')
+    await waitFor(() => expect(opened).toBeVisible())
     await expect(usePlaylistsStore.getState().shownPlaylist).toBeNull()
   }
 }
 
-/** Its menu holds Edit playlist, then Delete playlist, each handing the playlist on. */
+/**
+ * Its menu holds Edit playlist, then Delete playlist, each handing the playlist on. Recheck songs
+ * shows only while songs are missing.
+ */
 export const Menu: Story = {
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
@@ -205,5 +223,35 @@ export const Menu: Story = {
     await userEvent.click(await page.findByRole('menuitem', { name: 'Delete playlist' }))
     await waitFor(() => expect(args.onDelete).toHaveBeenCalledOnce())
     await expect(usePlaylistsStore.getState().shownPlaylist).toBeNull()
+  }
+}
+
+/**
+ * While songs are missing, the menu starts with Recheck songs, which looks for them in the Songs
+ * folder again; once they're all back, the play button takes the alert's place.
+ */
+export const RecheckingFromTheMenu: Story = {
+  args: { playlist: { ...cityLights, allSongsFound: false } },
+  beforeEach: () => {
+    usePlaylistsStore.setState({ playlists: [{ ...cityLights, allSongsFound: false }] })
+    mockCommands({ check_playlist: checkPlaylist })
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    await userEvent.click(canvas.getByRole('button', { name: 'More for City lights' }))
+
+    const items = await page.findAllByRole('menuitem')
+    await expect(items.map(item => item.textContent)).toEqual([
+      'Recheck songs',
+      'Edit playlist',
+      'Delete playlist'
+    ])
+
+    await userEvent.click(page.getByRole('menuitem', { name: 'Recheck songs' }))
+
+    await waitFor(() =>
+      expect(checkPlaylist).toHaveBeenCalledWith({ fileName: cityLights.fileName })
+    )
+    await waitFor(() => expect(usePlaylistsStore.getState().playlists[0]?.allSongsFound).toBe(true))
   }
 }

@@ -11,7 +11,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * The red alert icon, as it follows a name in a list row. Screen readers hear its label, which
+ * The red alert icon, as it takes a round button's place in a list row. Screen readers hear its label, which
  * also shows when the mouse rests on it.
  */
 export const Default: Story = {
@@ -21,7 +21,7 @@ export const Default: Story = {
   }
 }
 
-/** Larger, as it follows a page's title in its header. */
+/** Larger, as it takes the large play button's place in a page's header. */
 export const Large: Story = {
   args: { isLarge: true }
 }

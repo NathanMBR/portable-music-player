@@ -8,6 +8,8 @@ import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { withNotificationArea } from '../../../testing/withNotificationArea'
 import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
+import { type PlaybackSource, playlistSource, SONGS_SOURCE } from '../../playback/playbackSource'
+import { usePlaybackStore } from '../../playback/playbackStore'
 import { selectShownPlaylist, usePlaylistsStore } from '../playlistsStore'
 import type { PlaylistContents, SavedPlaylist } from '../types'
 import { PlaylistSongList } from './PlaylistSongList'
@@ -49,6 +51,21 @@ const showing = (playlist: SavedPlaylist) => {
     playlists: [playlist],
     loadStatus: 'loaded',
     shownPlaylist: playlist.fileName
+  })
+}
+
+/** Darts in the player, playing from `source`, a while into the song. */
+const playingDartsFrom = (source: PlaybackSource) => {
+  usePlaybackStore.setState({
+    session: {
+      track: darts,
+      queue: [darts, cigaro],
+      playOrder: [darts, cigaro],
+      isPlaying: true,
+      elapsedSeconds: 42,
+      durationSeconds: 156,
+      source
+    }
   })
 }
 
@@ -107,6 +124,63 @@ export const Default: Story = {
     await expect(
       row.getAllByRole('button').map(button => button.getAttribute('aria-label'))
     ).toEqual(['Move Darts', 'Play Darts', 'More for Darts'])
+  }
+}
+
+/**
+ * The song in the player plays from this playlist: its row is on the pen tint, screen readers hear
+ * it as the current one, and its play button pauses it.
+ */
+export const SongInPlayer: Story = {
+  beforeEach: () => playingDartsFrom(playlistSource(lateDrive.fileName)),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('listitem', { current: true })).toHaveTextContent(darts.title)
+    await expect(canvas.getByRole('button', { name: `Pause ${darts.title}` })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  }
+}
+
+/**
+ * The song in the player is one of the playlist's, played from the Songs view: the playlist shows
+ * it like its other songs, and its play button plays it from here, with the playlist as the queue,
+ * which then makes it current in the playlist.
+ */
+export const SongPlayingFromTheSongsView: Story = {
+  beforeEach: () => {
+    playingDartsFrom(SONGS_SOURCE)
+    mockCommands({
+      read_cover: noCover,
+      check_playlist: () => ({ playlist: lateDrive, missingCount: 0 })
+    })
+  },
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.queryByRole('listitem', { current: true })).toBeNull()
+
+    await userEvent.click(canvas.getByRole('button', { name: `Play ${darts.title}` }))
+
+    await waitFor(() =>
+      expect(usePlaybackStore.getState().session).toMatchObject({
+        track: darts,
+        queue: [darts, cigaro, aMonsterInHerEyes],
+        elapsedSeconds: 0,
+        source: playlistSource(lateDrive.fileName)
+      })
+    )
+    await expect(canvas.getByRole('listitem', { current: true })).toHaveTextContent(darts.title)
+  }
+}
+
+/** The song in the player is one of the playlist's, played from another playlist holding it. */
+export const SongPlayingFromAnotherPlaylist: Story = {
+  beforeEach: () => playingDartsFrom(playlistSource('1763600044444-Night_shift.json')),
+  play: async ({ canvas }) => {
+    await expect(canvas.queryByRole('listitem', { current: true })).toBeNull()
+    await expect(canvas.getByRole('button', { name: `Play ${darts.title}` })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
   }
 }
 

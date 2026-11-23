@@ -82,7 +82,9 @@ queue. Next comes a square miniature of the song's cover (`CoverThumbnail`), or 
 middle dot. The dot and the artist are in a lighter ink (`ink-faded`) than the title, as in "Better
 than You · Metallica". The row under the mouse is tinted, and the song in the player, playing or
 paused, has its row on a pen tint with its title and artist in pen, like the current category in
-the menu. The songs are sorted as the Settings view says: by title, the default, or by filename.
+the menu. A song shows as the one in the player only in the list it plays from: played from a
+playlist, it looks like any other song here, and its play button plays it from the Songs view. The
+songs are sorted as the Settings view says: by title, the default, or by filename.
 
 **Playlists** (`PlaylistsView`) lists the playlists of the `Playlists` folder, sorted by title
 (`PlaylistsOverview`), or, without any, says so in the middle of the view. Each row
@@ -93,7 +95,9 @@ missing, nothing plays, a notification says how many, and its file remembers it.
 (`RecheckButton`) finds them all, a red alert follows its title (`AlertMark`) and its plays are
 disabled. An open playlist (`PlaylistPage`) has its title in the header, with a back button, a
 large play button that starts from its first song, and its songs below, each with its own play
-button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. The songs
+button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. Its song in
+the player has the same pen tint as in the song list, but only when it plays from this playlist,
+not from the Songs view or another playlist. The songs
 (`PlaylistSongList`) move by dragging their Move handle, with the pointer or from the keyboard
 (`SortableList`), each row shows its song's position after the handle, and each row ends with a
 menu (`ActionMenu`). Its Change position opens a dialog (`ChangePositionDialog`) that places the

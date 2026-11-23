@@ -8,7 +8,8 @@ import { SortableList, SortableRow } from '../../../components/SortableList/Sort
 import { useScannedTracks } from '../../library/scannedTracks'
 import type { Track } from '../../library/types'
 import { PlayButton } from '../../playback/PlayButton/PlayButton'
-import { usePlaybackStore } from '../../playback/playbackStore'
+import { type PlaybackSource, playlistSource } from '../../playback/playbackSource'
+import { useIsInPlayerFrom } from '../../playback/useIsInPlayerFrom'
 import { ChangePositionDialog } from '../ChangePositionDialog/ChangePositionDialog'
 import { PlaylistSongLabel } from '../PlaylistSongLabel/PlaylistSongLabel'
 import { findPlaylistSongs, type PlaylistSong, songNameOf } from '../playlistSongs'
@@ -35,14 +36,16 @@ type SongPlayButtonProps = {
   playlist: SavedPlaylist
   song: PlaylistSong
   track: Track
+  source: PlaybackSource
 }
 
-const SongPlayButton = ({ playlist, song, track }: SongPlayButtonProps) => {
+const SongPlayButton = ({ playlist, song, track, source }: SongPlayButtonProps) => {
   const playPlaylist = usePlaylistsStore(state => state.playPlaylist)
 
   return (
     <PlayButton
       track={track}
+      source={source}
       onPlay={() => void playPlaylist(playlist.fileName, song.fileName)}
       isDisabled={!playlist.allSongsFound}
     />
@@ -58,16 +61,15 @@ const MissingSongAlert = () => (
 
 const SongRow = ({ playlist, song, position, onRemove, onChangePosition }: SongRowProps) => {
   const { track } = song
-  const isInPlayer = usePlaybackStore(
-    state => track !== null && state.session?.track.path === track.path
-  )
+  const source = playlistSource(playlist.fileName)
+  const isInPlayer = useIsInPlayerFrom(track, source)
   const name = songNameOf(song)
 
   return (
     <SortableRow id={song.fileName} moveLabel={`Move ${name}`} isCurrent={isInPlayer}>
       <SongPosition position={position} songCount={playlist.songs.length} />
       {track ? (
-        <SongPlayButton playlist={playlist} song={song} track={track} />
+        <SongPlayButton playlist={playlist} song={song} track={track} source={source} />
       ) : (
         <MissingSongAlert />
       )}

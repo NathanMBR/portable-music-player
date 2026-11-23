@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
 import type { Track } from '../library/types'
+import { SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 import { connectWindowTitle } from './windowTitle'
 
@@ -63,7 +64,7 @@ describe('connectWindowTitle', () => {
     const titles = mockWindowTitle()
     connect()
 
-    playback().playTrack(lastingChild, [lastingChild, makeBelieve])
+    playback().playTrack(lastingChild, [lastingChild, makeBelieve], SONGS_SOURCE)
     playback().playNext()
     playback().stop()
     await settle()
@@ -85,7 +86,7 @@ describe('connectWindowTitle', () => {
     const titles = mockWindowTitle()
     connect()
 
-    playback().playTrack(bringEmBackAlive, [bringEmBackAlive])
+    playback().playTrack(bringEmBackAlive, [bringEmBackAlive], SONGS_SOURCE)
     await settle()
 
     expect(titles).toEqual([
@@ -98,7 +99,7 @@ describe('connectWindowTitle', () => {
     const setTitle = vi.fn()
     mockCommands({ 'plugin:window|set_title': setTitle })
     connect()
-    playback().playTrack(lastingChild, [lastingChild])
+    playback().playTrack(lastingChild, [lastingChild], SONGS_SOURCE)
 
     playback().reportProgress(12)
     playback().togglePlaying()

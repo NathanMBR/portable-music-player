@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { loggedMessages } from '../../testing/logs'
 import type { Track } from '../library/types'
-import { audibleVolume, type PlaybackSession, usePlaybackStore } from './playbackStore'
+import { playlistSource, SONGS_SOURCE } from './playbackSource'
+import {
+  audibleVolume,
+  isInPlayerFrom,
+  type PlaybackSession,
+  usePlaybackStore
+} from './playbackStore'
 
 const trackTitled = (title: string, artist: string): Track => ({
   path: `Songs/${title}.mp3`,
@@ -32,6 +38,7 @@ const loadSession = (overrides: Partial<PlaybackSession>) => {
       isPlaying: true,
       elapsedSeconds: 83,
       durationSeconds: 270,
+      source: SONGS_SOURCE,
       ...overrides
     }
   })
@@ -43,7 +50,7 @@ describe('playTrack', () => {
   })
 
   it('plays the chosen song from its start, with the list it was played from as the queue', () => {
-    playback().playTrack(secondTrack, queue)
+    playback().playTrack(secondTrack, queue, SONGS_SOURCE)
 
     expect(session()).toEqual({
       track: secondTrack,
@@ -51,14 +58,15 @@ describe('playTrack', () => {
       playOrder: queue,
       isPlaying: true,
       elapsedSeconds: 0,
-      durationSeconds: null
+      durationSeconds: null,
+      source: SONGS_SOURCE
     })
   })
 
   it('starts a shuffled order with the chosen song while shuffle is on', () => {
     usePlaybackStore.setState({ isShuffled: true })
 
-    playback().playTrack(thirdTrack, queue)
+    playback().playTrack(thirdTrack, queue, SONGS_SOURCE)
 
     expect(session()?.playOrder[0]).toBe(thirdTrack)
     expect(sortedTitles(session()?.playOrder)).toEqual(sortedTitles(queue))
@@ -67,7 +75,7 @@ describe('playTrack', () => {
 
 describe('togglePlaying', () => {
   it('pauses the playing song, then resumes it', () => {
-    playback().playTrack(firstTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
 
     playback().togglePlaying()
     expect(session()?.isPlaying).toBe(false)
@@ -471,7 +479,7 @@ describe('the log', () => {
   it('names the song that starts playing by its title, which the file name stands in for', () => {
     const numberedFile: Track = { ...sadButTrue, path: 'Songs/05 Sad but True.mp3' }
 
-    playback().playTrack(numberedFile, loggedQueue)
+    playback().playTrack(numberedFile, loggedQueue, SONGS_SOURCE)
 
     expect(loggedMessages()).toEqual(['Started playing song "Sad but True"'])
   })
@@ -554,7 +562,8 @@ describe('restore', () => {
       playOrder: songQueue,
       isPlaying: false,
       elapsedSeconds: 125.25,
-      durationSeconds: null
+      durationSeconds: null,
+      source: SONGS_SOURCE
     })
     expect(playback()).toMatchObject(choicesLeft)
   })
@@ -590,5 +599,76 @@ describe('restore', () => {
     })
 
     expect(loggedMessages()).toEqual(['Restored song "The Golden Age" at 02:05.250'])
+  })
+})
+
+describe('the list a song plays from', () => {
+  const roadTrip = playlistSource('1763600000000-Road_trip.json')
+
+  it('is remembered with the song', () => {
+    playback().playTrack(secondTrack, queue, roadTrip)
+
+    expect(session()?.source).toEqual(roadTrip)
+  })
+
+  it('stays through next, previous, the end of a song and shuffle', () => {
+    playback().playTrack(firstTrack, queue, roadTrip)
+
+    playback().playNext()
+    expect(session()?.source).toEqual(roadTrip)
+    playback().playPrevious()
+    expect(session()?.source).toEqual(roadTrip)
+    playback().finishSong()
+    expect(session()?.source).toEqual(roadTrip)
+    playback().toggleShuffle()
+    expect(session()?.source).toEqual(roadTrip)
+  })
+
+  it('keeps the length of a song that starts over from another list', () => {
+    loadSession({ track: secondTrack, durationSeconds: 270, source: SONGS_SOURCE })
+
+    playback().playTrack(secondTrack, queue, roadTrip)
+
+    expect(session()).toMatchObject({
+      track: secondTrack,
+      isPlaying: true,
+      elapsedSeconds: 0,
+      durationSeconds: 270,
+      source: roadTrip
+    })
+  })
+})
+
+describe('isInPlayerFrom', () => {
+  const roadTrip = playlistSource('1763600000000-Road_trip.json')
+  const nightDrive = playlistSource('1763600011111-Night_drive.json')
+
+  it('is the song in the player, played from the list asked about', () => {
+    loadSession({ track: secondTrack, source: roadTrip })
+
+    expect(isInPlayerFrom(session(), secondTrack, roadTrip)).toBe(true)
+  })
+
+  it("isn't the same song played from the Songs view, or from another playlist", () => {
+    loadSession({ track: secondTrack, source: roadTrip })
+
+    expect(isInPlayerFrom(session(), secondTrack, SONGS_SOURCE)).toBe(false)
+    expect(isInPlayerFrom(session(), secondTrack, nightDrive)).toBe(false)
+  })
+
+  it("isn't a song of a playlist, while the song plays from the Songs view", () => {
+    loadSession({ track: secondTrack, source: SONGS_SOURCE })
+
+    expect(isInPlayerFrom(session(), secondTrack, SONGS_SOURCE)).toBe(true)
+    expect(isInPlayerFrom(session(), secondTrack, roadTrip)).toBe(false)
+  })
+
+  it("isn't another song, a missing song or any song while the player is empty", () => {
+    expect(isInPlayerFrom(null, secondTrack, SONGS_SOURCE)).toBe(false)
+
+    loadSession({ track: secondTrack })
+
+    expect(isInPlayerFrom(session(), thirdTrack, SONGS_SOURCE)).toBe(false)
+    expect(isInPlayerFrom(session(), null, SONGS_SOURCE)).toBe(false)
   })
 })

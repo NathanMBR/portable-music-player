@@ -3,6 +3,7 @@ import { expect, fireEvent, within } from 'storybook/test'
 import { loggedMessages } from '../../../testing/logs'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
+import { SONGS_SOURCE } from '../playbackSource'
 import { usePlaybackStore } from '../playbackStore'
 import { SongProgress } from './SongProgress'
 
@@ -91,7 +92,8 @@ export const SeeksWithinTheSong: Story = {
         playOrder: [track],
         isPlaying: true,
         elapsedSeconds: 83,
-        durationSeconds: 270
+        durationSeconds: 270,
+        source: SONGS_SOURCE
       }
     })
   },
@@ -120,7 +122,8 @@ export const LogsWhereItJumps: Story = {
         playOrder: [track],
         isPlaying: true,
         elapsedSeconds: 83,
-        durationSeconds: 270
+        durationSeconds: 270,
+        source: SONGS_SOURCE
       }
     })
   },
@@ -149,7 +152,8 @@ export const JumpsFiveSecondsWithTheArrowKeys: Story = {
         playOrder: [track],
         isPlaying: true,
         elapsedSeconds: 83,
-        durationSeconds: 270
+        durationSeconds: 270,
+        source: SONGS_SOURCE
       }
     })
   },

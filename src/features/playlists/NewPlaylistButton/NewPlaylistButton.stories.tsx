@@ -6,6 +6,7 @@ import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
 import { useNavigationStore } from '../../navigation/navigationStore'
+import { SONGS_SOURCE } from '../../playback/playbackSource'
 import { usePlaybackStore } from '../../playback/playbackStore'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
@@ -162,7 +163,7 @@ export const SlidesInFromTheBottom: Story = {
 export const SlidesInFromBelowThePlayer: Story = {
   beforeEach: () => {
     useNavigationStore.setState({ currentCategory: 'songs' })
-    usePlaybackStore.getState().playTrack(revelations, [revelations])
+    usePlaybackStore.getState().playTrack(revelations, [revelations], SONGS_SOURCE)
   },
   play: async ({ canvas, canvasElement }) => {
     useNavigationStore.getState().selectCategory('playlists')

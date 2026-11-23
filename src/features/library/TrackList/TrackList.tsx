@@ -1,3 +1,4 @@
+import { SONGS_SOURCE } from '../../playback/playbackSource'
 import { usePlaybackStore } from '../../playback/playbackStore'
 import { TrackRow } from '../TrackRow/TrackRow'
 import type { Track } from '../types'
@@ -16,7 +17,8 @@ type TrackListProps = {
  * ink. A row too long for its width is cut with an ellipsis, and hovering shows it whole,
  * as "Title · Artist". The row under the mouse is tinted. The song in the player, playing or
  * paused, has its row on a pen tint with its title and artist in pen, and screen readers hear it
- * as current.
+ * as current, but only while it plays from this list: a song played from a playlist isn't
+ * highlighted here, and its play button plays it from the Songs view.
  *
  * @summary List of songs
  */
@@ -26,7 +28,11 @@ export const TrackList = ({ tracks }: TrackListProps) => {
   return (
     <ul aria-label="Songs" className="pb-8">
       {tracks.map(track => (
-        <TrackRow key={track.path} track={track} onPlay={() => playTrack(track, tracks)} />
+        <TrackRow
+          key={track.path}
+          track={track}
+          onPlay={() => playTrack(track, tracks, SONGS_SOURCE)}
+        />
       ))}
     </ul>
   )

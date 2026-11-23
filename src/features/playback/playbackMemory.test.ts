@@ -9,6 +9,7 @@ import { useSettingsStore } from '../settings/settingsStore'
 import type { SavedPlayback, Settings } from '../settings/types'
 import { PLAYBACK_SAVE_DELAY_MS } from './constants'
 import { connectPlaybackMemory, restorePlayback } from './playbackMemory'
+import { SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 
 const jewelOfTheSummertime: Track = {
@@ -151,7 +152,7 @@ describe('connectPlaybackMemory', () => {
     const saves = mockSaves()
     connect()
 
-    playback().playTrack(blindSpell, [blindSpell, theHouseJackBuilt])
+    playback().playTrack(blindSpell, [blindSpell, theHouseJackBuilt], SONGS_SOURCE)
     playback().cycleRepeatMode()
     playback().toggleShuffle()
     await vi.advanceTimersByTimeAsync(PLAYBACK_SAVE_DELAY_MS)
@@ -209,7 +210,7 @@ describe('connectPlaybackMemory', () => {
 
   it('saves nothing while the song just plays on', async () => {
     const saves = mockSaves()
-    playback().playTrack(jewelOfTheSummertime, [jewelOfTheSummertime])
+    playback().playTrack(jewelOfTheSummertime, [jewelOfTheSummertime], SONGS_SOURCE)
     connect()
 
     playback().reportDuration(279)
@@ -221,7 +222,7 @@ describe('connectPlaybackMemory', () => {
 
   it('saves where the song was paused', async () => {
     const saves = mockSaves()
-    playback().playTrack(jewelOfTheSummertime, [jewelOfTheSummertime])
+    playback().playTrack(jewelOfTheSummertime, [jewelOfTheSummertime], SONGS_SOURCE)
     connect()
 
     playback().reportProgress(64.3)
@@ -235,7 +236,7 @@ describe('connectPlaybackMemory', () => {
 
   it('saves no song once the player is stopped', async () => {
     const saves = mockSaves()
-    playback().playTrack(theHouseJackBuilt, [theHouseJackBuilt])
+    playback().playTrack(theHouseJackBuilt, [theHouseJackBuilt], SONGS_SOURCE)
     connect()
 
     playback().stop()
@@ -254,7 +255,7 @@ describe('connectPlaybackMemory', () => {
         events.push('closed')
       }
     })
-    playback().playTrack(theHouseJackBuilt, [theHouseJackBuilt])
+    playback().playTrack(theHouseJackBuilt, [theHouseJackBuilt], SONGS_SOURCE)
     connect()
 
     playback().setVolume(0.4)

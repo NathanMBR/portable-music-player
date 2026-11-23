@@ -6,6 +6,7 @@ import { clickNotificationAction, shownNotifications } from '../../testing/notif
 import { useLibraryStore } from '../library/libraryStore'
 import type { Track } from '../library/types'
 import { useNavigationStore } from '../navigation/navigationStore'
+import { playlistSource } from '../playback/playbackSource'
 import { usePlaybackStore } from '../playback/playbackStore'
 import { usePlaylistsStore } from './playlistsStore'
 import type { PlaylistCheck, SavedPlaylist } from './types'
@@ -277,6 +278,16 @@ describe('playPlaylist', () => {
       track: blackened,
       queue: [makeBelieve, blackened, sadStatue]
     })
+  })
+
+  it('plays them as songs of this playlist, by its file name', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCheck(checkFinding(roadTrip, 0))
+
+    await playlists().playPlaylist(roadTrip.fileName)
+
+    expect(usePlaybackStore.getState().session?.source).toEqual(playlistSource(roadTrip.fileName))
   })
 
   it('skips the songs the last scan lacks', async () => {

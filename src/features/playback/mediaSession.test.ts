@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Track } from '../library/types'
 import { connectMediaSession } from './mediaSession'
+import { SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 
 const waitingSilence: Track = {
@@ -93,7 +94,7 @@ describe('connectMediaSession', () => {
   it('does nothing in webviews without a media session', () => {
     expect(() => {
       connect()
-      playback().playTrack(waitingSilence, [waitingSilence])
+      playback().playTrack(waitingSilence, [waitingSilence], SONGS_SOURCE)
     }).not.toThrow()
   })
 
@@ -101,7 +102,7 @@ describe('connectMediaSession', () => {
     const { shownTitles } = fakeMediaSession()
     connect()
 
-    playback().playTrack(waitingSilence, [waitingSilence, deepBlue])
+    playback().playTrack(waitingSilence, [waitingSilence, deepBlue], SONGS_SOURCE)
     playback().playNext()
     playback().stop()
 
@@ -114,7 +115,7 @@ describe('connectMediaSession', () => {
     const { shownArtists } = fakeMediaSession()
     connect()
 
-    playback().playTrack(battery, [battery, paradise])
+    playback().playTrack(battery, [battery, paradise], SONGS_SOURCE)
     playback().playNext()
 
     expect(shownArtists).toEqual(['Metallica', ''])
@@ -124,7 +125,7 @@ describe('connectMediaSession', () => {
     const { playbackStates } = fakeMediaSession()
     connect()
 
-    playback().playTrack(deepBlue, [deepBlue])
+    playback().playTrack(deepBlue, [deepBlue], SONGS_SOURCE)
     playback().togglePlaying()
     playback().stop()
 
@@ -134,7 +135,7 @@ describe('connectMediaSession', () => {
   it('hands over the song and its play state only when they change', () => {
     const { shownTitles, playbackStates } = fakeMediaSession()
     connect()
-    playback().playTrack(arisingThunder, [arisingThunder])
+    playback().playTrack(arisingThunder, [arisingThunder], SONGS_SOURCE)
 
     playback().reportDuration(254)
     playback().reportProgress(0.1)
@@ -148,7 +149,7 @@ describe('connectMediaSession', () => {
   it("plays and pauses the song from the OS's media controls", () => {
     const { press } = fakeMediaSession()
     connect()
-    playback().playTrack(waitingSilence, [waitingSilence])
+    playback().playTrack(waitingSilence, [waitingSilence], SONGS_SOURCE)
 
     press('pause')
     expect(session()?.isPlaying).toBe(false)
@@ -160,7 +161,7 @@ describe('connectMediaSession', () => {
   it("stops the player from the OS's media controls", () => {
     const { press } = fakeMediaSession()
     connect()
-    playback().playTrack(deepBlue, [deepBlue])
+    playback().playTrack(deepBlue, [deepBlue], SONGS_SOURCE)
 
     press('stop')
 
@@ -170,7 +171,7 @@ describe('connectMediaSession', () => {
   it("skips to the next and the previous song from the OS's media controls", () => {
     const { press } = fakeMediaSession()
     connect()
-    playback().playTrack(deepBlue, [deepBlue, arisingThunder])
+    playback().playTrack(deepBlue, [deepBlue, arisingThunder], SONGS_SOURCE)
 
     press('nexttrack')
     expect(session()?.track).toBe(arisingThunder)
@@ -182,7 +183,7 @@ describe('connectMediaSession', () => {
   it("moves the song to where the OS's media controls seek", () => {
     const { press } = fakeMediaSession()
     connect()
-    playback().playTrack(arisingThunder, [arisingThunder])
+    playback().playTrack(arisingThunder, [arisingThunder], SONGS_SOURCE)
     playback().reportDuration(254)
 
     press('seekto', { seekTime: 97 })

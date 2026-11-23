@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
+import { SONGS_SOURCE } from '../playbackSource'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { AudioPlayer } from './AudioPlayer'
 
@@ -35,6 +36,7 @@ const loadSession = (overrides: Partial<PlaybackSession> = {}) => {
       isPlaying: true,
       elapsedSeconds: 83,
       durationSeconds: 270,
+      source: SONGS_SOURCE,
       ...overrides
     }
   })

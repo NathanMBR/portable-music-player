@@ -3,6 +3,7 @@ import { expect, waitFor } from 'storybook/test'
 import { drawCover, noCover, UNTIL_COVER_SHOWS } from '../../../testing/covers'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import { playlistSource, SONGS_SOURCE } from '../../playback/playbackSource'
 import { usePlaybackStore } from '../../playback/playbackStore'
 import type { Track } from '../types'
 import { TrackList } from './TrackList'
@@ -30,6 +31,17 @@ const queueWithSongInPlayer: Track[] = [
     title: 'The Frayed Ends of Sanity',
     artist: 'Metallica'
   }
+]
+
+const songFromAPlaylist: Track = {
+  path: 'Songs/Hero of the Day.mp3',
+  title: 'Hero of the Day',
+  artist: 'Metallica'
+}
+const songsWithOneFromAPlaylist: Track[] = [
+  { path: 'Songs/The Four Horsemen.mp3', title: 'The Four Horsemen', artist: 'Metallica' },
+  songFromAPlaylist,
+  { path: 'Songs/Enter Sandman.mp3', title: 'Enter Sandman', artist: 'Metallica' }
 ]
 
 /** The computed background of a row that nothing highlights. */
@@ -129,7 +141,8 @@ export const SongInPlayer: Story = {
         playOrder: queueWithSongInPlayer,
         isPlaying: false,
         elapsedSeconds: 0,
-        durationSeconds: null
+        durationSeconds: null,
+        source: SONGS_SOURCE
       }
     })
   },
@@ -146,6 +159,44 @@ export const SongInPlayer: Story = {
       await expect(backgroundOf(otherRow)).not.toBe(backgroundOf(row))
       await expect(getComputedStyle(otherRow).color).not.toBe(PEN)
     }
+  }
+}
+
+/**
+ * The song in the player plays from a playlist: the Songs view doesn't highlight it, and its play
+ * button plays it again from here, with the whole list as the queue, which then highlights it.
+ */
+export const SongPlayingFromAPlaylist: Story = {
+  args: { tracks: songsWithOneFromAPlaylist },
+  parameters: renderInOwnFrame(150),
+  beforeEach: () => {
+    usePlaybackStore.setState({
+      session: {
+        track: songFromAPlaylist,
+        queue: [songFromAPlaylist],
+        playOrder: [songFromAPlaylist],
+        isPlaying: true,
+        elapsedSeconds: 42,
+        durationSeconds: 260,
+        source: playlistSource('1763600033333-Rainy_evening.json')
+      }
+    })
+  },
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.queryByRole('listitem', { current: true })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: /^Pause / })).toBeNull()
+
+    await userEvent.click(canvas.getByRole('button', { name: `Play ${songFromAPlaylist.title}` }))
+
+    await expect(usePlaybackStore.getState().session).toMatchObject({
+      track: songFromAPlaylist,
+      queue: songsWithOneFromAPlaylist,
+      elapsedSeconds: 0,
+      source: SONGS_SOURCE
+    })
+    await expect(canvas.getByRole('listitem', { current: true })).toBe(
+      rowOf(canvas.getByText(songFromAPlaylist.title))
+    )
   }
 }
 

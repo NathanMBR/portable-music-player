@@ -5,6 +5,7 @@ import { useLibraryStore } from './features/library/libraryStore'
 import type { Track } from './features/library/types'
 import { useNavigationStore } from './features/navigation/navigationStore'
 import { DISMISS_LABEL } from './features/notifications/constants'
+import { SONGS_SOURCE } from './features/playback/playbackSource'
 import { usePlaybackStore } from './features/playback/playbackStore'
 import { usePlaylistsStore } from './features/playlists/playlistsStore'
 import type { SavedPlaylist } from './features/playlists/types'
@@ -88,7 +89,8 @@ const loadPlayingSong = () => {
       playOrder: TRACKS,
       isPlaying: true,
       elapsedSeconds: 0,
-      durationSeconds: null
+      durationSeconds: null,
+      source: SONGS_SOURCE
     }
   })
 }

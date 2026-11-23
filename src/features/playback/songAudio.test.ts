@@ -3,6 +3,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type CommandHandler, failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
 import type { SongSource, Track } from '../library/types'
+import { SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 import { connectSongAudio, type ObjectUrls, type SongAudio } from './songAudio'
 
@@ -224,7 +225,7 @@ const waitUntilStreaming = ({ audio }: ConnectedAudio, track: Track) =>
 
 /** Starts `track` from the queue and waits for its audio to load. */
 const startPlaying = async (connected: ConnectedAudio, track: Track) => {
-  playback().playTrack(track, queue)
+  playback().playTrack(track, queue, SONGS_SOURCE)
   await waitUntilPlaying(connected, track)
 }
 
@@ -242,7 +243,7 @@ const streamWithClockMovingAt = async (track: Track, seconds: number) => {
   })
   mockCommands(streamedSongs)
   const connected = connectAudio()
-  playback().playTrack(track, [track])
+  playback().playTrack(track, [track], SONGS_SOURCE)
   await waitUntilStreaming(connected, track)
   const { audio } = connected
   audio.loadLength(270)
@@ -258,7 +259,7 @@ describe('connectSongAudio', () => {
     mockCommands({ ...streamedSongs, read_song: readSongFromRust })
     const connected = connectAudio()
 
-    playback().playTrack(firstTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
 
     await waitUntilStreaming(connected, firstTrack)
     expect(connected.audio.paused).toBe(false)
@@ -275,8 +276,8 @@ describe('connectSongAudio', () => {
         })
     })
     const connected = connectAudio()
-    playback().playTrack(firstTrack, queue)
-    playback().playTrack(secondTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
+    playback().playTrack(secondTrack, queue, SONGS_SOURCE)
     await vi.waitFor(() => expect(answers.size).toBe(2))
 
     answers.get(secondTrack.path)?.()
@@ -413,7 +414,7 @@ describe('connectSongAudio', () => {
     mockCommands(songsFromMemory)
     const connected = connectAudio()
     const { audio } = connected
-    playback().playTrack(cochise, [cochise])
+    playback().playTrack(cochise, [cochise], SONGS_SOURCE)
     await waitUntilPlaying(connected, cochise)
     audio.loadLength(222)
     audio.playTo(80)
@@ -432,7 +433,7 @@ describe('connectSongAudio', () => {
     mockCommands(streamedSongs)
     const connected = connectAudio()
 
-    playback().playTrack(aMonsterInHerEyes, [aMonsterInHerEyes])
+    playback().playTrack(aMonsterInHerEyes, [aMonsterInHerEyes], SONGS_SOURCE)
 
     await waitUntilStreaming(connected, aMonsterInHerEyes)
     expect(connected.audio.loadedSources).toEqual([streamUrlOf(aMonsterInHerEyes.path)])
@@ -443,7 +444,7 @@ describe('connectSongAudio', () => {
     const angelsCry = trackTitled('Angels Cry', 'Angra')
     mockCommands(songsFromMemory)
     const connected = connectAudio()
-    playback().playTrack(angelsCry, [angelsCry])
+    playback().playTrack(angelsCry, [angelsCry], SONGS_SOURCE)
     await waitUntilPlaying(connected, angelsCry)
     connected.audio.loadLength(380)
     playback().pause()
@@ -500,7 +501,7 @@ describe('connectSongAudio', () => {
     mockCommands(streamedSongs)
     const connected = connectAudio()
     const { audio } = connected
-    playback().playTrack(firstTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
     await waitUntilStreaming(connected, firstTrack)
     audio.loadLength(270)
     audio.playTo(80)
@@ -535,8 +536,8 @@ describe('connectSongAudio', () => {
         })
     })
     const connected = connectAudio()
-    playback().playTrack(firstTrack, queue)
-    playback().playTrack(secondTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
+    playback().playTrack(secondTrack, queue, SONGS_SOURCE)
     await vi.waitFor(() => expect(answers.size).toBe(2))
 
     answers.get(secondTrack.path)?.()
@@ -553,7 +554,7 @@ describe('connectSongAudio', () => {
     mockCommands({ song_source: failingCommand(reason) })
     const connected = connectAudio()
 
-    playback().playTrack(thirdTrack, queue)
+    playback().playTrack(thirdTrack, queue, SONGS_SOURCE)
 
     await vi.waitFor(() =>
       expect(shownNotifications()).toEqual([
@@ -596,7 +597,7 @@ describe('connectSongAudio', () => {
     audio.canPlayType = () => ''
     connectAudio(audio)
 
-    playback().playTrack(track, [track])
+    playback().playTrack(track, [track], SONGS_SOURCE)
     await settle()
 
     expect(shownNotifications()).toEqual([
@@ -619,7 +620,7 @@ describe('connectSongAudio', () => {
     audio.play = () => Promise.reject(new DOMException('Autoplay is blocked', 'NotAllowedError'))
     connectAudio(audio)
 
-    playback().playTrack(firstTrack, queue)
+    playback().playTrack(firstTrack, queue, SONGS_SOURCE)
 
     await vi.waitFor(() =>
       expect(shownNotifications()).toMatchObject([

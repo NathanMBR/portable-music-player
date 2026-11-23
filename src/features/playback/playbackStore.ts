@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { clamp } from '../../clamp'
 import type { Track } from '../library/types'
 import { log } from '../logging/log'
+import { isSameSource, type PlaybackSource, SONGS_SOURCE } from './playbackSource'
 import { formatPreciseTime } from './playbackTime'
 import {
   createPlayOrder,
@@ -15,7 +16,7 @@ import {
 /** What the time left of the progress bar shows. */
 export type ShownTime = 'elapsed' | 'remaining'
 
-/** The song loaded in the player and the queue it was played from. */
+/** The song loaded in the player, the queue it was played from and the list that queue is. */
 export type PlaybackSession = {
   /** The current song: a single one, so only one song plays at a time. */
   track: Track
@@ -27,12 +28,17 @@ export type PlaybackSession = {
   elapsedSeconds: number
   /** `null` until the song's audio has loaded its length. */
   durationSeconds: number | null
+  /**
+   * The list the queue came from, for as long as the session lasts: only that list shows the song
+   * as the one in the player.
+   */
+  source: PlaybackSource
 }
 
 /** The song put back in the player when the app opens again, found among the library's songs. */
 export type RestoredSong = {
   track: Track
-  /** The list it plays from, as the Songs view shows it. */
+  /** The list it plays from, as the Songs view shows it: it's put back as played from there. */
   queue: Track[]
   elapsedSeconds: number
 }
@@ -63,7 +69,8 @@ type PlaybackStore = {
    */
   movingVolume: number | null
   shownTime: ShownTime
-  playTrack: (track: Track, queue: Track[]) => void
+  /** Plays the song from its start, with `queue`, the songs of `source`, to go on with. */
+  playTrack: (track: Track, queue: Track[], source: PlaybackSource) => void
   togglePlaying: () => void
   stop: () => void
   playNext: () => void
@@ -93,15 +100,34 @@ const OTHER_SHOWN_TIME: Record<ShownTime, ShownTime> = {
   remaining: 'elapsed'
 }
 
-// A song that starts plays from its beginning, and its length is unknown until its audio loads.
-// The same song starting over keeps its length: its audio is already loaded, so none would arrive.
+// A song's length is unknown until its audio loads. The same song starting over, from its own list
+// or another, keeps its length: its audio is already loaded, so none would arrive.
+const knownLengthOf = (session: PlaybackSession | null, track: Track) =>
+  session?.track.path === track.path ? session.durationSeconds : null
+
+// A song that starts plays from its beginning.
 const startFromTheBeginning = (session: PlaybackSession, track: Track): PlaybackSession => ({
   ...session,
   track,
   isPlaying: true,
   elapsedSeconds: 0,
-  durationSeconds: track.path === session.track.path ? session.durationSeconds : null
+  durationSeconds: knownLengthOf(session, track)
 })
+
+/**
+ * Whether the song in the player is `track`, played from `source`: a song is current only in the
+ * list it plays from, so another list holding it shows it like any other. A missing song, `null`,
+ * never is.
+ */
+export const isInPlayerFrom = (
+  session: PlaybackSession | null,
+  track: Track | null,
+  source: PlaybackSource
+) =>
+  session !== null &&
+  track !== null &&
+  session.track.path === track.path &&
+  isSameSource(session.source, source)
 
 type HeardVolume = Pick<PlaybackStore, 'volume' | 'isMuted' | 'movingVolume'>
 
@@ -113,13 +139,17 @@ export const audibleVolume = ({ volume, isMuted, movingVolume }: HeardVolume) =>
 const toVolume = (value: number) => clamp(value, SILENT, FULL_VOLUME)
 
 // A song put back stays paused: the app opening shouldn't start the music on its own.
-const sessionOf = ({ track, queue, elapsedSeconds }: RestoredSong, isShuffled: boolean) => ({
+const sessionOf = (
+  { track, queue, elapsedSeconds }: RestoredSong,
+  isShuffled: boolean
+): PlaybackSession => ({
   track,
   queue,
   playOrder: createPlayOrder(queue, track, isShuffled),
   isPlaying: false,
   elapsedSeconds: Math.max(elapsedSeconds, 0),
-  durationSeconds: null
+  durationSeconds: null,
+  source: SONGS_SOURCE
 })
 
 type SongEvent = 'Started' | 'Paused' | 'Resumed' | 'Stopped'
@@ -171,16 +201,17 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
     isMuted: false,
     movingVolume: null,
     shownTime: 'elapsed',
-    playTrack: (track, queue) => {
-      const playOrder = createPlayOrder(queue, track, get().isShuffled)
+    playTrack: (track, queue, source) => {
+      const { session, isShuffled } = get()
       set({
         session: {
           track,
           queue,
-          playOrder,
+          playOrder: createPlayOrder(queue, track, isShuffled),
           isPlaying: true,
           elapsedSeconds: 0,
-          durationSeconds: null
+          durationSeconds: knownLengthOf(session, track),
+          source
         }
       })
       logSong('Started', track)

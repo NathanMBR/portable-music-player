@@ -5,6 +5,7 @@ import { formatSongCount } from '../library/libraryStatus'
 import { useLibraryStore } from '../library/libraryStore'
 import { log } from '../logging/log'
 import { notifyError, notifySuccess, notifyUndoable } from '../notifications/notify'
+import { playlistSource } from '../playback/playbackSource'
 import { usePlaybackStore } from '../playback/playbackStore'
 import { playlistFileName } from './playlistFileName'
 import { findPlaylistSongs, playableTracksOf, songNameOf } from './playlistSongs'
@@ -91,7 +92,7 @@ const playSongsOf = (playlist: SavedPlaylist, fromSong: string | undefined) => {
     notifyError(`Couldn't play "${playlist.title}"`, NOT_SCANNED_YET)
     return
   }
-  usePlaybackStore.getState().playTrack(firstTrack, queue)
+  usePlaybackStore.getState().playTrack(firstTrack, queue, playlistSource(playlist.fileName))
 }
 
 /** The playlist on screen, or `undefined` while the list is, as when the open one was deleted. */

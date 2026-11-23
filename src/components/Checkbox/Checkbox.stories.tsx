@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { expect, fn } from 'storybook/test'
 import { loggedMessages } from '../../testing/logs'
+import { ListRow } from '../ListRow/ListRow'
 import { Checkbox } from './Checkbox'
 
 const meta = {
@@ -57,5 +58,31 @@ export const LogsItsToggles: Story = {
     await userEvent.click(canvas.getByRole('checkbox', { name: 'Late Redemption · Angra' }))
 
     await expect(loggedMessages()).toEqual(['"Late Redemption · Angra" is on'])
+  }
+}
+
+/**
+ * In a list's row, like a song of the New playlist dialog, the box sits where the row's padding
+ * ends, with no room of its own added before it.
+ */
+export const InAListRow: Story = {
+  args: { children: 'Question! · System of a Down' },
+  render: args => (
+    <ul>
+      <ListRow>
+        <Checkbox {...args} />
+      </ListRow>
+    </ul>
+  ),
+  play: async ({ canvas }) => {
+    const row = canvas.getByRole('listitem')
+    const box = canvas.getByRole('checkbox').firstElementChild
+    if (!box) {
+      throw new Error('The checkbox has no box')
+    }
+
+    await expect(box.getBoundingClientRect().left - row.getBoundingClientRect().left).toBe(
+      Number.parseFloat(getComputedStyle(row).paddingLeft)
+    )
   }
 }

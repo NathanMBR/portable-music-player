@@ -2,11 +2,11 @@ import { DataInteractive } from '@headlessui/react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { ACTIVE_CLASSES } from '../buttonStyles'
 
-// The right padding matches an icon button's own, so a cut name ends as far from the edge of a
-// highlighted row as a button's icon starts. A sortable row's slide, an inline transition, stops
-// for users who prefer reduced motion.
+// The side padding matches an icon button's own, so the first element starts, and a cut name
+// ends, as far from the edges of a highlighted row as a button's icon sits inside the button. A
+// sortable row's slide, an inline transition, stops for users who prefer reduced motion.
 const ROW_CLASSES =
-  'flex items-center gap-2 border-b border-rule py-1.5 pr-2 first:border-t motion-reduce:transition-none!'
+  'flex items-center gap-2 border-b border-rule px-2 py-1.5 first:border-t motion-reduce:transition-none!'
 
 // Highlighted like the menu's categories: the current one is on, the others tint under the pointer.
 const OTHER_ROW_CLASSES = 'data-hover:bg-rule/60'
@@ -36,9 +36,10 @@ const rowLookOf = (isCurrent: boolean, isLifted: boolean) => {
 
 /**
  * Row of a list between thin rules, from above the first row to below the last, like a song of
- * the song list or a playlist of the Playlists view. The row under the mouse is tinted. The
- * current row sits on a pen tint with its text in pen, and screen readers hear it as current. In
- * a sortable list, the row being dragged is lifted above the others. It goes in a `<ul>`.
+ * the song list or a playlist of the Playlists view, with the same room inside both of its ends.
+ * The row under the mouse is tinted. The current row sits on a pen tint with its text in pen, and
+ * screen readers hear it as current. In a sortable list, the row being dragged is lifted above the
+ * others. It goes in a `<ul>`.
  *
  * @summary Row of a list, tinted under the mouse
  */

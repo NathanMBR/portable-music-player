@@ -43,7 +43,7 @@ export const Checkbox = ({ checked, onChange, children }: CheckboxProps) => {
       ref={checkboxRef}
       checked={checked}
       onChange={toggle}
-      className="group flex min-w-0 flex-1 cursor-pointer items-center gap-3 pl-2 outline-none"
+      className="group flex min-w-0 flex-1 cursor-pointer items-center gap-3 outline-none"
     >
       <span
         className={`flex size-5 shrink-0 items-center justify-center rounded border-2 border-ink-faded group-data-checked:border-pen group-data-checked:bg-pen ${BOX_FOCUS_CLASSES}`}

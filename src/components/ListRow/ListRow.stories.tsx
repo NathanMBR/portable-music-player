@@ -46,3 +46,16 @@ export const Current: Story = {
 export const Lifted: Story = {
   args: { children: 'One · Metallica', isLifted: true }
 }
+
+/**
+ * What the row shows keeps the same room from both of its edges, so the first element, like a
+ * song's play button, never touches the row's left end.
+ */
+export const Padded: Story = {
+  play: async ({ canvas }) => {
+    const { paddingLeft, paddingRight } = getComputedStyle(canvas.getByRole('listitem'))
+
+    await expect(paddingLeft).not.toBe('0px')
+    await expect(paddingLeft).toBe(paddingRight)
+  }
+}

@@ -3,7 +3,7 @@ import { PlusIcon } from '@heroicons/react/20/solid'
 import { useState } from 'react'
 import { IconButton } from '../../../components/IconButton/IconButton'
 import { usePlaybackStore } from '../../playback/playbackStore'
-import { NewPlaylistDialog } from '../NewPlaylistDialog/NewPlaylistDialog'
+import { PlaylistDialog } from '../PlaylistDialog/PlaylistDialog'
 import { useIsNewPlaylistButtonShown } from '../useIsNewPlaylistButtonShown'
 
 // It slides up from below the window over a notification's time and curve, Sonner's 400ms ease,
@@ -55,7 +55,7 @@ export const NewPlaylistButton = () => {
           />
         </div>
       </Transition>
-      <NewPlaylistDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+      <PlaylistDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
     </>
   )
 }

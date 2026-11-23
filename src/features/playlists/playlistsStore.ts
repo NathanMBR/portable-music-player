@@ -32,6 +32,11 @@ type PlaylistsStore = {
   loadPlaylists: () => Promise<void>
   /** Writes a new playlist's file, and resolves to whether it was created. */
   createPlaylist: (contents: PlaylistContents) => Promise<boolean>
+  /**
+   * Writes a playlist's file again with new contents, keeping its name whatever the new title, and
+   * resolves to whether it was saved.
+   */
+  editPlaylist: (fileName: string, contents: PlaylistContents) => Promise<boolean>
   showPlaylist: (fileName: string) => void
   showList: () => void
   /**
@@ -48,6 +53,8 @@ type PlaylistsStore = {
   /** Takes a song out of the playlist, never out of the Songs folder; Undo puts it back. */
   removeSong: (fileName: string, songFileName: string) => Promise<void>
 }
+
+const DELETED_SINCE = 'The playlist was deleted.'
 
 const NOT_SCANNED_YET = "Its songs aren't in the song list yet: scan the Songs folder again."
 
@@ -129,7 +136,7 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
     const failureTitle = `Couldn't put "${songName}" back in "${removed.title}"`
     const playlist = playlistNamed(removed.fileName)
     if (!playlist) {
-      notifyError(failureTitle, 'The playlist was deleted.')
+      notifyError(failureTitle, DELETED_SINCE)
       return
     }
 
@@ -177,6 +184,27 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
         return true
       } catch (error) {
         notifyError(`Couldn't create "${contents.title}"`, error)
+        return false
+      }
+    },
+    editPlaylist: async (fileName, contents) => {
+      const playlist = playlistNamed(fileName)
+      if (!playlist) {
+        notifyError(`Couldn't save "${contents.title}"`, DELETED_SINCE)
+        return false
+      }
+
+      try {
+        const saved = await savePlaylistFile(fileName, contents)
+        set({
+          playlists: sortByTitle(
+            get().playlists.map(other => (other.fileName === fileName ? saved : other))
+          )
+        })
+        log(`Edited playlist "${saved.title}"`)
+        return true
+      } catch (error) {
+        notifyError(`Couldn't save "${playlist.title}"`, error)
         return false
       }
     },

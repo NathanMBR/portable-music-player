@@ -148,6 +148,67 @@ describe('createPlaylist', () => {
   })
 })
 
+describe('editPlaylist', () => {
+  const edited = {
+    title: 'Afternoon run',
+    description: 'Windows down',
+    songs: ['Sad Statue.mp3', 'Make Believe.mp3']
+  }
+
+  it('saves the playlist over its own file, whatever its new title', async () => {
+    listed(roadTrip)
+    const savePlaylist = vi.fn((_args?: InvokeArgs) => ({ ...roadTrip, ...edited }))
+    mockCommands({ save_playlist: savePlaylist })
+
+    await playlists().editPlaylist(roadTrip.fileName, edited)
+
+    expect(savePlaylist).toHaveBeenCalledWith({ fileName: roadTrip.fileName, playlist: edited })
+  })
+
+  it('takes the playlist as Rust saved it, keeps the list sorted by title, and logs its new title', async () => {
+    listed(calmEvening, roadTrip)
+    const saved: SavedPlaylist = { ...roadTrip, ...edited, allSongsFound: false }
+    mockCommands({ save_playlist: () => saved })
+
+    const isSaved = await playlists().editPlaylist(roadTrip.fileName, edited)
+
+    expect(isSaved).toBe(true)
+    expect(playlists().playlists).toEqual([saved, calmEvening])
+    expect(loggedMessages()).toEqual(['Edited playlist "Afternoon run"'])
+  })
+
+  it("notifies when its file can't be written, keeping the playlist as it was", async () => {
+    listed(roadTrip)
+    mockCommands({ save_playlist: failingCommand(MISSING_ERROR) })
+
+    const isSaved = await playlists().editPlaylist(roadTrip.fileName, edited)
+
+    expect(isSaved).toBe(false)
+    expect(playlists().playlists).toEqual([roadTrip])
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: `Couldn't save "Road trip"`, description: MISSING_ERROR }
+    ])
+  })
+
+  it('notifies when the playlist was deleted since, writing nothing', async () => {
+    listed(calmEvening)
+    const savePlaylist = vi.fn()
+    mockCommands({ save_playlist: savePlaylist })
+
+    const isSaved = await playlists().editPlaylist(roadTrip.fileName, edited)
+
+    expect(isSaved).toBe(false)
+    expect(savePlaylist).not.toHaveBeenCalled()
+    expect(shownNotifications()).toEqual([
+      {
+        type: 'error',
+        title: `Couldn't save "Afternoon run"`,
+        description: 'The playlist was deleted.'
+      }
+    ])
+  })
+})
+
 describe('showPlaylist', () => {
   it('opens a playlist and logs it by its title', () => {
     listed(roadTrip)

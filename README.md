@@ -17,6 +17,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Add songs by dropping files or folders on the window
 - Playlists page, from the `Playlists` folder
 - Create playlists, picking their songs with a search
+- Edit a playlist's title, description and songs
 - Play, open and delete playlists, with an Undo notification
 - Reorder and remove the numbered songs of a playlist
 - Flags playlists whose songs are missing, until a recheck finds them

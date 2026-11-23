@@ -1,8 +1,12 @@
+import { PencilIcon } from '@heroicons/react/20/solid'
+import { useState } from 'react'
 import { AlertMark } from '../../../components/AlertMark/AlertMark'
+import { IconButton } from '../../../components/IconButton/IconButton'
 import { StatusLine } from '../../../components/StatusLine/StatusLine'
 import { ViewHeader } from '../../../components/ViewHeader/ViewHeader'
 import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
 import { MISSING_SONGS_LABEL, PLAYLISTS_ICON } from '../constants'
+import { PlaylistDialog } from '../PlaylistDialog/PlaylistDialog'
 import { PlaylistPlayButton } from '../PlaylistPlayButton/PlaylistPlayButton'
 import { PlaylistSongList } from '../PlaylistSongList/PlaylistSongList'
 import { describePlaylist } from '../playlistStatus'
@@ -18,7 +22,8 @@ type PlaylistPageProps = {
 /**
  * One playlist, opened from the Playlists view with See. Its header has a back button to the list
  * of playlists, the playlist's title, a red alert after it while the playlist's file says songs
- * are missing, then a Recheck button meanwhile, and a large play button, which always starts from
+ * are missing, then a Recheck button meanwhile, an Edit button, which opens the playlist's dialog
+ * filled with its values (`PlaylistDialog`), and a large play button, which always starts from
  * the first song. Below the rule, the status line counts the songs and gives the description, and
  * the songs follow, to play, reorder and remove (`PlaylistSongList`). While songs are missing,
  * every play button of the playlist is disabled.
@@ -27,6 +32,7 @@ type PlaylistPageProps = {
  */
 export const PlaylistPage = ({ playlist }: PlaylistPageProps) => {
   const showList = usePlaylistsStore(state => state.showList)
+  const [isEditing, setIsEditing] = useState(false)
 
   return (
     <ViewLayout
@@ -39,6 +45,11 @@ export const PlaylistPage = ({ playlist }: PlaylistPageProps) => {
           actions={
             <>
               <RecheckButton playlist={playlist} />
+              <IconButton
+                icon={PencilIcon}
+                label={`Edit ${playlist.title}`}
+                onClick={() => setIsEditing(true)}
+              />
               <PlaylistPlayButton playlist={playlist} isLarge />
             </>
           }
@@ -50,6 +61,7 @@ export const PlaylistPage = ({ playlist }: PlaylistPageProps) => {
         <StatusLine>{describePlaylist(playlist)}</StatusLine>
         <PlaylistSongList playlist={playlist} />
       </div>
+      <PlaylistDialog isOpen={isEditing} onClose={() => setIsEditing(false)} playlist={playlist} />
     </ViewLayout>
   )
 }

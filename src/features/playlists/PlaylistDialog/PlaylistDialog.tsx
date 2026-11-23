@@ -11,15 +11,24 @@ import { useScannedTracks, useSortedTracks } from '../../library/scannedTracks'
 import { TrackName } from '../../library/TrackName/TrackName'
 import type { Track } from '../../library/types'
 import { MAX_TITLE_LENGTH } from '../constants'
-import { pickedFileNames } from '../playlistSongs'
+import { editedSongs, pickedFileNames, pickedPathsIn } from '../playlistSongs'
 import { usePlaylistsStore } from '../playlistsStore'
 import { matchesSearch } from '../songSearch'
+import type { PlaylistContents, SavedPlaylist } from '../types'
 
-type NewPlaylistDialogProps = {
-  /** Shows the dialog, with an empty form each time it opens. */
+type PlaylistDialogProps = {
+  /**
+   * Shows the dialog, with its form as it starts each time it opens: empty, or with the values the
+   * edited playlist has then.
+   */
   isOpen: boolean
   /** Runs on Cancel, Escape, a click outside the dialog, and once the playlist is saved. */
   onClose: () => void
+  /**
+   * The playlist to edit. The dialog then says "Edit playlist", starts from its title,
+   * description and songs, and saves over its file. Leave it out to create a playlist.
+   */
+  playlist?: SavedPlaylist
 }
 
 type SongPickerProps = {
@@ -75,6 +84,9 @@ const useFocusOnMount = () => {
   }, [])
   return field
 }
+
+const describeUnlistedSongs = (count: number) =>
+  `${formatSongCount(count)} not in the Songs folder ${count === 1 ? 'stays' : 'stay'} in the playlist.`
 
 const emptyPickerMessage = (hasSongs: boolean, search: string) =>
   hasSongs ? `No songs match "${search.trim()}".` : 'The Songs folder has no songs yet.'
@@ -138,6 +150,8 @@ type SongsStepProps = {
   onSearchChange: (search: string) => void
   pickedPaths: ReadonlySet<string>
   onPick: (path: string, isPicked: boolean) => void
+  /** How many songs of the edited playlist the picker can't show, since the scan lacks them. */
+  unlistedCount: number
   isSaving: boolean
   onBack: () => void
   onSave: () => void
@@ -149,6 +163,7 @@ const SongsStep = ({
   onSearchChange,
   pickedPaths,
   onPick,
+  unlistedCount,
   isSaving,
   onBack,
   onSave
@@ -180,6 +195,9 @@ const SongsStep = ({
       <p aria-live="polite" className="mt-2 text-sm text-ink-faded">
         {formatSongCount(pickedPaths.size)} picked
       </p>
+      {unlistedCount > 0 && (
+        <p className="text-sm text-ink-faded">{describeUnlistedSongs(unlistedCount)}</p>
+      )}
       <ModalButtons>
         <Button variant="quiet" onClick={onBack}>
           Back
@@ -192,38 +210,60 @@ const SongsStep = ({
   )
 }
 
-// Inside the panel, which Headless UI takes away once the dialog closes, so each opening starts
-// with an empty form. The steps share its state, so going back and forth keeps what was typed and
-// picked.
-const NewPlaylistForm = ({ onClose }: Pick<NewPlaylistDialogProps, 'onClose'>) => {
+// Saving creates a playlist, or writes the edited one over its file.
+const useSavePlaylist = (playlist: SavedPlaylist | undefined) => {
   const createPlaylist = usePlaylistsStore(state => state.createPlaylist)
+  const editPlaylist = usePlaylistsStore(state => state.editPlaylist)
+  return (contents: PlaylistContents) =>
+    playlist ? editPlaylist(playlist.fileName, contents) : createPlaylist(contents)
+}
+
+// The songs a save writes: those picked, in the list's order, or for an edit, merged into the
+// playlist's own order.
+const songsToSave = (
+  playlist: SavedPlaylist | undefined,
+  tracks: Track[],
+  pickedPaths: ReadonlySet<string>
+) =>
+  playlist ? editedSongs(playlist.songs, tracks, pickedPaths) : pickedFileNames(tracks, pickedPaths)
+
+// Inside the panel, which Headless UI takes away once the dialog closes, so each opening starts
+// over: empty, or from the edited playlist's values then. The steps share its state, so going back
+// and forth keeps what was typed and picked.
+const PlaylistForm = ({ playlist, onClose }: Omit<PlaylistDialogProps, 'isOpen'>) => {
+  const savePlaylist = useSavePlaylist(playlist)
   const tracks = useSortedTracks(useScannedTracks())
   const [step, setStep] = useState<FormStep>('details')
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(playlist?.title ?? '')
+  const [description, setDescription] = useState(playlist?.description ?? '')
   const [search, setSearch] = useState('')
-  const [pickedPaths, setPickedPaths] = useState<ReadonlySet<string>>(new Set())
+  const [pickedPaths, setPickedPaths] = useState<ReadonlySet<string>>(() =>
+    playlist ? pickedPathsIn(playlist.songs, tracks) : new Set()
+  )
   const [isSaving, setIsSaving] = useState(false)
+  const unlistedCount = playlist
+    ? playlist.songs.length - pickedPathsIn(playlist.songs, tracks).size
+    : 0
 
   const pick = (path: string, isPicked: boolean) =>
     setPickedPaths(picked => togglePath(picked, path, isPicked))
 
   const save = async () => {
     setIsSaving(true)
-    const isCreated = await createPlaylist({
+    const isSaved = await savePlaylist({
       title: title.trim(),
       description: description.trim(),
-      songs: pickedFileNames(tracks, pickedPaths)
+      songs: songsToSave(playlist, tracks, pickedPaths)
     })
     setIsSaving(false)
-    if (isCreated) {
+    if (isSaved) {
       onClose()
     }
   }
 
   return (
     <>
-      <ModalTitle>New playlist</ModalTitle>
+      <ModalTitle>{playlist ? 'Edit playlist' : 'New playlist'}</ModalTitle>
       <Description className="mt-1 text-sm text-ink-faded">{STEP_NAMES[step]}</Description>
       {step === 'details' ? (
         <DetailsStep
@@ -241,6 +281,7 @@ const NewPlaylistForm = ({ onClose }: Pick<NewPlaylistDialogProps, 'onClose'>) =
           onSearchChange={setSearch}
           pickedPaths={pickedPaths}
           onPick={pick}
+          unlistedCount={unlistedCount}
           isSaving={isSaving}
           onBack={() => setStep('details')}
           onSave={() => void save()}
@@ -251,20 +292,26 @@ const NewPlaylistForm = ({ onClose }: Pick<NewPlaylistDialogProps, 'onClose'>) =
 }
 
 /**
- * Modal dialog creating a playlist, in two steps, named under its title. First the playlist's
- * title, required, and its description: Next is disabled until the title isn't blank. Then the
- * songs of the Songs folder, in the Songs view's order, each with a checkbox. The search above
- * them finds songs by title, artist or file name, whatever their case and accents, and picked
- * songs stay picked while it hides them; the count below the list says how many are. Back returns
- * to the first step, keeping what was typed, the search included, and picked. Each step focuses its first field when it
- * shows. Save keeps the songs in the list's order, whatever order they were picked in, and the
- * playlist may have none. A failed save keeps the dialog open with what was typed and picked, and
- * a notification says why.
+ * Modal dialog creating a playlist, or editing one, in two steps, named under its title. First the
+ * playlist's title, required, and its description: Next is disabled until the title isn't blank.
+ * Then the songs of the Songs folder, in the Songs view's order, each with a checkbox. The search
+ * above them finds songs by title, artist or file name, whatever their case and accents, and
+ * picked songs stay picked while it hides them; the count below the list says how many are. Back
+ * returns to the first step, keeping what was typed, the search included, and picked. Each step
+ * focuses its first field when it shows. A new playlist keeps its songs in the list's order,
+ * whatever order they were picked in, and may have none.
  *
- * @summary Dialog creating a playlist from the songs of the Songs folder
+ * Given a playlist, the dialog says "Edit playlist" and starts from the playlist's title,
+ * description and found songs, picked. Save writes over the playlist's file, which keeps its name
+ * whatever the new title: the songs still picked keep their place, the unpicked ones leave, and
+ * the newly picked ones follow in the list's order. Songs the Songs folder lacks can't be shown, so
+ * they stay where they are, and the second step says how many. A failed save keeps the dialog open
+ * with what was typed and picked, and a notification says why.
+ *
+ * @summary Dialog creating or editing a playlist
  */
-export const NewPlaylistDialog = ({ isOpen, onClose }: NewPlaylistDialogProps) => (
+export const PlaylistDialog = ({ isOpen, onClose, playlist }: PlaylistDialogProps) => (
   <Modal isOpen={isOpen} onClose={onClose} isWide>
-    <NewPlaylistForm onClose={onClose} />
+    <PlaylistForm playlist={playlist} onClose={onClose} />
   </Modal>
 )

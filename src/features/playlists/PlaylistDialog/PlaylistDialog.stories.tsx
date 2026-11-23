@@ -8,8 +8,9 @@ import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { withNotificationArea } from '../../../testing/withNotificationArea'
 import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
-import type { SavedPlaylist } from '../types'
-import { NewPlaylistDialog } from './NewPlaylistDialog'
+import { usePlaylistsStore } from '../playlistsStore'
+import type { PlaylistContents, SavedPlaylist } from '../types'
+import { PlaylistDialog } from './PlaylistDialog'
 
 const boatSong: Track = { path: 'Songs/Boat Song.mp3', title: 'Boat Song', artist: 'Woodkid' }
 const leperMessiah: Track = {
@@ -54,13 +55,32 @@ const roadTrip: SavedPlaylist = {
 
 const createPlaylist = fn((_args?: InvokeArgs) => roadTrip)
 
+// A playlist to edit, with a song the Songs folder doesn't hold anymore between its found ones.
+const MISSING_SONG = 'Ancient Winds.mp3'
+const summerDrive: SavedPlaylist = {
+  fileName: '1763590012345-Summer_drive.json',
+  title: 'Summer drive',
+  description: 'Coast road',
+  allSongsFound: false,
+  songs: ['Winds of Destination.mp3', MISSING_SONG, 'Boat Song.mp3']
+}
+
+const SAVE_ERROR =
+  "Couldn't save the playlist 1763590012345-Summer_drive.json: Read-only file system (os error 30)"
+
+// Rust saves what it's given, and finds every song but the missing one.
+const savePlaylist = fn((args?: InvokeArgs) => {
+  const { fileName, playlist } = args as { fileName: string; playlist: PlaylistContents }
+  return { fileName, ...playlist, allSongsFound: !playlist.songs.includes(MISSING_SONG) }
+})
+
 const songNamesIn = (dialog: HTMLElement) =>
   within(dialog)
     .queryAllByRole('checkbox')
     .map(checkbox => checkbox.textContent)
 
 const meta = {
-  component: NewPlaylistDialog,
+  component: PlaylistDialog,
   args: { isOpen: true, onClose: fn() },
   decorators: [withNotificationArea],
   parameters: { layout: 'fullscreen', ...renderInOwnFrame(720) },
@@ -68,7 +88,7 @@ const meta = {
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: TRACKS } })
     mockCommands({ read_cover: noCover, create_playlist: createPlaylist })
   }
-} satisfies Meta<typeof NewPlaylistDialog>
+} satisfies Meta<typeof PlaylistDialog>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -331,5 +351,102 @@ export const WithoutSongsInTheLibrary: Story = {
 
     await expect(within(dialog).getByText('The Songs folder has no songs yet.')).toBeVisible()
     await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+  }
+}
+
+/** Editing: the playlist the store holds, which the dialog saves over. */
+const editing = (playlist: SavedPlaylist) => {
+  usePlaylistsStore.setState({ playlists: [playlist], loadStatus: 'loaded' })
+  mockCommands({ read_cover: noCover, save_playlist: savePlaylist })
+}
+
+const findEditDialog = (canvasElement: HTMLElement) =>
+  within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'Edit playlist' })
+
+/**
+ * Given a playlist, the dialog edits it: it says "Edit playlist", and starts from the playlist's
+ * title and description, then its songs, picked. A song the Songs folder lacks can't be shown,
+ * so the dialog says it stays in the playlist.
+ */
+export const Editing: Story = {
+  args: { playlist: summerDrive },
+  beforeEach: () => {
+    editing(summerDrive)
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findEditDialog(canvasElement)
+    await expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveValue('Summer drive')
+    await expect(within(dialog).getByRole('textbox', { name: 'Description' })).toHaveValue(
+      'Coast road'
+    )
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+    const picked = within(dialog)
+      .getAllByRole('checkbox', { checked: true })
+      .map(checkbox => checkbox.textContent)
+    await expect(picked).toEqual(['Boat Song · Woodkid', 'Winds of Destination · Angra'])
+    await expect(within(dialog).getByText('2 songs picked')).toBeVisible()
+    await expect(
+      within(dialog).getByText('1 song not in the Songs folder stays in the playlist.')
+    ).toBeVisible()
+  }
+}
+
+/**
+ * Save writes the playlist over its own file: the songs still picked keep their place, the
+ * unpicked ones leave, the newly picked ones follow in the list's order, and a song the Songs
+ * folder lacks stays where it was.
+ */
+export const SavingAnEdit: Story = {
+  args: { playlist: summerDrive },
+  beforeEach: () => {
+    editing(summerDrive)
+  },
+  play: async ({ args, canvasElement, userEvent }) => {
+    const dialog = await findEditDialog(canvasElement)
+    const title = within(dialog).getByRole('textbox', { name: 'Title' })
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Summer drive home')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Boat Song/ }))
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Carpe Diem Baby/ }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(args.onClose).toHaveBeenCalledOnce())
+    await expect(savePlaylist).toHaveBeenCalledWith({
+      fileName: summerDrive.fileName,
+      playlist: {
+        title: 'Summer drive home',
+        description: 'Coast road',
+        songs: ['Winds of Destination.mp3', MISSING_SONG, 'Carpe Diem Baby.mp3', 'Morning Star.mp3']
+      }
+    })
+    await expect(createPlaylist).not.toHaveBeenCalled()
+    await expect(loggedMessages()).toContain('Edited playlist "Summer drive home"')
+  }
+}
+
+/** When the file can't be written, the edit stays open as it was, and a notification says why. */
+export const EditFailing: Story = {
+  args: { playlist: summerDrive },
+  beforeEach: () => {
+    editing(summerDrive)
+    mockCommands({ read_cover: noCover, save_playlist: failingCommand(SAVE_ERROR) })
+  },
+  play: async ({ args, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const dialog = await findEditDialog(canvasElement)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(page.getByText(`Couldn't save "Summer drive"`)).toBeVisible())
+    await expect(page.getByText(SAVE_ERROR)).toBeVisible()
+    await expect(args.onClose).not.toHaveBeenCalled()
+    await expect(within(dialog).getByRole('checkbox', { name: /^Morning Star/ })).toBeChecked()
   }
 }

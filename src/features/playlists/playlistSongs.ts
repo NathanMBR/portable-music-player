@@ -29,3 +29,27 @@ export const playableTracksOf = (songs: PlaylistSong[]) => songs.flatMap(({ trac
 /** The file names of the picked songs, by their paths, in the order of `tracks`. */
 export const pickedFileNames = (tracks: Track[], pickedPaths: ReadonlySet<string>) =>
   tracks.filter(track => pickedPaths.has(track.path)).map(fileNameOf)
+
+/** The paths of a playlist's songs the scan found, to start an edit with them picked. */
+export const pickedPathsIn = (fileNames: string[], tracks: Track[]): ReadonlySet<string> =>
+  new Set(playableTracksOf(findPlaylistSongs(fileNames, tracks)).map(track => track.path))
+
+/**
+ * A playlist's songs after an edit: those still picked keep their place, the unpicked ones leave,
+ * the newly picked ones follow in the order of `tracks`, and those the scan lacks stay where they
+ * are, since the picker can't show them.
+ */
+export const editedSongs = (
+  fileNames: string[],
+  tracks: Track[],
+  pickedPaths: ReadonlySet<string>
+) => {
+  const keptSongs = findPlaylistSongs(fileNames, tracks)
+    .filter(({ track }) => track === null || pickedPaths.has(track.path))
+    .map(song => song.fileName)
+  const alreadyThere = pickedPathsIn(fileNames, tracks)
+  const addedSongs = tracks
+    .filter(track => pickedPaths.has(track.path) && !alreadyThere.has(track.path))
+    .map(fileNameOf)
+  return [...keptSongs, ...addedSongs]
+}

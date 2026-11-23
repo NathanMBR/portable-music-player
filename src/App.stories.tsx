@@ -260,6 +260,54 @@ export const KeepsTheNewPlaylistButtonAboveThePlayer: Story = {
   }
 }
 
+/** The center of the element, where a pointer would hit it. */
+const centerOf = (element: Element) => {
+  const box = element.getBoundingClientRect()
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+}
+
+/**
+ * Coming to the list of playlists while the player is open, the New playlist button slides up
+ * from behind the player, which stays on top of it until the button clears it.
+ */
+export const SlidesTheNewPlaylistButtonFromBehindThePlayer: Story = {
+  beforeEach: () => {
+    loadPlayingSong()
+  },
+  play: async ({ canvas, canvasElement }) => {
+    const player = canvas.getByRole('region', { name: 'Player' })
+    useNavigationStore.getState().selectCategory('playlists')
+    const newPlaylist = await canvas.findByRole('button', { name: 'New playlist' })
+    const box = newPlaylist.parentElement
+    const slide = await waitFor(() => {
+      const running = box
+        ?.getAnimations()
+        .find(
+          (animation): animation is CSSTransition =>
+            animation instanceof CSSTransition && animation.transitionProperty === 'translate'
+        )
+      if (!running) {
+        throw new Error('The New playlist button is not sliding')
+      }
+      return running
+    })
+
+    // Holds the slide at the first moment the button's center is over the player.
+    slide.pause()
+    const playerBox = player.getBoundingClientRect()
+    const duration = Number(slide.effect?.getTiming().duration)
+    for (let time = 0; time < duration && centerOf(newPlaylist).y > playerBox.bottom; time += 10) {
+      slide.currentTime = time
+    }
+    const center = centerOf(newPlaylist)
+    const hit = canvasElement.ownerDocument.elementFromPoint(center.x, center.y)
+    slide.play()
+
+    await expect(center.y).toBeLessThan(playerBox.bottom)
+    await expect(player.contains(hit)).toBe(true)
+  }
+}
+
 type Slide = { duration: EffectTiming['duration']; easing: EffectTiming['easing'] }
 
 /** How the element is moving right now through a CSS transition of the property, if it is. */

@@ -6,6 +6,7 @@ import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
 import { useNavigationStore } from '../../navigation/navigationStore'
+import { usePlaybackStore } from '../../playback/playbackStore'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
 import { NewPlaylistButton } from './NewPlaylistButton'
@@ -26,22 +27,45 @@ const garageNights: SavedPlaylist = {
 
 type Slide = { duration: EffectTiming['duration']; easing: EffectTiming['easing'] }
 
-/** How the element is moving right now through a CSS transition of the property, if it is. */
-const runningSlide = (element: Element, property: string): Slide | undefined => {
-  const transition = element
+// Sonner's notifications slide in over 400ms, with CSS's ease.
+const NOTIFICATION_SLIDE: Slide = { duration: 400, easing: 'ease' }
+
+/** The CSS transition of the property the element runs right now, if it runs one. */
+const runningTransition = (element: Element, property: string) =>
+  element
     .getAnimations()
     .find(
-      animation =>
+      (animation): animation is CSSTransition =>
         animation instanceof CSSTransition &&
         animation.transitionProperty === property &&
         animation.playState === 'running'
     )
-  const timing = transition?.effect?.getTiming()
-  return timing && { duration: timing.duration, easing: timing.easing }
+
+/** The element's slide, the transition of its `translate`, which it must be running. */
+const slideOf = (element: Element) => {
+  const slide = runningTransition(element, 'translate')
+  if (!slide) {
+    throw new Error('The button is not sliding')
+  }
+  return slide
 }
 
-// Sonner's notifications slide in over 400ms, with CSS's ease.
-const NOTIFICATION_SLIDE: Slide = { duration: 400, easing: 'ease' }
+const timingOf = (slide: CSSTransition): Slide => {
+  const timing = slide.effect?.getTiming()
+  return { duration: timing?.duration, easing: timing?.easing }
+}
+
+/** Where the element starts its slide from: the slide sent back to its first frame, then resumed. */
+const slideStartOf = (element: Element, slide: CSSTransition) => {
+  slide.pause()
+  slide.currentTime = 0
+  const start = element.getBoundingClientRect()
+  slide.play()
+  return start
+}
+
+const windowHeightOf = (canvasElement: HTMLElement) =>
+  canvasElement.ownerDocument.defaultView?.innerHeight ?? 0
 
 const floatingBoxOf = (button: HTMLElement) => {
   const box = button.parentElement
@@ -104,25 +128,49 @@ export const OnAnotherPage: Story = {
 }
 
 /**
- * Coming to the list, it slides up and fades in like a notification, over the same time and
- * curve, and leaving it, it slides back out the same way.
+ * Coming to the list, it slides up from below the window's bottom edge, over a notification's
+ * time and curve, without fading, and leaving it, it slides back down out of the window.
  */
-export const SlidesInLikeANotification: Story = {
+export const SlidesInFromTheBottom: Story = {
   beforeEach: () => {
     useNavigationStore.setState({ currentCategory: 'songs' })
   },
-  play: async ({ canvas }) => {
+  play: async ({ canvas, canvasElement }) => {
     useNavigationStore.getState().selectCategory('playlists')
     const box = floatingBoxOf(await canvas.findByRole('button', { name: 'New playlist' }))
-    await waitFor(() => {
-      expect(runningSlide(box, 'opacity')).toEqual(NOTIFICATION_SLIDE)
-      expect(runningSlide(box, 'translate')).toEqual(NOTIFICATION_SLIDE)
-    })
-    await waitFor(() => expect(runningSlide(box, 'opacity')).toBeUndefined())
+    const slideIn = await waitFor(() => slideOf(box))
+
+    await expect(timingOf(slideIn)).toEqual(NOTIFICATION_SLIDE)
+    await expect(slideStartOf(box, slideIn).top).toBeGreaterThanOrEqual(
+      windowHeightOf(canvasElement)
+    )
+    await expect(runningTransition(box, 'opacity')).toBeUndefined()
+    await waitFor(() => expect(runningTransition(box, 'translate')).toBeUndefined())
 
     useNavigationStore.getState().selectCategory('songs')
 
-    await waitFor(() => expect(runningSlide(box, 'opacity')).toEqual(NOTIFICATION_SLIDE))
+    await waitFor(() => expect(timingOf(slideOf(box))).toEqual(NOTIFICATION_SLIDE))
+    await expect(runningTransition(box, 'opacity')).toBeUndefined()
     await waitFor(() => expect(canvas.queryByRole('button', { name: 'New playlist' })).toBeNull())
+  }
+}
+
+/**
+ * While the audio player is open, the button floats above it, and still slides in from below the
+ * window's bottom edge, passing behind the player.
+ */
+export const SlidesInFromBelowThePlayer: Story = {
+  beforeEach: () => {
+    useNavigationStore.setState({ currentCategory: 'songs' })
+    usePlaybackStore.getState().playTrack(revelations, [revelations])
+  },
+  play: async ({ canvas, canvasElement }) => {
+    useNavigationStore.getState().selectCategory('playlists')
+    const box = floatingBoxOf(await canvas.findByRole('button', { name: 'New playlist' }))
+    const slideIn = await waitFor(() => slideOf(box))
+
+    await expect(slideStartOf(box, slideIn).top).toBeGreaterThanOrEqual(
+      windowHeightOf(canvasElement)
+    )
   }
 }

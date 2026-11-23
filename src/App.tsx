@@ -66,8 +66,9 @@ export const App = () => {
         </div>
         <CurrentView />
       </div>
-      <AudioPlayer />
+      {/* Before the player, which then covers it as it slides in from below the window. */}
       <NewPlaylistButton />
+      <AudioPlayer />
       <SongDropOverlay />
       <SongDropDialog />
       <NotificationArea bottomClearance={notificationClearance} />

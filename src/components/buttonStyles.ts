@@ -40,5 +40,12 @@ export const POPUP_CLASSES = 'border border-rule bg-paper shadow-lg shadow-shade
 /** An option of such a panel, tinted while it's the active one, from the pointer or the keyboard. */
 export const POPUP_OPTION_CLASSES = 'text-ink data-focus:bg-rule/60'
 
+/** A step's tab, faded, darker under the pointer when it can be clicked, in pen while current. */
+export const STEP_TAB_CLASSES =
+  'text-ink-faded data-selected:text-pen data-hover:not-data-selected:text-ink'
+
+/** The bar under the current step's tab. */
+export const STEP_INDICATOR_CLASSES = 'bg-pen'
+
 /** A button that can't act right now fades; the base styles give it the not-allowed cursor. */
 export const DISABLED_CLASSES = 'data-disabled:opacity-40'

@@ -8,6 +8,7 @@ import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { withNotificationArea } from '../../../testing/withNotificationArea'
 import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
+import { connectButtonLog } from '../../logging/buttonLog'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { PlaylistContents, SavedPlaylist } from '../types'
 import { PlaylistDialog } from './PlaylistDialog'
@@ -97,27 +98,36 @@ type UserEvent = Parameters<NonNullable<Story['play']>>[0]['userEvent']
 const findDialog = (canvasElement: HTMLElement) =>
   within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'New playlist' })
 
+const clickButton = (dialog: HTMLElement, userEvent: UserEvent, name: 'Next' | 'Back') =>
+  userEvent.click(within(dialog).getByRole('button', { name }))
+
 /** Fills in the first step with a title, then goes on to the songs. */
 const goToTheSongs = async (dialog: HTMLElement, userEvent: UserEvent, title = 'Road trip') => {
   await userEvent.type(within(dialog).getByRole('textbox', { name: 'Title' }), title)
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+  await clickButton(dialog, userEvent, 'Next')
   return within(dialog).findByRole('searchbox', { name: 'Search songs' })
 }
 
 /**
- * The first step: the title, focused, and the description. Next is disabled until a title is
- * typed, and the songs come in the second step.
+ * The first step, its tab current: the title, focused, and the description, with Cancel and Next.
+ * Next is disabled until a title is typed, and nothing under the dialog's title but the tabs says
+ * which step this is.
  */
 export const Empty: Story = {
   play: async ({ canvasElement }) => {
     const dialog = await findDialog(canvasElement)
 
-    await expect(dialog).toHaveAccessibleDescription('Step 1 of 2: Title and description')
+    await expect(dialog).not.toHaveAccessibleDescription()
+    await expect(within(dialog).queryByText(/^Step /)).toBeNull()
+    await expect(within(dialog).getByRole('tab', { name: 'Details', selected: true })).toBeVisible()
+    await expect(within(dialog).getByRole('tab', { name: 'Songs', selected: false })).toBeVisible()
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveFocus()
     )
     await expect(within(dialog).getByRole('textbox', { name: 'Description' })).toBeVisible()
+    await expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeEnabled()
     await expect(within(dialog).getByRole('button', { name: 'Next' })).toBeDisabled()
+    await expect(within(dialog).queryByRole('button', { name: 'Save' })).toBeNull()
     await expect(within(dialog).queryByRole('searchbox')).toBeNull()
   }
 }
@@ -137,9 +147,21 @@ export const NextNeedsATitle: Story = {
   }
 }
 
+/** Creating, only Next and Back move between the steps: clicking the Songs tab does nothing. */
+export const TabsFollowTheButtons: Story = {
+  play: async ({ canvasElement }) => {
+    const dialog = await findDialog(canvasElement)
+
+    await expect(
+      getComputedStyle(within(dialog).getByRole('tab', { name: 'Songs' })).pointerEvents
+    ).toBe('none')
+    await expect(within(dialog).getByRole('tab', { name: 'Details', selected: true })).toBeVisible()
+  }
+}
+
 /**
- * The second step: the search, focused, then the songs in the Songs view's order, none picked,
- * with Back and Save.
+ * The second step, its tab current: the search, focused, then the songs in the Songs view's
+ * order, none picked, with Back and Save.
  */
 export const TheSongsStep: Story = {
   play: async ({ canvasElement, userEvent }) => {
@@ -147,7 +169,7 @@ export const TheSongsStep: Story = {
 
     const search = await goToTheSongs(dialog, userEvent)
 
-    await expect(dialog).toHaveAccessibleDescription('Step 2 of 2: Songs')
+    await expect(within(dialog).getByRole('tab', { name: 'Songs', selected: true })).toBeVisible()
     await waitFor(() => expect(search).toHaveFocus())
     await expect(within(dialog).queryByRole('textbox', { name: 'Title' })).toBeNull()
     await expect(songNamesIn(dialog)).toEqual([
@@ -159,6 +181,8 @@ export const TheSongsStep: Story = {
       'Winds of Destination · Angra'
     ])
     await expect(within(dialog).getByText('0 songs picked')).toBeVisible()
+    await expect(within(dialog).getByRole('button', { name: 'Back' })).toBeEnabled()
+    await expect(within(dialog).queryByRole('button', { name: 'Cancel' })).toBeNull()
     await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
   }
 }
@@ -178,8 +202,9 @@ export const GoingBack: Story = {
     await userEvent.type(search, 'angra')
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Back' }))
+    await clickButton(dialog, userEvent, 'Back')
 
+    await expect(within(dialog).getByRole('tab', { name: 'Details', selected: true })).toBeVisible()
     const title = within(dialog).getByRole('textbox', { name: 'Title' })
     await expect(title).toHaveValue('Road trip')
     await waitFor(() => expect(title).toHaveFocus())
@@ -187,7 +212,7 @@ export const GoingBack: Story = {
       'For the long drive'
     )
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await clickButton(dialog, userEvent, 'Next')
     await expect(within(dialog).getByRole('searchbox')).toHaveValue('angra')
     await expect(within(dialog).getByRole('checkbox', { name: /^Morning Star/ })).toBeChecked()
     await expect(within(dialog).getByText('1 song picked')).toBeVisible()
@@ -366,7 +391,7 @@ const findEditDialog = (canvasElement: HTMLElement) =>
 /**
  * Given a playlist, the dialog edits it: it says "Edit playlist", and starts from the playlist's
  * title and description, then its songs, picked. A song the Songs folder lacks can't be shown,
- * so the dialog says it stays in the playlist.
+ * so the second step says it stays in the playlist.
  */
 export const Editing: Story = {
   args: { playlist: summerDrive },
@@ -380,7 +405,7 @@ export const Editing: Story = {
       'Coast road'
     )
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await clickButton(dialog, userEvent, 'Next')
 
     const picked = within(dialog)
       .getAllByRole('checkbox', { checked: true })
@@ -390,6 +415,51 @@ export const Editing: Story = {
     await expect(
       within(dialog).getByText('1 song not in the Songs folder stays in the playlist.')
     ).toBeVisible()
+  }
+}
+
+/** Editing, a click on a tab goes to its step, as Next and Back do, focusing its first field. */
+export const EditingFromTheTabs: Story = {
+  args: { playlist: summerDrive },
+  beforeEach: () => {
+    editing(summerDrive)
+    return connectButtonLog()
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findEditDialog(canvasElement)
+
+    await userEvent.click(within(dialog).getByRole('tab', { name: 'Songs' }))
+
+    await expect(within(dialog).getByRole('tab', { name: 'Songs', selected: true })).toBeVisible()
+    await waitFor(() => expect(within(dialog).getByRole('searchbox')).toHaveFocus())
+
+    await userEvent.click(within(dialog).getByRole('tab', { name: 'Details' }))
+
+    const title = within(dialog).getByRole('textbox', { name: 'Title' })
+    await expect(title).toHaveValue('Summer drive')
+    await waitFor(() => expect(title).toHaveFocus())
+    await expect(loggedMessages()).toEqual([
+      'Clicked at button "Songs"',
+      'Clicked at button "Details"'
+    ])
+  }
+}
+
+/** Editing, the Songs tab waits for a title, like Next: spaces alone aren't one. */
+export const EditingNeedsATitleForTheSongs: Story = {
+  args: { playlist: summerDrive },
+  beforeEach: () => {
+    editing(summerDrive)
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const dialog = await findEditDialog(canvasElement)
+    const title = within(dialog).getByRole('textbox', { name: 'Title' })
+
+    await userEvent.clear(title)
+    await userEvent.type(title, '  ')
+
+    await expect(within(dialog).getByRole('tab', { name: 'Songs' })).toBeDisabled()
+    await expect(within(dialog).getByRole('button', { name: 'Next' })).toBeDisabled()
   }
 }
 
@@ -408,7 +478,7 @@ export const SavingAnEdit: Story = {
     const title = within(dialog).getByRole('textbox', { name: 'Title' })
     await userEvent.clear(title)
     await userEvent.type(title, 'Summer drive home')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await clickButton(dialog, userEvent, 'Next')
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Boat Song/ }))
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Carpe Diem Baby/ }))
@@ -439,7 +509,7 @@ export const EditFailing: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
     const dialog = await findEditDialog(canvasElement)
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+    await clickButton(dialog, userEvent, 'Next')
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /^Morning Star/ }))
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))

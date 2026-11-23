@@ -1,9 +1,9 @@
-import { Description } from '@headlessui/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../components/Button/Button'
 import { Checkbox } from '../../../components/Checkbox/Checkbox'
 import { ListRow } from '../../../components/ListRow/ListRow'
 import { Modal, ModalButtons, ModalTitle } from '../../../components/Modal/Modal'
+import { StepTabs } from '../../../components/StepTabs/StepTabs'
 import { TextField } from '../../../components/TextField/TextField'
 import { CoverThumbnail } from '../../library/CoverThumbnail/CoverThumbnail'
 import { formatSongCount } from '../../library/libraryStatus'
@@ -92,58 +92,40 @@ const emptyPickerMessage = (hasSongs: boolean, search: string) =>
   hasSongs ? `No songs match "${search.trim()}".` : 'The Songs folder has no songs yet.'
 
 /** The dialog's steps, in order: the playlist's title and description, then its songs. */
-type FormStep = 'details' | 'songs'
+const STEPS = ['details', 'songs'] as const
+type FormStep = (typeof STEPS)[number]
 
-const STEP_NAMES: Record<FormStep, string> = {
-  details: 'Step 1 of 2: Title and description',
-  songs: 'Step 2 of 2: Songs'
-}
-
-type DetailsStepProps = {
+type DetailsTabProps = {
   title: string
   description: string
   onTitleChange: (title: string) => void
   onDescriptionChange: (description: string) => void
-  onCancel: () => void
-  onNext: () => void
 }
 
-const DetailsStep = ({
+const DetailsTab = ({
   title,
   description,
   onTitleChange,
-  onDescriptionChange,
-  onCancel,
-  onNext
-}: DetailsStepProps) => {
+  onDescriptionChange
+}: DetailsTabProps) => {
   const titleField = useFocusOnMount()
 
   return (
-    <>
-      <div className="mt-4 flex flex-col gap-3">
-        <TextField
-          ref={titleField}
-          label="Title"
-          value={title}
-          onChange={onTitleChange}
-          maxLength={MAX_TITLE_LENGTH}
-          isRequired
-        />
-        <TextField label="Description" value={description} onChange={onDescriptionChange} />
-      </div>
-      <ModalButtons>
-        <Button variant="quiet" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={onNext} isDisabled={title.trim() === ''}>
-          Next
-        </Button>
-      </ModalButtons>
-    </>
+    <div className="mt-4 flex flex-col gap-3">
+      <TextField
+        ref={titleField}
+        label="Title"
+        value={title}
+        onChange={onTitleChange}
+        maxLength={MAX_TITLE_LENGTH}
+        isRequired
+      />
+      <TextField label="Description" value={description} onChange={onDescriptionChange} />
+    </div>
   )
 }
 
-type SongsStepProps = {
+type SongsTabProps = {
   /** Every scanned song, in the Songs view's order. */
   tracks: Track[]
   search: string
@@ -152,22 +134,16 @@ type SongsStepProps = {
   onPick: (path: string, isPicked: boolean) => void
   /** How many songs of the edited playlist the picker can't show, since the scan lacks them. */
   unlistedCount: number
-  isSaving: boolean
-  onBack: () => void
-  onSave: () => void
 }
 
-const SongsStep = ({
+const SongsTab = ({
   tracks,
   search,
   onSearchChange,
   pickedPaths,
   onPick,
-  unlistedCount,
-  isSaving,
-  onBack,
-  onSave
-}: SongsStepProps) => {
+  unlistedCount
+}: SongsTabProps) => {
   const searchField = useFocusOnMount()
   const foundTracks = useMemo(
     () => tracks.filter(track => matchesSearch(track, search)),
@@ -198,14 +174,6 @@ const SongsStep = ({
       {unlistedCount > 0 && (
         <p className="text-sm text-ink-faded">{describeUnlistedSongs(unlistedCount)}</p>
       )}
-      <ModalButtons>
-        <Button variant="quiet" onClick={onBack}>
-          Back
-        </Button>
-        <Button onClick={onSave} isDisabled={isSaving}>
-          Save
-        </Button>
-      </ModalButtons>
     </>
   )
 }
@@ -245,6 +213,9 @@ const PlaylistForm = ({ playlist, onClose }: Omit<PlaylistDialogProps, 'isOpen'>
     ? playlist.songs.length - pickedPathsIn(playlist.songs, tracks).size
     : 0
 
+  // The songs wait for a title, whether Next or, when editing, the Songs tab goes to them.
+  const hasTitle = title.trim() !== ''
+
   const pick = (path: string, isPicked: boolean) =>
     setPickedPaths(picked => togglePath(picked, path, isPicked))
 
@@ -264,42 +235,75 @@ const PlaylistForm = ({ playlist, onClose }: Omit<PlaylistDialogProps, 'isOpen'>
   return (
     <>
       <ModalTitle>{playlist ? 'Edit playlist' : 'New playlist'}</ModalTitle>
-      <Description className="mt-1 text-sm text-ink-faded">{STEP_NAMES[step]}</Description>
+      <div className="mt-4 flex min-h-0 flex-col">
+        <StepTabs
+          label="Playlist"
+          stepIndex={STEPS.indexOf(step)}
+          onStepChange={playlist ? index => setStep(STEPS[index] ?? 'details') : undefined}
+          tabs={[
+            {
+              label: 'Details',
+              content: (
+                <DetailsTab
+                  title={title}
+                  description={description}
+                  onTitleChange={setTitle}
+                  onDescriptionChange={setDescription}
+                />
+              )
+            },
+            {
+              label: 'Songs',
+              isDisabled: !hasTitle,
+              content: (
+                <SongsTab
+                  tracks={tracks}
+                  search={search}
+                  onSearchChange={setSearch}
+                  pickedPaths={pickedPaths}
+                  onPick={pick}
+                  unlistedCount={unlistedCount}
+                />
+              )
+            }
+          ]}
+        />
+      </div>
       {step === 'details' ? (
-        <DetailsStep
-          title={title}
-          description={description}
-          onTitleChange={setTitle}
-          onDescriptionChange={setDescription}
-          onCancel={onClose}
-          onNext={() => setStep('songs')}
-        />
+        <ModalButtons>
+          <Button variant="quiet" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => setStep('songs')} isDisabled={!hasTitle}>
+            Next
+          </Button>
+        </ModalButtons>
       ) : (
-        <SongsStep
-          tracks={tracks}
-          search={search}
-          onSearchChange={setSearch}
-          pickedPaths={pickedPaths}
-          onPick={pick}
-          unlistedCount={unlistedCount}
-          isSaving={isSaving}
-          onBack={() => setStep('details')}
-          onSave={() => void save()}
-        />
+        <ModalButtons>
+          <Button variant="quiet" onClick={() => setStep('details')}>
+            Back
+          </Button>
+          <Button onClick={() => void save()} isDisabled={isSaving}>
+            Save
+          </Button>
+        </ModalButtons>
       )}
     </>
   )
 }
 
 /**
- * Modal dialog creating a playlist, or editing one, in two steps, named under its title. First the
- * playlist's title, required, and its description: Next is disabled until the title isn't blank.
- * Then the songs of the Songs folder, in the Songs view's order, each with a checkbox. The search
- * above them finds songs by title, artist or file name, whatever their case and accents, and
- * picked songs stay picked while it hides them; the count below the list says how many are. Back
- * returns to the first step, keeping what was typed, the search included, and picked. Each step
- * focuses its first field when it shows. A new playlist keeps its songs in the list's order,
- * whatever order they were picked in, and may have none.
+ * Modal dialog creating a playlist, or editing one, in two steps, whose tabs (`StepTabs`) show
+ * which one is on screen. Creating, only the dialog's buttons move between them; editing, so do the
+ * tabs, and the Songs tab is disabled while the title is blank, like Next. First Details: the
+ * playlist's title, required, and its description, with Cancel and Next, which is disabled until
+ * the title isn't blank. Then Songs: the songs of the Songs folder, in the Songs view's order, each
+ * with a checkbox, with Back and Save. The search above them finds songs by title, artist or file
+ * name, whatever their case and accents, and picked songs stay picked while it hides them; the
+ * count below the list says how many are. Back returns to the first step, keeping what was typed,
+ * the search included, and picked. Each step focuses its first field when it shows. A new
+ * playlist keeps its songs in the list's order, whatever order they were picked in, and may have
+ * none.
  *
  * Given a playlist, the dialog says "Edit playlist" and starts from the playlist's title,
  * description and found songs, picked. Save writes over the playlist's file, which keeps its name

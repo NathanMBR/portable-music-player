@@ -155,7 +155,7 @@ export const DeletingAndUndoing: Story = {
     const page = within(canvasElement.ownerDocument.body)
     await userEvent.click(canvas.getByRole('button', { name: 'Delete Road trip' }))
     const dialog = await page.findByRole('dialog', { name: 'Delete "Road trip"?' })
-    await expect(within(dialog).getByText('Its songs stay in the Songs folder.')).toBeVisible()
+    await expect(within(dialog).getByText('This action is irreversible.')).toBeVisible()
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
 

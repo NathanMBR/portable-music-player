@@ -10,7 +10,7 @@ const meta = {
   args: {
     isOpen: true,
     question: 'Delete "Road trip"?',
-    details: 'Its songs stay in the Songs folder.',
+    details: 'This action is irreversible.',
     confirmLabel: 'Delete',
     onConfirm: fn(),
     onCancel: fn()
@@ -25,7 +25,7 @@ export const Asking: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body)
     const dialog = await page.findByRole('dialog', { name: 'Delete "Road trip"?' })
-    await expect(within(dialog).getByText('Its songs stay in the Songs folder.')).toBeVisible()
+    await expect(within(dialog).getByText('This action is irreversible.')).toBeVisible()
   }
 }
 

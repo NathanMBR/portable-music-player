@@ -104,7 +104,7 @@ export const PlaylistsOverview = () => {
         <ConfirmDialog
           isOpen={isAsking}
           question={`Delete "${askedPlaylist.title}"?`}
-          details="Its songs stay in the Songs folder."
+          details="This action is irreversible."
           confirmLabel="Delete"
           onConfirm={() => confirmDelete(askedPlaylist)}
           onCancel={() => setIsAsking(false)}

@@ -10,11 +10,15 @@ const PRESSED_ATTRIBUTE = 'aria-pressed'
 // opens it without a click, and a choice or Escape closes it.
 const isSelect = (button: Element) => button.getAttribute('aria-haspopup') === 'listbox'
 
+// A menu opens from a button too, and logs its opening and closing itself (ActionMenu), for the
+// same reason. Its items are buttons, logged like any other.
+const isMenu = (button: Element) => button.getAttribute('aria-haspopup') === 'menu'
+
 // A switch is a button too, but logs its new state itself (Switch): the keyboard toggles it
 // without a click.
 const isSwitch = (button: Element) => button.getAttribute('role') === 'switch'
 
-const logsItself = (button: Element) => isSelect(button) || isSwitch(button)
+const logsItself = (button: Element) => isSelect(button) || isMenu(button) || isSwitch(button)
 
 // A state is logged once the click has taken effect: React draws what the click changed in a
 // microtask, so a task queued now runs after it.
@@ -50,7 +54,8 @@ const logClickedButton = (event: MouseEvent) => {
 /**
  * Logs every button the user clicks or presses from the keyboard, by the name screen readers give
  * it, for as long as the app runs: `Clicked at button "<name>"`. It leaves out switches and the
- * buttons of selects, which log themselves. A toggle logs like a switch, `"<name>" is on` or `off`, and a button with three or more states adds
+ * buttons of selects and menus, which log themselves. A toggle logs like a switch, `"<name>" is
+ * on` or `off`, and a button with three or more states adds
  * `State: "<state>"`, both in the state the click leaves them in. A plain click is logged before
  * what the button does, as the click goes down to it. Returns a function that stops listening.
  */

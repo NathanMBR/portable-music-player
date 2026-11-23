@@ -1,9 +1,15 @@
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
-import { type RefObject, useEffect, useRef } from 'react'
+import { type RefObject, useRef } from 'react'
 import { log } from '../../features/logging/log'
 import { labelOf } from '../accessibleName'
-import { FOCUS_CLASSES, VARIANT_CLASSES } from '../buttonStyles'
+import {
+  FOCUS_CLASSES,
+  POPUP_CLASSES,
+  POPUP_OPTION_CLASSES,
+  VARIANT_CLASSES
+} from '../buttonStyles'
+import { useOpenStateLog } from '../useOpenStateLog'
 
 type SelectOption<Value extends string> = {
   /** What `onChange` gets when this option is chosen. */
@@ -26,20 +32,13 @@ type OpenStateLogProps = {
   buttonRef: RefObject<HTMLButtonElement | null>
 }
 
-// Logs only when the list opens or closes, never on the first render, so StrictMode's second run
-// of the mount effect logs nothing either.
+// A component, since the list's open state only comes from Headless UI's render prop.
 const OpenStateLog = ({ isOpen, buttonRef }: OpenStateLogProps) => {
-  const wasOpen = useRef(isOpen)
-
-  useEffect(() => {
-    if (isOpen === wasOpen.current) {
-      return
-    }
-    wasOpen.current = isOpen
+  useOpenStateLog(isOpen, nowOpen => {
     if (buttonRef.current) {
-      log(`${isOpen ? 'Opened' : 'Closed'} selector "${labelOf(buttonRef.current)}"`)
+      log(`${nowOpen ? 'Opened' : 'Closed'} selector "${labelOf(buttonRef.current)}"`)
     }
-  }, [isOpen, buttonRef])
+  })
 
   return null
 }
@@ -82,13 +81,13 @@ export const Select = <Value extends string>({ options, value, onChange }: Selec
           </ListboxButton>
           <ListboxOptions
             anchor={{ to: 'bottom end', gap: 4 }}
-            className="z-20 w-(--button-width) rounded-lg border border-rule bg-paper p-1 shadow-lg shadow-shade/20 outline-none"
+            className={`z-20 w-(--button-width) rounded-lg p-1 outline-none ${POPUP_CLASSES}`}
           >
             {options.map(option => (
               <ListboxOption
                 key={option.value}
                 value={option.value}
-                className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-ink data-focus:bg-rule/60"
+                className={`group flex items-center gap-2 rounded-md px-2 py-1.5 ${POPUP_OPTION_CLASSES}`}
               >
                 <CheckIcon className="invisible size-4 text-pen group-data-selected:visible" />
                 {option.label}

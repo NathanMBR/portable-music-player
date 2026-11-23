@@ -75,6 +75,24 @@ describe('connectButtonLog', () => {
     expect(loggedMessages()).toEqual([])
   })
 
+  it('leaves menus to log their opening and closing themselves', () => {
+    show(
+      '<button aria-haspopup="menu" aria-expanded="false" aria-label="More for Gate XIII"></button>'
+    )
+
+    click('button')
+
+    expect(loggedMessages()).toEqual([])
+  })
+
+  it('logs the items of a menu like any button', () => {
+    show('<div role="menu"><button role="menuitem">Remove from playlist</button></div>')
+
+    click('button')
+
+    expect(loggedMessages()).toEqual(['Clicked at button "Remove from playlist"'])
+  })
+
   it('leaves switches to log their new state themselves', () => {
     show('<button role="switch" aria-checked="false" aria-label="Dark theme"></button>')
 

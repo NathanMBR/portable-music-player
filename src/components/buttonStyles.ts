@@ -27,5 +27,11 @@ export const ACTIVE_CLASSES = 'bg-pen/15 text-pen data-hover:bg-pen/20'
 export const FOCUS_CLASSES =
   'outline-none data-focus:outline-2 data-focus:outline-solid data-focus:outline-offset-2 data-focus:outline-pen'
 
+/** The panel a button opens over the page, like a select's list or a menu: on the paper, lifted. */
+export const POPUP_CLASSES = 'border border-rule bg-paper shadow-lg shadow-shade/20'
+
+/** An option of such a panel, tinted while it's the active one, from the pointer or the keyboard. */
+export const POPUP_OPTION_CLASSES = 'text-ink data-focus:bg-rule/60'
+
 /** A button that can't act right now fades; the base styles give it the not-allowed cursor. */
 export const DISABLED_CLASSES = 'data-disabled:opacity-40'

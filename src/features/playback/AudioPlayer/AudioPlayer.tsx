@@ -1,5 +1,6 @@
 import { Transition } from '@headlessui/react'
 import { useState } from 'react'
+import { TrackName } from '../../library/TrackName/TrackName'
 import { PlaybackControls } from '../PlaybackControls/PlaybackControls'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { findNextTrack, findPreviousTrack, restartsOnPrevious } from '../playOrder'
@@ -33,11 +34,9 @@ const PlayerContent = ({ session }: { session: PlaybackSession }) => {
       {/* The progress grows up to a set width only: a longer bar is harder to follow, so in wide
           windows the player spreads the space left between its three parts instead. */}
       <div className="min-w-0 max-w-xl flex-1">
-        <p
-          aria-live="polite"
-          className="mb-1 truncate text-center font-semibold font-stretch-semi-condensed"
-        >
-          {track.title}
+        {/* The line cuts the name, since the name inside it is inline. */}
+        <p aria-live="polite" className="mb-1 truncate text-center font-semibold">
+          <TrackName track={track} />
         </p>
         <SongProgress
           elapsedSeconds={session.elapsedSeconds}
@@ -52,8 +51,10 @@ const PlayerContent = ({ session }: { session: PlaybackSession }) => {
 /**
  * The bar at the bottom of the window that plays the songs. It slides up when a song is played
  * and away when it's stopped. The app shell renders it outside the views, so a song keeps playing
- * when the category changes. It holds the controls on the left, the song's title and progress in
- * the middle, and the volume on the right. The progress stops growing at a set width, so in wide
+ * when the category changes. It holds the controls on the left, the song's name and progress in
+ * the middle, and the volume on the right. The name is the song's title, then, when its tags name
+ * one, a middle dot and its artist in a lighter ink, as in the song list: cut with an ellipsis when
+ * it's too long, and shown whole on hover. The progress stops growing at a set width, so in wide
  * windows the spaces around it widen instead. The songs themselves play through `songAudio.ts`,
  * which follows the same playback store.
  *

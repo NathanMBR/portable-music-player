@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, waitFor } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
@@ -62,6 +62,38 @@ export const Playing: Story = {
   }
 }
 
+/** A song whose tags name its artist shows it after the title, behind a middle dot, as in the list. */
+export const WithArtist: Story = {
+  beforeEach: () => {
+    const soHandsomeHello: Track = {
+      path: 'Songs/So Handsome Hello.mp3',
+      title: 'So Handsome Hello',
+      artist: 'Woodkid'
+    }
+    loadSession({ track: soHandsomeHello, queue: [soHandsomeHello], playOrder: [soHandsomeHello] })
+  },
+  play: async ({ canvas }) => {
+    const player = within(canvas.getByRole('region', { name: 'Player' }))
+
+    await expect(player.getByTitle('So Handsome Hello · Woodkid')).toHaveTextContent(
+      /^So Handsome Hello · Woodkid$/
+    )
+  }
+}
+
+/** A song whose tags name no artist shows its title alone. */
+export const WithoutArtist: Story = {
+  beforeEach: () => {
+    const orion: Track = { path: 'Songs/Orion.mp3', title: 'Orion', artist: null }
+    loadSession({ track: orion, queue: [orion], playOrder: [orion] })
+  },
+  play: async ({ canvas }) => {
+    const player = within(canvas.getByRole('region', { name: 'Player' }))
+
+    await expect(player.getByTitle('Orion')).toHaveTextContent(/^Orion$/)
+  }
+}
+
 /** The song is paused: the main button plays it again. */
 export const Paused: Story = {
   beforeEach: () => {
@@ -79,16 +111,21 @@ export const UnknownLength: Story = {
   }
 }
 
-/** A title too long for the player is cut with an ellipsis. */
+/** A name too long for the player is cut with an ellipsis, and hovering shows it whole. */
 export const LongTitle: Story = {
   beforeEach: () => {
     const longTrack: Track = { path: `Songs/${LONG_TITLE}.mp3`, title: LONG_TITLE, artist: 'Angra' }
     loadSession({ track: longTrack, queue: [longTrack], playOrder: [longTrack] })
   },
   play: async ({ canvas }) => {
-    const title = canvas.getByText(LONG_TITLE)
-    await expect(getComputedStyle(title).textOverflow).toBe('ellipsis')
-    await expect(title).not.toHaveAttribute('title')
+    const name = canvas.getByTitle(`${LONG_TITLE} · Angra`)
+    const line = name.closest('p')
+    if (!line) {
+      throw new Error('The name sits outside its line')
+    }
+
+    await expect(getComputedStyle(line).textOverflow).toBe('ellipsis')
+    await expect(line.scrollWidth).toBeGreaterThan(line.clientWidth)
   }
 }
 
@@ -110,7 +147,7 @@ export const WideWindow: Story = {
   },
   play: async ({ canvas }) => {
     const controls = canvas.getByRole('button', { name: 'Shuffle' }).parentElement
-    const progress = canvas.getByText(secondTrack.title).parentElement
+    const progress = canvas.getByText(secondTrack.title).closest('p')?.parentElement
     const volume = canvas.getByRole('button', { name: 'Mute' }).parentElement
     if (!controls || !progress || !volume) {
       throw new Error('The player lost one of its parts')

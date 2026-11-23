@@ -67,7 +67,7 @@ export const List: Story = {
   }
 }
 
-/** See opens a playlist in place of the list, and the back button goes back to it. */
+/** A playlist's row opens it in place of the list, and the back button goes back to it. */
 export const OpeningAndGoingBack: Story = {
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'See Studying' }))

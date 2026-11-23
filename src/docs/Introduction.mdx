@@ -86,9 +86,9 @@ the menu. The songs are sorted as the Settings view says: by title, the default,
 
 **Playlists** (`PlaylistsView`) lists the playlists of the `Playlists` folder, sorted by title
 (`PlaylistsOverview`), or, without any, says so in the middle of the view. Each row
-(`PlaylistRow`) has a play button, then the playlist's title and description, and at its right end
-See, which opens the playlist, and Delete, which asks first (`ConfirmDialog`), then notifies with
-an Undo. Playing a playlist first has Rust look for its songs in the `Songs` folder: if some are
+(`PlaylistRow`) has a play button, then the playlist's title and description, and a click anywhere
+else on it opens the playlist. At its right end, a menu (`ActionMenu`) holds Edit playlist, and
+Delete playlist, which asks first (`ConfirmDialog`), then notifies with an Undo. Playing a playlist first has Rust look for its songs in the `Songs` folder: if some are
 missing, nothing plays, a notification says how many, and its file remembers it. Until a Recheck
 (`RecheckButton`) finds them all, a red alert follows its title (`AlertMark`) and its plays are
 disabled. An open playlist (`PlaylistPage`) has its title in the header, with a back button, a
@@ -108,7 +108,8 @@ and keeps above the player and below the notifications. It opens the New playlis
 after Next, the songs of the Songs folder, each with a `Checkbox`, found by a search over their
 title, artist and file name that ignores case and accents. Back returns to the first step, keeping
 what was typed and picked. The playlist keeps the picked songs in the list's order. The Edit button
-of a playlist's page, before its large play button, opens the same dialog as "Edit playlist",
+of a playlist's page, before its large play button, and Edit playlist, in the menu of its row,
+open the same dialog as "Edit playlist",
 filled with the playlist's values: the songs still picked keep their place, and the newly picked
 ones follow.
 

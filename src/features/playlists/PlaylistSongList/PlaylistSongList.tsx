@@ -1,5 +1,5 @@
 import { MusicalNoteIcon, NumberedListIcon, TrashIcon } from '@heroicons/react/20/solid'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ActionMenu } from '../../../components/ActionMenu/ActionMenu'
 import { AlertMark } from '../../../components/AlertMark/AlertMark'
 import { ConfirmDialog } from '../../../components/ConfirmDialog/ConfirmDialog'
@@ -15,6 +15,7 @@ import { findPlaylistSongs, type PlaylistSong, songNameOf } from '../playlistSon
 import { usePlaylistsStore } from '../playlistsStore'
 import { SongPosition } from '../SongPosition/SongPosition'
 import type { SavedPlaylist } from '../types'
+import { useDialogAbout } from '../useDialogAbout'
 
 type PlaylistSongListProps = {
   /** The playlist whose songs the list shows. */
@@ -85,22 +86,6 @@ const SongRow = ({ playlist, song, position, onRemove, onChangePosition }: SongR
   )
 }
 
-// The song a dialog is about stays while the dialog fades out, after its row may be gone.
-const useSongDialog = () => {
-  const [song, setSong] = useState<PlaylistSong | null>(null)
-  const [isOpen, setIsOpen] = useState(false)
-
-  return {
-    song,
-    isOpen,
-    open: (chosenSong: PlaylistSong) => {
-      setSong(chosenSong)
-      setIsOpen(true)
-    },
-    close: () => setIsOpen(false)
-  }
-}
-
 /**
  * The songs of a playlist, in its order, on its page. Each row starts with a Move handle that
  * drags the song to another place, with the pointer or from the keyboard, and the playlist is
@@ -121,8 +106,8 @@ export const PlaylistSongList = ({ playlist }: PlaylistSongListProps) => {
   const moveSong = usePlaylistsStore(state => state.moveSong)
   const removeSong = usePlaylistsStore(state => state.removeSong)
   const songs = useMemo(() => findPlaylistSongs(playlist.songs, tracks), [playlist.songs, tracks])
-  const removal = useSongDialog()
-  const positionChange = useSongDialog()
+  const removal = useDialogAbout<PlaylistSong>()
+  const positionChange = useDialogAbout<PlaylistSong>()
 
   const nameOf = (fileName: string) => {
     const song = songs.find(other => other.fileName === fileName)
@@ -130,8 +115,8 @@ export const PlaylistSongList = ({ playlist }: PlaylistSongListProps) => {
   }
   const confirmRemove = () => {
     removal.close()
-    if (removal.song) {
-      void removeSong(playlist.fileName, removal.song.fileName)
+    if (removal.subject) {
+      void removeSong(playlist.fileName, removal.subject.fileName)
     }
   }
 
@@ -161,23 +146,23 @@ export const PlaylistSongList = ({ playlist }: PlaylistSongListProps) => {
         </div>
       )}
       {/* Kept outside the list, so they can fade out after the last song's removal empties it. */}
-      {removal.song && (
+      {removal.subject && (
         <ConfirmDialog
           isOpen={removal.isOpen}
-          question={`Remove "${songNameOf(removal.song)}" from "${playlist.title}"?`}
+          question={`Remove "${songNameOf(removal.subject)}" from "${playlist.title}"?`}
           details="The song stays in the Songs folder."
           confirmLabel="Remove"
           onConfirm={confirmRemove}
           onCancel={removal.close}
         />
       )}
-      {positionChange.song && (
+      {positionChange.subject && (
         <ChangePositionDialog
           isOpen={positionChange.isOpen}
           onClose={positionChange.close}
           playlist={playlist}
           songs={songs}
-          song={positionChange.song}
+          song={positionChange.subject}
         />
       )}
     </>

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Button } from '../../../components/Button/Button'
 import { ConfirmDialog } from '../../../components/ConfirmDialog/ConfirmDialog'
 import { EmptyState } from '../../../components/EmptyState/EmptyState'
@@ -7,10 +6,12 @@ import { StatusLine } from '../../../components/StatusLine/StatusLine'
 import { ViewHeader } from '../../../components/ViewHeader/ViewHeader'
 import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
 import { PLAYLISTS_ICON, PLAYLISTS_TITLE } from '../constants'
+import { PlaylistDialog } from '../PlaylistDialog/PlaylistDialog'
 import { PlaylistRow } from '../PlaylistRow/PlaylistRow'
 import { describePlaylistsStatus } from '../playlistStatus'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
+import { useDialogAbout } from '../useDialogAbout'
 
 const LoadFailure = () => {
   const loadPlaylists = usePlaylistsStore(state => state.loadPlaylists)
@@ -32,7 +33,13 @@ const NoPlaylists = () => (
   />
 )
 
-const PlaylistList = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => void }) => {
+// What a row's menu starts, each for the row's playlist.
+type RowActions = {
+  onEdit: (playlist: SavedPlaylist) => void
+  onDelete: (playlist: SavedPlaylist) => void
+}
+
+const PlaylistList = ({ onEdit, onDelete }: RowActions) => {
   const playlists = usePlaylistsStore(state => state.playlists)
 
   return (
@@ -42,6 +49,7 @@ const PlaylistList = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => voi
         <PlaylistRow
           key={playlist.fileName}
           playlist={playlist}
+          onEdit={() => onEdit(playlist)}
           onDelete={() => onDelete(playlist)}
         />
       ))}
@@ -49,7 +57,7 @@ const PlaylistList = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => voi
   )
 }
 
-const OverviewContent = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => void }) => {
+const OverviewContent = (actions: RowActions) => {
   const hasPlaylists = usePlaylistsStore(state => state.playlists.length > 0)
   const loadStatus = usePlaylistsStore(state => state.loadStatus)
 
@@ -59,7 +67,7 @@ const OverviewContent = ({ onDelete }: { onDelete: (playlist: SavedPlaylist) => 
   if (loadStatus === 'failed') {
     return <LoadFailure />
   }
-  return hasPlaylists ? <PlaylistList onDelete={onDelete} /> : <NoPlaylists />
+  return hasPlaylists ? <PlaylistList {...actions} /> : <NoPlaylists />
 }
 
 const OverviewStatus = () => {
@@ -73,24 +81,22 @@ const OverviewStatus = () => {
  * status line counts them, and below it the view shows nothing until the Playlists folder is
  * read, then a row per playlist, the failure notice with a "Try again" button, or, without
  * playlists, a message in the middle of the view pointing at the New playlist button. The last row
- * can scroll clear of that button. Deleting a playlist asks first, then a
- * notification says it was deleted, with an Undo button that brings it back.
+ * can scroll clear of that button. A row opens its playlist. Editing a playlist opens its dialog
+ * filled with its values (`PlaylistDialog`). Deleting one asks first, then a notification says it
+ * was deleted, with an Undo button that brings it back.
  *
  * @summary Playlists view's list of playlists
  */
 export const PlaylistsOverview = () => {
   const deletePlaylist = usePlaylistsStore(state => state.deletePlaylist)
-  // The playlist asked about stays while the dialog fades out, after its row is gone.
-  const [askedPlaylist, setAskedPlaylist] = useState<SavedPlaylist | null>(null)
-  const [isAsking, setIsAsking] = useState(false)
+  const editing = useDialogAbout<SavedPlaylist>()
+  const deletion = useDialogAbout<SavedPlaylist>()
 
-  const askToDelete = (playlist: SavedPlaylist) => {
-    setAskedPlaylist(playlist)
-    setIsAsking(true)
-  }
-  const confirmDelete = (playlist: SavedPlaylist) => {
-    setIsAsking(false)
-    void deletePlaylist(playlist.fileName)
+  const confirmDelete = () => {
+    deletion.close()
+    if (deletion.subject) {
+      void deletePlaylist(deletion.subject.fileName)
+    }
   }
 
   return (
@@ -98,16 +104,24 @@ export const PlaylistsOverview = () => {
       {/* At least as tall as the view, so the message without playlists can sit in its middle. */}
       <div className="flex min-h-full flex-col">
         <OverviewStatus />
-        <OverviewContent onDelete={askToDelete} />
+        <OverviewContent onEdit={editing.open} onDelete={deletion.open} />
       </div>
-      {askedPlaylist && (
+      {/* Kept outside the list, so they can fade out after their row is gone. */}
+      {editing.subject && (
+        <PlaylistDialog
+          isOpen={editing.isOpen}
+          onClose={editing.close}
+          playlist={editing.subject}
+        />
+      )}
+      {deletion.subject && (
         <ConfirmDialog
-          isOpen={isAsking}
-          question={`Delete "${askedPlaylist.title}"?`}
+          isOpen={deletion.isOpen}
+          question={`Delete "${deletion.subject.title}"?`}
           details="This action is irreversible."
           confirmLabel="Delete"
-          onConfirm={() => confirmDelete(askedPlaylist)}
-          onCancel={() => setIsAsking(false)}
+          onConfirm={confirmDelete}
+          onCancel={deletion.close}
         />
       )}
     </ViewLayout>

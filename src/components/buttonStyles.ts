@@ -27,6 +27,13 @@ export const ACTIVE_CLASSES = 'bg-pen/15 text-pen data-hover:bg-pen/20'
 export const FOCUS_CLASSES =
   'outline-none data-focus:outline-2 data-focus:outline-solid data-focus:outline-offset-2 data-focus:outline-pen'
 
+/**
+ * The focus ring of a button stretched over a whole row, like a playlist's: the same ring, drawn
+ * just inside the row's edges, around the row rather than the button's text.
+ */
+export const STRETCHED_FOCUS_CLASSES =
+  'outline-none data-focus:after:outline-2 data-focus:after:outline-solid data-focus:after:-outline-offset-2 data-focus:after:outline-pen'
+
 /** The panel a button opens over the page, like a select's list or a menu: on the paper, lifted. */
 export const POPUP_CLASSES = 'border border-rule bg-paper shadow-lg shadow-shade/20'
 

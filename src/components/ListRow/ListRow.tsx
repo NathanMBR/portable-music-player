@@ -4,15 +4,17 @@ import { ACTIVE_CLASSES } from '../buttonStyles'
 
 // The side padding matches an icon button's own, so the first element starts, and a cut name
 // ends, as far from the edges of a highlighted row as a button's icon sits inside the button. A
-// sortable row's slide, an inline transition, stops for users who prefer reduced motion.
+// sortable row's slide, an inline transition, stops for users who prefer reduced motion. The row
+// is the box and stacking context of what it holds, so a button stretched over it, and the
+// controls raised above that button, stay within it, under the header and the floating buttons.
 const ROW_CLASSES =
-  'flex items-center gap-2 border-b border-rule px-2 py-1.5 first:border-t motion-reduce:transition-none!'
+  'relative isolate flex items-center gap-2 border-b border-rule px-2 py-1.5 first:border-t motion-reduce:transition-none!'
 
 // Highlighted like the menu's categories: the current one is on, the others tint under the pointer.
 const OTHER_ROW_CLASSES = 'data-hover:bg-rule/60'
 
 // A lifted row passes over the others, so it hides them instead of letting them show through.
-const LIFTED_ROW_CLASSES = 'relative z-10 bg-paper shadow-md shadow-shade/30'
+const LIFTED_ROW_CLASSES = 'z-10 bg-paper shadow-md shadow-shade/30'
 
 type ListRowProps = {
   /** What the row shows, side by side, like a song's play button, cover and name. */
@@ -39,7 +41,8 @@ const rowLookOf = (isCurrent: boolean, isLifted: boolean) => {
  * the song list or a playlist of the Playlists view, with the same room inside both of its ends.
  * The row under the mouse is tinted. The current row sits on a pen tint with its text in pen, and
  * screen readers hear it as current. In a sortable list, the row being dragged is lifted above the
- * others. It goes in a `<ul>`.
+ * others. A button stretched over the whole row (`after:absolute after:inset-0`), like a playlist's,
+ * covers it from edge to edge. It goes in a `<ul>`.
  *
  * @summary Row of a list, tinted under the mouse
  */

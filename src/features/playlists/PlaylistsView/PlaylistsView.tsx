@@ -3,8 +3,8 @@ import { PlaylistsOverview } from '../PlaylistsOverview/PlaylistsOverview'
 import { selectShownPlaylist, usePlaylistsStore } from '../playlistsStore'
 
 /**
- * The Playlists category: the list of playlists, or the playlist opened from it with See, until
- * its back button goes back to the list. The playlist stays open while other pages are on screen,
+ * The Playlists category: the list of playlists, or the playlist opened from its row, until its
+ * back button goes back to the list. The playlist stays open while other pages are on screen,
  * so coming back shows it again.
  *
  * @summary Playlists category view

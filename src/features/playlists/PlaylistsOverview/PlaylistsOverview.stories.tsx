@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { InvokeArgs } from '@tauri-apps/api/core'
 import { expect, fn, waitFor, within } from 'storybook/test'
+import { noCover } from '../../../testing/covers'
+import { loggedMessages } from '../../../testing/logs'
 import { failingCommand, mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { withNotificationArea } from '../../../testing/withNotificationArea'
@@ -8,7 +10,7 @@ import { useLibraryStore } from '../../library/libraryStore'
 import type { Track } from '../../library/types'
 import { usePlaybackStore } from '../../playback/playbackStore'
 import { usePlaylistsStore } from '../playlistsStore'
-import type { SavedPlaylist } from '../types'
+import type { PlaylistContents, SavedPlaylist } from '../types'
 import { PlaylistsOverview } from './PlaylistsOverview'
 
 const suggestions: Track = {
@@ -50,6 +52,11 @@ const listed = (...playlists: SavedPlaylist[]) =>
 
 const deletePlaylist = fn((_args?: InvokeArgs) => undefined)
 const createPlaylist = fn((_args?: InvokeArgs) => roadTrip)
+// Rust saves what it's given, and finds every song.
+const savePlaylist = fn((args?: InvokeArgs) => {
+  const { fileName, playlist } = args as { fileName: string; playlist: PlaylistContents }
+  return { fileName, ...playlist, allSongsFound: true }
+})
 
 const meta = {
   component: PlaylistsOverview,
@@ -63,13 +70,32 @@ const meta = {
     mockCommands({
       check_playlist: () => ({ playlist: roadTrip, missingCount: 0 }),
       delete_playlist: deletePlaylist,
-      create_playlist: createPlaylist
+      create_playlist: createPlaylist,
+      save_playlist: savePlaylist,
+      read_cover: noCover
     })
   }
 } satisfies Meta<typeof PlaylistsOverview>
 
 export default meta
 type Story = StoryObj<typeof meta>
+type PlayContext = Pick<Parameters<NonNullable<Story['play']>>[0], 'canvasElement' | 'userEvent'>
+
+/** Chooses an item of a playlist's menu, as the pointer does. */
+const chooseFromTheMenuOf = async (
+  { canvasElement, userEvent }: PlayContext,
+  title: string,
+  item: string
+) => {
+  const page = within(canvasElement.ownerDocument.body)
+  await userEvent.click(page.getByRole('button', { name: `More for ${title}` }))
+  await userEvent.click(await page.findByRole('menuitem', { name: item }))
+}
+
+const openingButtonsIn = (list: HTMLElement) =>
+  within(list)
+    .getAllByRole('button', { name: /^See / })
+    .map(button => button.getAttribute('aria-label'))
 
 /** Every playlist, sorted by title, one row each, below a status line counting them. */
 export const Default: Story = {
@@ -147,13 +173,13 @@ export const SongsMissing: Story = {
 }
 
 /**
- * Delete asks first. Once the playlist is deleted, its row goes, and a notification says so, with
- * an Undo button that writes its file again.
+ * Delete playlist, in its menu, asks first. Once the playlist is deleted, its row goes, and a
+ * notification says so, with an Undo button that writes its file again.
  */
 export const DeletingAndUndoing: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Delete Road trip' }))
+    await chooseFromTheMenuOf({ canvasElement, userEvent }, 'Road trip', 'Delete playlist')
     const dialog = await page.findByRole('dialog', { name: 'Delete "Road trip"?' })
     await expect(within(dialog).getByText('This action is irreversible.')).toBeVisible()
 
@@ -175,7 +201,7 @@ export const DeletingAndUndoing: Story = {
 export const CancellingTheDelete: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Delete Road trip' }))
+    await chooseFromTheMenuOf({ canvasElement, userEvent }, 'Road trip', 'Delete playlist')
 
     await userEvent.click(await page.findByRole('button', { name: 'Cancel' }))
 
@@ -192,11 +218,49 @@ export const DeleteFailing: Story = {
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
-    await userEvent.click(canvas.getByRole('button', { name: 'Delete Road trip' }))
+    await chooseFromTheMenuOf({ canvasElement, userEvent }, 'Road trip', 'Delete playlist')
 
     await userEvent.click(await page.findByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(page.getByText(DELETE_ERROR)).toBeVisible())
     await expect(canvas.getByRole('button', { name: 'Play Road trip' })).toBeVisible()
+  }
+}
+
+/**
+ * Edit playlist, in its menu, opens the playlist's dialog filled with its values. Once saved, the
+ * row shows the new title, in its place among the others sorted by title.
+ */
+export const Editing: Story = {
+  parameters: renderInOwnFrame(640),
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    await chooseFromTheMenuOf({ canvasElement, userEvent }, 'Road trip', 'Edit playlist')
+    const dialog = await page.findByRole('dialog', { name: 'Edit playlist' })
+    const title = within(dialog).getByRole('textbox', { name: 'Title' })
+    await expect(title).toHaveValue('Road trip')
+    await expect(within(dialog).getByRole('textbox', { name: 'Description' })).toHaveValue(
+      'For the long drive'
+    )
+    await userEvent.clear(title)
+    await userEvent.type(title, 'A long road trip')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(page.queryByRole('dialog')).toBeNull())
+    await expect(savePlaylist).toHaveBeenCalledWith({
+      fileName: roadTrip.fileName,
+      playlist: {
+        title: 'A long road trip',
+        description: 'For the long drive',
+        songs: roadTrip.songs
+      }
+    })
+    await expect(openingButtonsIn(canvas.getByRole('list', { name: 'Playlists' }))).toEqual([
+      'See A long road trip',
+      'See Late night'
+    ])
+    await expect(loggedMessages()).toContain('Edited playlist "A long road trip"')
   }
 }

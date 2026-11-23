@@ -102,6 +102,8 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   data-focus:outline-pen` (`FOCUS_CLASSES`) when reached from the keyboard, and no ring after a
   click: `outline-none` hides the browser's own. Labels beside a control are `passive`, so
   clicking one doesn't hand the control a click Headless UI would ring as a screen reader's.
+  A button stretched over a whole row, like a playlist's, draws the same ring just inside the
+  row's edges instead (`STRETCHED_FOCUS_CLASSES`), around the row rather than its text.
   Sliders use `outline-offset-4`, so the ring clears their thumb. They also hide the ring after a click,
   because Headless UI rings inputs on any focus, like text fields.
 - **Active:** whatever is on right now, like a pressed toggle (shuffle, repeat), the playing

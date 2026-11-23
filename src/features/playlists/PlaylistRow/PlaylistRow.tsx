@@ -1,6 +1,9 @@
-import { EyeIcon, TrashIcon } from '@heroicons/react/20/solid'
+import { Button } from '@headlessui/react'
+import { PencilIcon, TrashIcon } from '@heroicons/react/20/solid'
+import type { ReactNode } from 'react'
+import { ActionMenu } from '../../../components/ActionMenu/ActionMenu'
 import { AlertMark } from '../../../components/AlertMark/AlertMark'
-import { IconButton } from '../../../components/IconButton/IconButton'
+import { STRETCHED_FOCUS_CLASSES } from '../../../components/buttonStyles'
 import { ListRow } from '../../../components/ListRow/ListRow'
 import { TITLE_ARTIST_SEPARATOR } from '../../library/trackName'
 import { MISSING_SONGS_LABEL, PLAYLISTS_ICON } from '../constants'
@@ -12,7 +15,9 @@ import type { SavedPlaylist } from '../types'
 type PlaylistRowProps = {
   /** The playlist the row shows. */
   playlist: SavedPlaylist
-  /** Asks before the playlist is deleted, which its Delete button starts. */
+  /** Opens the playlist's dialog to edit it, which Edit playlist, in its menu, starts. */
+  onEdit: () => void
+  /** Asks before the playlist is deleted, which Delete playlist, in its menu, starts. */
   onDelete: () => void
 }
 
@@ -26,29 +31,42 @@ const PlaylistSquare = () => (
   </div>
 )
 
+// The title's button covers the whole row, so the row's other controls sit above it.
+const RaisedControls = ({ children }: { children: ReactNode }) => (
+  <div className="relative z-10 flex shrink-0 items-center gap-2">{children}</div>
+)
+
 /**
  * Row of one playlist in the Playlists view, like a song's row: a round play button, a square with
  * the Playlists icon, then the playlist's title and, when it has one, a middle dot and its
  * description in a lighter ink. While its file says songs are missing, a red alert follows the
  * title, the play button is disabled and a Recheck button follows it. A name too long for the row
- * is cut with an ellipsis, and hovering shows it whole. At the row's right end, See opens the
- * playlist and Delete asks before deleting it.
+ * is cut with an ellipsis, and hovering shows it whole. A click anywhere on the row outside its
+ * buttons opens the playlist, under a pointer cursor, and so does Enter on its title from the
+ * keyboard, whose focus ring goes around the row. At the row's right end, a menu holds Edit
+ * playlist, which opens its dialog, and Delete playlist, which asks before deleting it.
  *
- * @summary Row of one playlist, with its play, See and Delete buttons
+ * @summary Row of one playlist, opening it, with its play button and a menu to edit or delete it
  */
-export const PlaylistRow = ({ playlist, onDelete }: PlaylistRowProps) => {
+export const PlaylistRow = ({ playlist, onEdit, onDelete }: PlaylistRowProps) => {
   const showPlaylist = usePlaylistsStore(state => state.showPlaylist)
 
   return (
     <ListRow>
-      <PlaylistPlayButton playlist={playlist} />
-      <RecheckButton playlist={playlist} />
+      <RaisedControls>
+        <PlaylistPlayButton playlist={playlist} />
+        <RecheckButton playlist={playlist} />
+      </RaisedControls>
       <PlaylistSquare />
-      <span
-        title={fullPlaylistName(playlist)}
-        className="flex min-w-0 flex-1 items-center gap-1.5 font-stretch-semi-condensed"
-      >
-        <span className="truncate">{playlist.title}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 font-stretch-semi-condensed">
+        <Button
+          aria-label={`See ${playlist.title}`}
+          title={fullPlaylistName(playlist)}
+          onClick={() => showPlaylist(playlist.fileName)}
+          className={`min-w-0 truncate text-left after:absolute after:inset-0 ${STRETCHED_FOCUS_CLASSES}`}
+        >
+          {playlist.title}
+        </Button>
         {!playlist.allSongsFound && <AlertMark label={MISSING_SONGS_LABEL} />}
         {playlist.description && (
           <span className="truncate text-ink-faded">
@@ -57,12 +75,15 @@ export const PlaylistRow = ({ playlist, onDelete }: PlaylistRowProps) => {
           </span>
         )}
       </span>
-      <IconButton
-        icon={EyeIcon}
-        label={`See ${playlist.title}`}
-        onClick={() => showPlaylist(playlist.fileName)}
-      />
-      <IconButton icon={TrashIcon} label={`Delete ${playlist.title}`} onClick={onDelete} />
+      <RaisedControls>
+        <ActionMenu
+          label={`More for ${playlist.title}`}
+          items={[
+            { label: 'Edit playlist', icon: PencilIcon, onClick: onEdit },
+            { label: 'Delete playlist', icon: TrashIcon, onClick: onDelete }
+          ]}
+        />
+      </RaisedControls>
     </ListRow>
   )
 }

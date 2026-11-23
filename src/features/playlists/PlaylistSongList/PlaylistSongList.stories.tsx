@@ -110,6 +110,31 @@ export const Positions: Story = {
   }
 }
 
+/** A box's left and right edges on screen, from its bounding rectangle. */
+const edgesOf = (element: Element | null | undefined) => {
+  if (!element) {
+    throw new Error('Nothing to measure')
+  }
+  const { left, right } = element.getBoundingClientRect()
+  return { left, right }
+}
+
+/**
+ * The play button sits as far from the drag area, the Move handle and the position after it, as
+ * from the cover: from what the eye sees, the position's digits and the play button's icon, since
+ * the quiet button shows no box of its own until hovered.
+ */
+export const PlaySpacedEvenly: Story = {
+  play: async ({ canvas }) => {
+    const play = canvas.getByRole('button', { name: 'Play Darts' })
+    const playIcon = edgesOf(play.querySelector('svg'))
+    const position = edgesOf(play.previousElementSibling)
+    const cover = edgesOf(play.nextElementSibling)
+
+    await expect(playIcon.left - position.right).toBeCloseTo(cover.left - playIcon.right, 0)
+  }
+}
+
 /**
  * A song moved from the keyboard takes its new place, the positions follow, and the playlist is
  * saved in that order.

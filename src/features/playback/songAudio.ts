@@ -13,6 +13,7 @@ export type SongAudio = Pick<
   | 'duration'
   | 'volume'
   | 'paused'
+  | 'ended'
   | 'error'
   | 'readyState'
   | 'canPlayType'
@@ -162,12 +163,16 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     playback().pause()
   }
 
-  // Stops the audio at once, so its song sends no more progress, and drops what it had read.
+  // Stops the audio at once, so its song sends no more progress, and drops what it had read. A
+  // position set before the audio read anything is where its next source starts, and a load keeps
+  // it, so it's put back to the start: else a song starting while the one before loads again to
+  // resume would start from that one's position.
   const emptyAudio = () => {
     stopRunningOn()
     audio.pause()
     audio.removeAttribute('src')
     audio.load()
+    audio.currentTime = 0
   }
 
   // Lets go of the song's stream or frees its bytes.
@@ -202,8 +207,10 @@ export const connectSongAudio = (audio: SongAudio, objectUrls: ObjectUrls = URL)
     })
   }
 
+  // A song that ends is paused before its last report, and the store hears of the end only after
+  // it: playing it again then, from a new load, would drop the end and never reach the next song.
   const followPlaying = (isPlaying: boolean) => {
-    if (isPlaying && audio.paused) {
+    if (isPlaying && audio.paused && !audio.ended) {
       play()
     } else if (!isPlaying && !audio.paused) {
       audio.pause()

@@ -23,9 +23,12 @@ const MEDIA_ERR_DECODE = 3
 const HAVE_NOTHING = 0
 const HAVE_METADATA = 1
 
-/** Stands in for an `<audio>` element, since jsdom can't play media. Tests play it by hand. */
+/**
+ * Stands in for an `<audio>` element, since jsdom can't play media. Tests play it by hand. It
+ * follows the HTML spec where the player relies on it: a load drops the events it hadn't fired
+ * yet, and a position set before the audio has read anything is where its next song starts.
+ */
 class FakeAudio extends EventTarget implements SongAudio {
-  currentTime = 0
   duration = Number.NaN
   volume = 1
   paused = true
@@ -34,6 +37,29 @@ class FakeAudio extends EventTarget implements SongAudio {
   /** Every source the audio was given, in order: each one loads its song from the start. */
   readonly loadedSources: string[] = []
   private source = ''
+  private position = 0
+  // The element's default playback start position, which a load keeps, and reading a song's
+  // header uses up.
+  private startPosition = 0
+  private hasEnded = false
+  private loadCount = 0
+
+  get currentTime() {
+    return this.startPosition || this.position
+  }
+
+  set currentTime(seconds: number) {
+    this.hasEnded = false
+    if (this.readyState === HAVE_NOTHING) {
+      this.startPosition = seconds
+    } else {
+      this.position = seconds
+    }
+  }
+
+  get ended() {
+    return this.hasEnded
+  }
 
   get src() {
     return this.source
@@ -63,8 +89,10 @@ class FakeAudio extends EventTarget implements SongAudio {
   }
 
   load() {
+    this.loadCount++
     this.paused = true
-    this.currentTime = 0
+    this.position = 0
+    this.hasEnded = false
     this.error = null
     this.readyState = HAVE_NOTHING
     if (!Number.isNaN(this.duration)) {
@@ -83,18 +111,36 @@ class FakeAudio extends EventTarget implements SongAudio {
   loadLength(seconds: number) {
     this.duration = seconds
     this.readyState = HAVE_METADATA
+    if (this.startPosition > 0) {
+      this.position = this.startPosition
+      this.startPosition = 0
+    }
     this.dispatchEvent(new Event('durationchange'))
   }
 
   /** Plays on to `seconds` and says so, like the element does a few times a second. */
   playTo(seconds: number) {
-    this.currentTime = seconds
+    this.position = seconds
     this.dispatchEvent(new Event('timeupdate'))
   }
 
+  /**
+   * Plays on to the song's end like the element: paused and ended at once, then reporting where it
+   * is, saying it paused and saying it ended, each in turn unless a load comes first.
+   */
   end() {
     this.paused = true
-    this.dispatchEvent(new Event('ended'))
+    this.hasEnded = true
+    if (Number.isFinite(this.duration)) {
+      this.position = this.duration
+    }
+    const loadsBefore = this.loadCount
+    for (const event of ['timeupdate', 'pause', 'ended']) {
+      if (this.loadCount !== loadsBefore) {
+        return
+      }
+      this.dispatchEvent(new Event(event))
+    }
   }
 
   /** Runs out of data to play, like the element does while the file arrives too slowly. */
@@ -426,6 +472,8 @@ describe('connectSongAudio', () => {
     const connected = connectAudio()
     const { audio } = connected
     await startPlaying(connected, firstTrack)
+    audio.loadLength(270)
+    audio.playTo(269.9)
 
     audio.end()
 
@@ -446,6 +494,24 @@ describe('connectSongAudio', () => {
 
     expect(audio).toMatchObject({ currentTime: 0, paused: false })
     expect(await playedBytes(connected)).toBe(bytesOf(firstTrack))
+  })
+
+  it('starts the next song from its beginning, though the one before was loading to resume', async () => {
+    mockCommands(streamedSongs)
+    const connected = connectAudio()
+    const { audio } = connected
+    playback().playTrack(firstTrack, queue)
+    await waitUntilStreaming(connected, firstTrack)
+    audio.loadLength(270)
+    audio.playTo(80)
+    playback().pause()
+    playback().play()
+
+    playback().playNext()
+    await waitUntilStreaming(connected, secondTrack)
+    audio.loadLength(330)
+
+    expect(audio.currentTime).toBe(0)
   })
 
   it('stops the audio when the player is stopped', async () => {

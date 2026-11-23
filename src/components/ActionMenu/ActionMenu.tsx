@@ -35,10 +35,12 @@ const OpenStateLog = ({ isOpen, label }: { isOpen: boolean; label: string }) => 
 
 /**
  * Round button with three vertical dots, opening a menu of actions below it, like what can be done
- * to a song of a playlist. Each item shows an icon and its text, and closes the menu once chosen.
- * From the keyboard, Enter, Space or the down arrow opens it, the arrows move through the items,
- * Enter or Space chooses one, and Escape closes it, giving the focus back to its button. The menu
- * logs its opening and closing under its label, and its items are logged as clicked buttons.
+ * to a song of a playlist. The menu fades in from a slightly smaller size, growing from its corner
+ * under the button, and fades out the same way. Each item shows an icon and its text, and closes
+ * the menu once chosen. From the keyboard, Enter, Space or the down arrow opens it, the arrows move
+ * through the items, Enter or Space chooses one, and Escape closes it, giving the focus back to its
+ * button. The menu logs its opening and closing under its label, and its items are logged as
+ * clicked buttons.
  *
  * @summary Button opening a menu of actions
  */
@@ -56,7 +58,8 @@ export const ActionMenu = ({ label, items }: ActionMenuProps) => (
         </MenuButton>
         <MenuItems
           anchor={{ to: 'bottom end', gap: 4 }}
-          className={`z-20 min-w-44 rounded-lg p-1 outline-none ${POPUP_CLASSES}`}
+          transition
+          className={`z-20 min-w-44 origin-top-right rounded-lg p-1 outline-none transition duration-150 ease-out data-closed:scale-95 data-closed:opacity-0 motion-reduce:transition-none ${POPUP_CLASSES}`}
         >
           {items.map(({ label: itemLabel, icon: Icon, onClick }) => (
             <MenuItem key={itemLabel}>

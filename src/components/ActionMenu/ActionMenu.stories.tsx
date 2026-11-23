@@ -46,6 +46,29 @@ export const Open: Story = {
   }
 }
 
+/**
+ * The menu fades in from a slightly smaller size, growing from its corner under the button, and
+ * fades out the same way when it closes.
+ */
+export const OpeningTransition: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const button = canvas.getByRole('button', { name: 'More for Gate XIII' })
+    await userEvent.click(button)
+
+    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu')
+    const style = getComputedStyle(menu)
+    await expect(style.transitionProperty).toMatch(/opacity/)
+    await expect(style.transitionProperty).toMatch(/scale/)
+    await expect(style.transitionDuration).toBe('0.15s')
+    await expect(style.transformOrigin).toBe(`${menu.offsetWidth}px 0px`)
+
+    await userEvent.click(button)
+
+    await waitFor(() => expect(menu).toHaveAttribute('data-closed'))
+    await waitFor(() => expect(menu).not.toBeInTheDocument())
+  }
+}
+
 /** Clicking an item does what it says and closes the menu; the log has the click between. */
 export const ChoosingAnItem: Story = {
   play: async ({ args, canvas, canvasElement, userEvent }) => {

@@ -23,6 +23,8 @@ type PlaylistSongListProps = {
 type SongRowProps = {
   playlist: SavedPlaylist
   song: PlaylistSong
+  /** The song's place in the playlist, from 1. */
+  position: number
   onRemove: () => void
 }
 
@@ -65,7 +67,19 @@ const MissingSong = ({ name }: { name: string }) => (
   </>
 )
 
-const SongRow = ({ playlist, song, onRemove }: SongRowProps) => {
+// As wide as the playlist's longest position, so every row's play button and name line up. The
+// list itself tells screen readers each row's position, so they don't hear it twice.
+const SongPosition = ({ position, songCount }: { position: number; songCount: number }) => (
+  <span
+    aria-hidden="true"
+    style={{ width: `${String(songCount).length}ch` }}
+    className="shrink-0 text-right text-sm text-ink-faded tabular-nums"
+  >
+    {position}
+  </span>
+)
+
+const SongRow = ({ playlist, song, position, onRemove }: SongRowProps) => {
   const { track } = song
   const isInPlayer = usePlaybackStore(
     state => track !== null && state.session?.track.path === track.path
@@ -74,6 +88,7 @@ const SongRow = ({ playlist, song, onRemove }: SongRowProps) => {
 
   return (
     <SortableRow id={song.fileName} moveLabel={`Move ${name}`} isCurrent={isInPlayer}>
+      <SongPosition position={position} songCount={playlist.songs.length} />
       {track ? (
         <FoundSong playlist={playlist} song={song} track={track} isInPlayer={isInPlayer} />
       ) : (
@@ -90,13 +105,14 @@ const SongRow = ({ playlist, song, onRemove }: SongRowProps) => {
 /**
  * The songs of a playlist, in its order, on its page. Each row starts with a Move handle that
  * drags the song to another place, with the pointer or from the keyboard, and the playlist is
- * saved as soon as it's dropped. A found song then has a row like in the song list, whose play
- * button plays the playlist from it, disabled while songs are missing. A song the last scan of
- * the Songs folder lacks is still listed, under its file name in a lighter ink, with an alert
- * where its play button would be, and can be moved and removed all the same. Each row ends with a
- * Remove button, which asks first, then a notification says the song was removed, with an Undo
- * button that puts it back. Removing never touches the Songs folder. A playlist without songs
- * says so in the middle of the view, as the page lays it out.
+ * saved as soon as it's dropped. The song's position in the playlist, from 1, follows the handle,
+ * and changes with every drop, removal and Undo. A found song then has a row like in the song
+ * list, whose play button plays the playlist from it, disabled while songs are missing. A song
+ * the last scan of the Songs folder lacks is still listed, under its file name in a lighter ink,
+ * with an alert where its play button would be, and can be moved and removed all the same. Each
+ * row ends with a Remove button, which asks first, then a notification says the song was removed,
+ * with an Undo button that puts it back. Removing never touches the Songs folder. A playlist
+ * without songs says so in the middle of the view, as the page lays it out.
  *
  * @summary Songs of a playlist, to play, reorder and remove
  */
@@ -134,11 +150,12 @@ export const PlaylistSongList = ({ playlist }: PlaylistSongListProps) => {
             nameOf={nameOf}
             onMove={(from, to) => void moveSong(playlist.fileName, from, to)}
           >
-            {songs.map(song => (
+            {songs.map((song, index) => (
               <SongRow
                 key={song.fileName}
                 playlist={playlist}
                 song={song}
+                position={index + 1}
                 onRemove={() => askToRemove(song)}
               />
             ))}

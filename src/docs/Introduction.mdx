@@ -27,7 +27,8 @@ view (`viewByCategory`), so the navigation feature never imports the views it sw
 The **audio player** (`AudioPlayer`) slides up along the bottom of the window when a song is played,
 and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the
 category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
-song's title above its progress bar in the middle, and the speaker and volume on the right. The bar
+song's title and artist, as in the song list, above its progress bar in the middle, and the speaker
+and volume on the right. The bar
 has the elapsed time on its left, which a click turns into the time left counted down, and the
 song's length on its right. The progress stops growing at a set width, so in wide windows the
 spaces around it widen instead.
@@ -95,8 +96,8 @@ disabled. An open playlist (`PlaylistPage`) has its title in the header, with a 
 large play button that starts from its first song, and its songs below, each with its own play
 button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. The songs
 (`PlaylistSongList`) move by dragging their Move handle, with the pointer or from the keyboard
-(`SortableList`), and each row ends with Remove, which asks first, then notifies with an Undo; a
-playlist is saved as soon as it changes. The open playlist stays open while other pages are on
+(`SortableList`), each row shows its song's position after the handle, and each row ends with
+Remove, which asks first, then notifies with an Undo; a playlist is saved as soon as it changes. The open playlist stays open while other pages are on
 screen.
 
 On the list of playlists, a round + button (`NewPlaylistButton`) floats in the bottom-right

@@ -58,10 +58,14 @@ const OfTheShownPlaylist = () => {
   return playlist ? <PlaylistSongList playlist={playlist} /> : null
 }
 
-const songNamesIn = (list: HTMLElement) =>
+/** Each row as it reads: its position, then its song's name, like "1. Darts · System of a Down". */
+const rowsIn = (list: HTMLElement) =>
   within(list)
     .getAllByRole('listitem')
-    .map(row => row.textContent)
+    .map(row => {
+      const position = within(row).getByText(/^\d+$/).textContent ?? ''
+      return `${position}. ${row.textContent?.slice(position.length)}`
+    })
 
 const meta = {
   component: PlaylistSongList,
@@ -95,7 +99,21 @@ export const Default: Story = {
   }
 }
 
-/** A song moved from the keyboard takes its new place, and the playlist is saved in that order. */
+/** Right after its Move handle, each row shows its song's position in the playlist, from 1. */
+export const Positions: Story = {
+  play: async ({ canvas }) => {
+    await expect(rowsIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
+      '1. Darts · System of a Down',
+      '2. Cigaro · System of a Down',
+      '3. A Monster in Her Eyes · Angra'
+    ])
+  }
+}
+
+/**
+ * A song moved from the keyboard takes its new place, the positions follow, and the playlist is
+ * saved in that order.
+ */
 export const MovingASong: Story = {
   play: async ({ canvas, userEvent }) => {
     canvas.getByRole('button', { name: 'Move Darts' }).focus()
@@ -114,10 +132,10 @@ export const MovingASong: Story = {
         }
       })
     )
-    await expect(songNamesIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
-      'Cigaro · System of a Down',
-      'Darts · System of a Down',
-      'A Monster in Her Eyes · Angra'
+    await expect(rowsIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
+      '1. Cigaro · System of a Down',
+      '2. Darts · System of a Down',
+      '3. A Monster in Her Eyes · Angra'
     ])
     await expect(loggedMessages()).toContain(
       'Moved song "Darts" to position 2 in playlist "Late drive"'
@@ -127,7 +145,7 @@ export const MovingASong: Story = {
 
 /**
  * Remove asks first. Once it's confirmed, the song leaves the playlist, though not the Songs
- * folder, and a notification says so, with an Undo button.
+ * folder, the songs after it move up a position, and a notification says so, with an Undo button.
  */
 export const RemovingASong: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -144,12 +162,15 @@ export const RemovingASong: Story = {
         playlist: expect.objectContaining({ songs: ['Darts.mp3', 'A Monster in Her Eyes.mp3'] })
       })
     )
-    await expect(canvas.queryByRole('button', { name: 'Remove Cigaro' })).toBeNull()
+    await expect(rowsIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
+      '1. Darts · System of a Down',
+      '2. A Monster in Her Eyes · Angra'
+    ])
     await expect(loggedMessages()).toContain('Removed song "Cigaro" from playlist "Late drive"')
   }
 }
 
-/** The notification's Undo puts the removed song back where it was. */
+/** The notification's Undo puts the removed song back where it was, at its old position. */
 export const UndoingARemoval: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
@@ -161,10 +182,10 @@ export const UndoingARemoval: Story = {
     await userEvent.click(await page.findByRole('button', { name: 'Undo' }))
 
     await waitFor(() =>
-      expect(songNamesIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
-        'Darts · System of a Down',
-        'Cigaro · System of a Down',
-        'A Monster in Her Eyes · Angra'
+      expect(rowsIn(canvas.getByRole('list', { name: 'Songs of Late drive' }))).toEqual([
+        '1. Darts · System of a Down',
+        '2. Cigaro · System of a Down',
+        '3. A Monster in Her Eyes · Angra'
       ])
     )
   }
@@ -208,9 +229,9 @@ export const MissingSong: Story = {
     )
 
     await waitFor(() => expect(canvas.getByRole('button', { name: 'Play Darts' })).toBeEnabled())
-    await expect(songNamesIn(canvas.getByRole('list'))).toEqual([
-      'Darts · System of a Down',
-      'Cigaro · System of a Down'
+    await expect(rowsIn(canvas.getByRole('list'))).toEqual([
+      '1. Darts · System of a Down',
+      '2. Cigaro · System of a Down'
     ])
   }
 }

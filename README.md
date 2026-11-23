@@ -8,7 +8,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Keeps all its data next to the executable
 - Log of clicks, switches, songs, jumps and pages, in the terminal and the `Logs` folder
 - Songs library from the `Songs` folder
-- Song titles and artists from their tags
+- Song titles and artists from their tags, in the song list and the player
 - Song cover miniatures from their tags
 - Songs sorted by title or by filename
 - Song list highlights the hovered song and the song in the player
@@ -18,7 +18,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Playlists page, from the `Playlists` folder
 - Create playlists, picking their songs with a search
 - Play, open and delete playlists, with an Undo notification
-- Reorder and remove the songs of a playlist
+- Reorder and remove the numbered songs of a playlist
 - Flags playlists whose songs are missing, until a recheck finds them
 - Audio player with shuffle, repeat, volume and seeking
 - Volume from the mouse wheel

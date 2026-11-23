@@ -1,6 +1,8 @@
 import { Field, Input, Label } from '@headlessui/react'
-import type { Ref } from 'react'
+import { type Ref, useState } from 'react'
 import { FOCUS_CLASSES } from '../buttonStyles'
+
+const POINTER_FOCUS_CLASSES = 'outline-none'
 
 type TextFieldProps = {
   /** The visible label above the box, which names the field. */
@@ -24,7 +26,8 @@ type TextFieldProps = {
 /**
  * One-line text box with its label above it, like a new playlist's title. The label names the box
  * for screen readers, and clicking it focuses the box. The box has the keyboard focus ring of
- * every control.
+ * every control, but a click on it shows none, since the caret already says where typing goes:
+ * Headless UI marks a text box focused however the focus came.
  *
  * @summary Text box with its label
  */
@@ -37,18 +40,23 @@ export const TextField = ({
   maxLength,
   isRequired = false,
   ref
-}: TextFieldProps) => (
-  <Field className="flex flex-col gap-1.5">
-    <Label className="text-sm font-semibold text-ink">{label}</Label>
-    <Input
-      ref={ref}
-      type={type}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      required={isRequired}
-      className={`rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faded ${FOCUS_CLASSES}`}
-    />
-  </Field>
-)
+}: TextFieldProps) => {
+  const [isFocusedByPointer, setIsFocusedByPointer] = useState(false)
+  return (
+    <Field className="flex flex-col gap-1.5">
+      <Label className="text-sm font-semibold text-ink">{label}</Label>
+      <Input
+        ref={ref}
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        onPointerDown={() => setIsFocusedByPointer(true)}
+        onBlur={() => setIsFocusedByPointer(false)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        required={isRequired}
+        className={`rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faded ${isFocusedByPointer ? POINTER_FOCUS_CLASSES : FOCUS_CLASSES}`}
+      />
+    </Field>
+  )
+}

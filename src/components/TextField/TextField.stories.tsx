@@ -54,6 +54,30 @@ export const Search: Story = {
   }
 }
 
+/** A click focuses the box without the focus ring, which only the keyboard brings. */
+export const FocusedByAClick: Story = {
+  play: async ({ canvas, userEvent }) => {
+    const box = canvas.getByRole('textbox', { name: 'Title' })
+
+    await userEvent.click(box)
+
+    await expect(box).toHaveFocus()
+    await expect(getComputedStyle(box).outlineStyle).toBe('none')
+  }
+}
+
+/** Tab brings the focus ring around the box. */
+export const FocusedFromTheKeyboard: Story = {
+  play: async ({ canvas, userEvent }) => {
+    const box = canvas.getByRole('textbox', { name: 'Title' })
+
+    await userEvent.tab()
+
+    await expect(box).toHaveFocus()
+    await expect(getComputedStyle(box).outlineStyle).toBe('solid')
+  }
+}
+
 /** It takes no more characters than its limit. */
 export const WithALimit: Story = {
   args: { maxLength: 10 },

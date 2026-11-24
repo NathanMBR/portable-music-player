@@ -39,7 +39,7 @@ In dev the executable is `src-tauri/target/debug/portable-music-player`, so the 
 - `publish-stable.yml`, when Quality Assurance passes on a push to `master` (`workflow_run`, so it builds and tags the commit QA tested): a draft release tagged `v<version>`;
 - `publish-unstable.yml`, on every push to `development`, without waiting for Quality Assurance: a pre-release tagged `v<version>-unstable.<run id>.<run attempt>`, with `unstable` and `<run id>_<run attempt>` (just before the extension) in every file name, so downloads of different builds never overwrite each other.
 
-Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key. Signing requires the matching public key in `plugins.updater.pubkey` of `tauri.conf.json`, even before the app uses the updater plugin: without it, bundling fails with `plugins > updater doesn't exist`.
+Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key. Signing requires the matching public key in `plugins.updater.pubkey` of `tauri.conf.json`: without it, bundling fails with `plugins > updater doesn't exist`. The app checks the stable releases only (see `updates.rs`): the unstable ones upload a `latest.json` too, which it never reads.
 
 ## Architecture
 
@@ -214,6 +214,11 @@ src/
   - The Windows release build has no console (`windows_subsystem` in `main.rs`), so there the file is the only log.
   - `log_opening` writes `Opening app` in `setup`, the first moment the plugin runs, and `log_closing` writes `Closing app` on `RunEvent::Exit`, which a process killed from outside never reaches.
   - The webview writes through `write_log`, a command of this module, rather than `@tauri-apps/plugin-log`, whose lines would each carry the caller's place in the bundled script.
+- `updates.rs`: the update check, through the official `tauri-plugin-updater`.
+  - `check_for_update` reads the `latest.json` of GitHub's latest release, the endpoint in `tauri.conf.json` (`plugins.updater.endpoints`). GitHub's latest release is never a draft or a pre-release, so the unstable builds are never offered. The plugin compares its version with the one running, and finds the release's files for this OS.
+  - It sends back the version and the notes (`FoundUpdate`), and keeps the plugin's `Update` (`PendingUpdate`, managed state) for its download.
+  - A check gives up after `CHECK_TIMEOUT`, so a stalled connection fails instead of checking forever.
+  - `plugins.updater.requireSignedVersion` makes the plugin refuse a release whose signature names another version than the one `latest.json` announces, so a tampered `latest.json` can't pass an older release off as a new one. The Tauri CLI writes the version into every signature it makes.
 - Commands are `async`: sync commands run on the main thread, and file I/O on a slow USB drive would freeze the window.
 - Commands return `Result<T, FeatureError>`. The error enum uses `thiserror` for messages and serializes as its message string, which the frontend shows to the user. Structs sent to the frontend use `#[serde(rename_all = "camelCase")]`.
 

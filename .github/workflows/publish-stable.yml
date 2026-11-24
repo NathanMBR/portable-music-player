@@ -76,7 +76,7 @@ jobs:
           releaseCommitish: ${{ github.event.workflow_run.head_sha }}
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
-          # latest.json, for the update detection to come.
+          # latest.json, which the app's update check reads.
           uploadUpdaterJson: true
           # Updater artifacts are made only here, where the signing key is: a local tauri build has
           # none to sign them with.

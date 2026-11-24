@@ -71,7 +71,7 @@ jobs:
           releaseAssetNamePattern: '[mainBinaryName]_[version]_unstable_[platform]_[arch][setup]_${{ github.run_id }}_${{ github.run_attempt }}[ext]'
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
-          # latest.json, for the update detection to come.
+          # latest.json, as in the stable releases, though the app checks only those.
           uploadUpdaterJson: true
           # Updater artifacts are made only here, where the signing key is: a local tauri build has
           # none to sign them with.

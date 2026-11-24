@@ -154,7 +154,7 @@ describe('savePlayback', () => {
     isMuted: false,
     repeatMode: 'all',
     isShuffled: true,
-    song: { fileName: 'Know.mp3', elapsedSeconds: 42.5 }
+    song: { fileName: 'Know.mp3', elapsedSeconds: 42.5, playlist: null }
   }
 
   it("saves the player's state to settings.json, along with the other settings", async () => {

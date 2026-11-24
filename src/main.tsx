@@ -17,14 +17,15 @@ import './index.css'
 const settingsLoaded = useSettingsStore.getState().restoreSettings()
 const libraryScanned = useLibraryStore.getState().scanLibrary()
 // Scans never list them again: whether their songs are there is read from the song list.
-void usePlaylistsStore.getState().loadPlaylists()
+const playlistsListed = usePlaylistsStore.getState().loadPlaylists()
 connectSongAudio(new Audio())
 connectWindowTitle()
 connectMediaSession()
 connectButtonLog()
 connectSongDrop()
-// The player's song is found among the scanned ones, and the player is saved only once it's back.
-void Promise.all([settingsLoaded, libraryScanned]).then(() => {
+// The player's song is found among the scanned ones, in its playlist, and the player is saved only
+// once it's back.
+void Promise.all([settingsLoaded, libraryScanned, playlistsListed]).then(() => {
   restorePlayback()
   connectPlaybackMemory()
 })

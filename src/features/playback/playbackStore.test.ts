@@ -553,7 +553,7 @@ describe('restore', () => {
 
     playback().restore({
       ...choicesLeft,
-      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 125.25 }
+      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 125.25, source: SONGS_SOURCE }
     })
 
     expect(session()).toEqual({
@@ -574,7 +574,7 @@ describe('restore', () => {
     playback().restore({
       ...choicesLeft,
       isShuffled: true,
-      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 0 }
+      song: { track: theGoldenAge, queue: songQueue, elapsedSeconds: 0, source: SONGS_SOURCE }
     })
 
     expect(session()?.playOrder[0]).toBe(theGoldenAge)
@@ -585,17 +585,33 @@ describe('restore', () => {
     playback().restore({
       ...choicesLeft,
       volume: 1.5,
-      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: -3 }
+      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: -3, source: SONGS_SOURCE }
     })
 
     expect(playback().volume).toBe(1)
     expect(session()?.elapsedSeconds).toBe(0)
   })
 
+  it('puts the song back as played from the list it was saved from', () => {
+    const roadTrip = playlistSource('1763600000000-Road_trip.json')
+
+    playback().restore({
+      ...choicesLeft,
+      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: 0, source: roadTrip }
+    })
+
+    expect(session()?.source).toEqual(roadTrip)
+  })
+
   it('logs the song put back and where', () => {
     playback().restore({
       ...choicesLeft,
-      song: { track: theGoldenAge, queue: [theGoldenAge], elapsedSeconds: 125.25 }
+      song: {
+        track: theGoldenAge,
+        queue: [theGoldenAge],
+        elapsedSeconds: 125.25,
+        source: SONGS_SOURCE
+      }
     })
 
     expect(loggedMessages()).toEqual(['Restored song "The Golden Age" at 02:05.250'])

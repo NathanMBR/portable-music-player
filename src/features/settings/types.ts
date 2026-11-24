@@ -12,6 +12,8 @@ export type SongOrder = 'fileName' | 'title'
 export type SavedSong = {
   fileName: string
   elapsedSeconds: number
+  /** The file name of the playlist it plays from, or `null` when it plays from the Songs view. */
+  playlist: string | null
 }
 
 /** What the player was left with, put back when the app opens again (mirrors `SavedPlayback`). */

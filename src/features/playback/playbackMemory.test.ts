@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockCommands } from '../../testing/mockCommands'
 import { useLibraryStore } from '../library/libraryStore'
 import type { Track } from '../library/types'
+import { usePlaylistsStore } from '../playlists/playlistsStore'
+import type { SavedPlaylist } from '../playlists/types'
 import { useSettingsStore } from '../settings/settingsStore'
 import type { SavedPlayback, Settings } from '../settings/types'
 import { PLAYBACK_SAVE_DELAY_MS } from './constants'
 import { connectPlaybackMemory, restorePlayback } from './playbackMemory'
-import { SONGS_SOURCE } from './playbackSource'
+import { playlistSource, SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 
 const jewelOfTheSummertime: Track = {
@@ -43,6 +45,19 @@ const NOTHING_SAVED: SavedPlayback = {
   isShuffled: false,
   song: null
 }
+
+const ROAD_TRIP = '1763581234567-Road_trip.json'
+
+const roadTrip: SavedPlaylist = {
+  fileName: ROAD_TRIP,
+  title: 'Road trip',
+  description: '',
+  allSongsFound: false,
+  songs: ['Blind Spell.mp3', 'Motorbreath.mp3', '05 The Great Escape.mp3']
+}
+
+const listed = (...playlists: SavedPlaylist[]) =>
+  usePlaylistsStore.setState({ playlists, loadStatus: 'loaded' })
 
 const playback = () => usePlaybackStore.getState()
 
@@ -91,7 +106,7 @@ describe('restorePlayback', () => {
   it('finds the song by its file name and puts it back paused, queued as the Songs view sorts', () => {
     const saves = mockSaves()
     loadSettingsWith(
-      { song: { fileName: '05 The Great Escape.mp3', elapsedSeconds: 131.75 } },
+      { song: { fileName: '05 The Great Escape.mp3', elapsedSeconds: 131.75, playlist: null } },
       { songOrder: 'fileName' }
     )
     scan(scannedTracks)
@@ -107,9 +122,63 @@ describe('restorePlayback', () => {
     expect(saves).toEqual([])
   })
 
+  it('puts back a song saved from a playlist in that playlist, queued with its songs in its order', () => {
+    const saves = mockSaves()
+    loadSettingsWith({
+      song: { fileName: '05 The Great Escape.mp3', elapsedSeconds: 48.5, playlist: ROAD_TRIP }
+    })
+    scan(scannedTracks)
+    listed(roadTrip)
+
+    restorePlayback()
+
+    expect(playback().session).toMatchObject({
+      track: theGreatEscape,
+      queue: [blindSpell, theGreatEscape],
+      isPlaying: false,
+      elapsedSeconds: 48.5,
+      source: playlistSource(ROAD_TRIP)
+    })
+    expect(saves).toEqual([])
+  })
+
+  it('puts the song back in the Songs view when its playlist is gone, and saves that', () => {
+    const saves = mockSaves()
+    loadSettingsWith({
+      song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 7, playlist: ROAD_TRIP }
+    })
+    scan(scannedTracks)
+    listed()
+
+    restorePlayback()
+
+    expect(playback().session).toMatchObject({ track: blindSpell, source: SONGS_SOURCE })
+    expect(saves.map(saved => saved.song)).toEqual([
+      { fileName: 'Blind Spell.mp3', elapsedSeconds: 7, playlist: null }
+    ])
+  })
+
+  it('puts the song back in the Songs view when its playlist no longer holds it', () => {
+    loadSettingsWith({
+      song: { fileName: 'Jewel of the Summertime.mp3', elapsedSeconds: 7, playlist: ROAD_TRIP }
+    })
+    scan(scannedTracks)
+    listed(roadTrip)
+
+    restorePlayback()
+
+    expect(playback().session).toMatchObject({
+      track: jewelOfTheSummertime,
+      source: SONGS_SOURCE
+    })
+  })
+
   it('forgets a song no longer in the Songs folder, keeping the player closed', () => {
     const saves = mockSaves()
-    loadSettingsWith({ volume: 0.3, song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 20 } })
+    loadSettingsWith({
+      volume: 0.3,
+      song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 20, playlist: null }
+    })
     scan([theHouseJackBuilt, jewelOfTheSummertime])
 
     restorePlayback()
@@ -120,7 +189,7 @@ describe('restorePlayback', () => {
 
   it("forgets the song when the Songs folder couldn't be read, keeping the player closed", () => {
     const saves = mockSaves()
-    loadSettingsWith({ song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 20 } })
+    loadSettingsWith({ song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 20, playlist: null } })
     useLibraryStore.setState({ lastScan: { kind: 'failed' } })
 
     restorePlayback()
@@ -163,9 +232,32 @@ describe('connectPlaybackMemory', () => {
         isMuted: false,
         repeatMode: 'all',
         isShuffled: true,
-        song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 0 }
+        song: { fileName: 'Blind Spell.mp3', elapsedSeconds: 0, playlist: null }
       }
     ])
+  })
+
+  it('saves the playlist the song plays from, by its file name', async () => {
+    const saves = mockSaves()
+    connect()
+
+    playback().playTrack(theGreatEscape, [theGreatEscape], playlistSource(ROAD_TRIP))
+    await vi.advanceTimersByTimeAsync(PLAYBACK_SAVE_DELAY_MS)
+
+    expect(saves.map(saved => saved.song)).toEqual([
+      { fileName: '05 The Great Escape.mp3', elapsedSeconds: 0, playlist: ROAD_TRIP }
+    ])
+  })
+
+  it('saves again when the same song goes on from another list', async () => {
+    const saves = mockSaves()
+    playback().playTrack(blindSpell, [blindSpell, theHouseJackBuilt], SONGS_SOURCE)
+    connect()
+
+    playback().playTrack(blindSpell, [blindSpell], playlistSource(ROAD_TRIP))
+    await vi.advanceTimersByTimeAsync(PLAYBACK_SAVE_DELAY_MS)
+
+    expect(saves.map(saved => saved.song?.playlist)).toEqual([ROAD_TRIP])
   })
 
   it('waits for changes to stop, so turning the mouse wheel saves once, where it stops', async () => {
@@ -230,7 +322,7 @@ describe('connectPlaybackMemory', () => {
     await vi.advanceTimersByTimeAsync(PLAYBACK_SAVE_DELAY_MS)
 
     expect(saves.map(saved => saved.song)).toEqual([
-      { fileName: 'Jewel of the Summertime.mp3', elapsedSeconds: 64.3 }
+      { fileName: 'Jewel of the Summertime.mp3', elapsedSeconds: 64.3, playlist: null }
     ])
   })
 

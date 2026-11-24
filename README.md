@@ -28,7 +28,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Tooltips on the song's progress and the volume showing where a click lands
 - Media keys and the system's media controls
 - Window title names the song in the player
-- Remembers the volume, repeat, shuffle and the song in the player, with its position
+- Remembers the volume, repeat, shuffle and the song in the player, with its position and playlist
 - Side menu with the categories
 - Settings page
 - Dark theme

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { clamp } from '../../clamp'
 import type { Track } from '../library/types'
 import { log } from '../logging/log'
-import { isSameSource, type PlaybackSource, SONGS_SOURCE } from './playbackSource'
+import { isSameSource, type PlaybackSource } from './playbackSource'
 import { formatPreciseTime } from './playbackTime'
 import {
   createPlayOrder,
@@ -38,9 +38,11 @@ export type PlaybackSession = {
 /** The song put back in the player when the app opens again, found among the library's songs. */
 export type RestoredSong = {
   track: Track
-  /** The list it plays from, as the Songs view shows it: it's put back as played from there. */
+  /** The songs of the list it plays from, as that list shows them. */
   queue: Track[]
   elapsedSeconds: number
+  /** The list it was played from, which it's put back as played from. */
+  source: PlaybackSource
 }
 
 /** What the player is put back to when the app opens again, as it was left. */
@@ -140,7 +142,7 @@ const toVolume = (value: number) => clamp(value, SILENT, FULL_VOLUME)
 
 // A song put back stays paused: the app opening shouldn't start the music on its own.
 const sessionOf = (
-  { track, queue, elapsedSeconds }: RestoredSong,
+  { track, queue, elapsedSeconds, source }: RestoredSong,
   isShuffled: boolean
 ): PlaybackSession => ({
   track,
@@ -149,7 +151,7 @@ const sessionOf = (
   isPlaying: false,
   elapsedSeconds: Math.max(elapsedSeconds, 0),
   durationSeconds: null,
-  source: SONGS_SOURCE
+  source
 })
 
 type SongEvent = 'Started' | 'Paused' | 'Resumed' | 'Stopped'

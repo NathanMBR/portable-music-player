@@ -64,6 +64,10 @@ impl Default for SavedPlayback {
 pub struct SavedSong {
     file_name: String,
     elapsed_seconds: f64,
+    /// The file name of the playlist it plays from, or `None` when it plays from the Songs view, as
+    /// a song saved before this was is read.
+    #[serde(default)]
+    playlist: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
@@ -211,7 +215,8 @@ mod tests {
     fn reads_the_saved_player_state() {
         let settings: Settings = serde_json::from_str(
             r#"{"playback":{"volume":0.4,"isMuted":true,"repeatMode":"one","isShuffled":true,
-                "song":{"fileName":"Streets of Tomorrow.mp3","elapsedSeconds":83.25}}}"#,
+                "song":{"fileName":"Streets of Tomorrow.mp3","elapsedSeconds":83.25,
+                "playlist":"1763581234567-Road_trip.json"}}}"#,
         )
         .unwrap();
 
@@ -225,8 +230,26 @@ mod tests {
                 song: Some(SavedSong {
                     file_name: "Streets of Tomorrow.mp3".to_owned(),
                     elapsed_seconds: 83.25,
+                    playlist: Some("1763581234567-Road_trip.json".to_owned()),
                 }),
             }
+        );
+    }
+
+    #[test]
+    fn a_song_saved_before_its_playlist_was_plays_from_the_songs_view() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"playback":{"song":{"fileName":"Motorbreath.mp3","elapsedSeconds":3.5}}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            settings.playback.song,
+            Some(SavedSong {
+                file_name: "Motorbreath.mp3".to_owned(),
+                elapsed_seconds: 3.5,
+                playlist: None,
+            })
         );
     }
 
@@ -261,6 +284,7 @@ mod tests {
                 song: Some(SavedSong {
                     file_name: "In Excelsis.mp3".to_owned(),
                     elapsed_seconds: 12.5,
+                    playlist: Some("1763581234567-Road_trip.json".to_owned()),
                 }),
             },
         };
@@ -305,6 +329,7 @@ mod tests {
                 song: Some(SavedSong {
                     file_name: "Streets of Tomorrow.mp3".to_owned(),
                     elapsed_seconds: 201.5,
+                    playlist: None,
                 }),
             },
         };
@@ -335,7 +360,11 @@ mod tests {
                     "isMuted": true,
                     "repeatMode": "one",
                     "isShuffled": true,
-                    "song": { "fileName": "Streets of Tomorrow.mp3", "elapsedSeconds": 201.5 }
+                    "song": {
+                        "fileName": "Streets of Tomorrow.mp3",
+                        "elapsedSeconds": 201.5,
+                        "playlist": null
+                    }
                 }
             })
         );

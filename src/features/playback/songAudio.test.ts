@@ -378,7 +378,7 @@ describe('connectSongAudio', () => {
       isMuted: false,
       repeatMode: 'off',
       isShuffled: false,
-      song: { track: boatSong, queue: [boatSong], elapsedSeconds: 95.5 }
+      song: { track: boatSong, queue: [boatSong], elapsedSeconds: 95.5, source: SONGS_SOURCE }
     })
 
     await waitUntilStreaming(connected, boatSong)
@@ -397,7 +397,12 @@ describe('connectSongAudio', () => {
       isMuted: false,
       repeatMode: 'off',
       isShuffled: false,
-      song: { track: theUnforgiven, queue: [theUnforgiven], elapsedSeconds: 95.5 }
+      song: {
+        track: theUnforgiven,
+        queue: [theUnforgiven],
+        elapsedSeconds: 95.5,
+        source: SONGS_SOURCE
+      }
     })
     await waitUntilStreaming(connected, theUnforgiven)
     audio.loadLength(386)

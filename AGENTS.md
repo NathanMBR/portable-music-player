@@ -111,13 +111,13 @@ src/
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
-- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, controls at the right), the update search's switch with `CheckForUpdatesButton` before it; the theme toggle stays in the side menu.
+- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `skipUpdateVersion`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, controls at the right), the update search's switch with `CheckForUpdatesButton` before it; the theme toggle stays in the side menu.
   - `checksForUpdates` (on by default) has the app look for a newer release each time it opens (see Updates).
   - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
 - Updates: the update store (`src/features/updates/updateStore.ts`) looks for a newer stable release through Rust's `check_for_update` (`updates.rs`), and keeps the one it finds (`foundUpdate`), which it offers until it's skipped.
-  - `main.tsx` calls `checkAtLaunch` once the settings load, and it checks only while `checksForUpdates` is on.
+  - `main.tsx` calls `checkAtLaunch` once the settings load, and it checks only while `checksForUpdates` is on. It passes over a release whose version is `skipUpdateVersion`, the one the user skipped, though a newer one is offered again.
   - A check at launch that fails is only logged, never notified: a flash drive often runs on offline computers, where a notification at every launch would nag.
-  - `CheckForUpdatesButton`, in the Settings view, checks by hand (`checkByHand`): it says when nothing newer is found (`notify`), and notifies a failure. It's disabled while `checksForUpdates` is on, and while any check runs (`isChecking`), when it reads "Checking for updates…".
+  - `CheckForUpdatesButton`, in the Settings view, checks by hand (`checkByHand`), offering even the version skipped: it says when nothing newer is found (`notify`), and notifies a failure. It's disabled while `checksForUpdates` is on, and while any check runs (`isChecking`), when it reads "Checking for updates…".
   - While an update is offered, a `NotificationDot` (`src/components/`, a decorative pen dot ringed with the paper) sits on the corner of `MenuButton`, and the side menu shows an Update option after the categories, outside their `<nav>` since it isn't a page, with the dot on its icon (`MenuOption`'s `hasNotificationDot`). The option closes the menu, then opens `UpdateDialog` (`openDialog`), rendered once from `App.tsx`, so the two dialogs never stack.
   - `UpdateDialog` shows the release's patch notes, `latest.json`'s `notes`, in a `ScrollBox`, through `PatchNotes`: Markdown rendered by `react-markdown`, never as HTML. Its headings start at h3, under the dialog's title. A link opens in the default browser (`openLink`, plugin-opener's `openUrl`, allowed by `opener:default`), so the webview never leaves the app; images are left out, since the app loads nothing from the web, and raw HTML is skipped (`skipHtml`).
   - Skip update (`skipUpdate`) stops offering the update, which takes the dots and the option away, and saves its version as `skipUpdateVersion` in `settings.json`.
@@ -200,7 +200,7 @@ src/
   - Its threads must never panic: the release build aborts on panic, which would kill the app. A failed write only means the webview let go of the song.
   - Responses carry `Cache-Control: no-store`, so the webview doesn't copy songs into its cache on the computer.
 - `settings.rs`: user settings in `settings.json` next to the executable.
-  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name, position and the file name of the playlist it plays from, `SavedSong`, whose `playlist` is `None` from the Songs view or in a file saved before it existed).
+  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default), the version of the update the user skipped (`skip_update_version`, `None` until one is), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name, position and the file name of the playlist it plays from, `SavedSong`, whose `playlist` is `None` from the Songs view or in a file saved before it existed).
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
   - Saves go through `write_atomically` (`atomic_write.rs`), so pulling the drive mid-save can't corrupt it.
 - `song_drop.rs`: adds the songs of a drop to the Songs folder, through `check_dropped_songs` and `copy_dropped_songs`.
@@ -380,6 +380,7 @@ Every feature logs what the user does and what the app does in response, followi
 | A check for updates finds a newer release | `Found update to version <version>`, e.g. `Found update to version 0.2.0` |
 | A check for updates finds none | `Found no update` |
 | The check for updates at launch fails | `Couldn't check for updates: <reason>`, the error Rust sent |
+| The check for updates at launch finds the version the user skipped | `Ignored skipped update to version <version>` |
 | An update is skipped | `Skipped update to version <version>` |
 | A portable build's download of an update opens in the browser | `Opened the download of version <version> in the browser` |
 | An installed build starts installing an update | `Installing update to version <version>` |

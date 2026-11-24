@@ -15,14 +15,14 @@ type UpdateStore = {
   /** Whether the update found downloads, which keeps its dialog open. */
   isDownloading: boolean
   /**
-   * Looks for a newer release as the app opens, when the settings say to. A failure is only
-   * logged: a flash drive often runs on offline computers, where a notification at every launch
-   * would nag.
+   * Looks for a newer release as the app opens, when the settings say to, and passes over the
+   * version the user skipped. A failure is only logged: a flash drive often runs on offline
+   * computers, where a notification at every launch would nag.
    */
   checkAtLaunch: () => Promise<void>
   /**
-   * Looks for a newer release when asked from the Settings view, whatever the settings say. It
-   * says so when there's none, and notifies a failure.
+   * Looks for a newer release when asked from the Settings view, whatever the settings say, and
+   * offers even the version the user skipped. It says so when there's none, and notifies a failure.
    */
   checkByHand: () => Promise<void>
   openDialog: () => void
@@ -63,7 +63,12 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => {
         return
       }
       try {
-        set({ foundUpdate: await findUpdate() })
+        const foundUpdate = await findUpdate()
+        if (foundUpdate?.version === useSettingsStore.getState().settings.skipUpdateVersion) {
+          log(`Ignored skipped update to version ${foundUpdate.version}`)
+          return
+        }
+        set({ foundUpdate })
       } catch (error) {
         log(`Couldn't check for updates: ${String(error)}`)
       }

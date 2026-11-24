@@ -14,6 +14,12 @@ const NEW_VERSION: FoundUpdate = {
   notes: '## New features\n\n- Checks for updates when the app opens'
 }
 
+const skipNewVersion = () => {
+  useSettingsStore.setState(state => ({
+    settings: { ...state.settings, skipUpdateVersion: NEW_VERSION.version }
+  }))
+}
+
 const turnOffAutomaticChecks = () => {
   useSettingsStore.setState(state => ({
     settings: { ...state.settings, checksForUpdates: false }
@@ -67,6 +73,29 @@ describe('checkAtLaunch', () => {
     expect(useUpdateStore.getState().isChecking).toBe(false)
   })
 
+  it('passes over the version the user skipped', async () => {
+    mockCommands({ check_for_update: () => NEW_VERSION })
+    skipNewVersion()
+
+    await useUpdateStore.getState().checkAtLaunch()
+
+    expect(useUpdateStore.getState().foundUpdate).toBeNull()
+    expect(loggedMessages()).toEqual([
+      'Found update to version 0.2.0',
+      'Ignored skipped update to version 0.2.0'
+    ])
+  })
+
+  it('offers a version newer than the one skipped', async () => {
+    const newerVersion: FoundUpdate = { ...NEW_VERSION, version: '0.3.0' }
+    mockCommands({ check_for_update: () => newerVersion })
+    skipNewVersion()
+
+    await useUpdateStore.getState().checkAtLaunch()
+
+    expect(useUpdateStore.getState().foundUpdate).toEqual(newerVersion)
+  })
+
   it('only logs a failed check, without a notification', async () => {
     mockCommands({ check_for_update: failingCommand(CHECK_ERROR) })
 
@@ -91,6 +120,15 @@ describe('checkByHand', () => {
   it('checks even while automatic update checks are off', async () => {
     mockCommands({ check_for_update: () => NEW_VERSION })
     turnOffAutomaticChecks()
+
+    await useUpdateStore.getState().checkByHand()
+
+    expect(useUpdateStore.getState().foundUpdate).toEqual(NEW_VERSION)
+  })
+
+  it('offers even the version the user skipped', async () => {
+    mockCommands({ check_for_update: () => NEW_VERSION })
+    skipNewVersion()
 
     await useUpdateStore.getState().checkByHand()
 

@@ -28,11 +28,12 @@ const ARROW_PADDING = CORNER_RADIUS + ARROW_WIDTH / 2
 const ARROW_PATH = `M0 0 L${ARROW_WIDTH / 2} ${ARROW_HEIGHT - BORDER_WIDTH / 2} L${ARROW_WIDTH} 0`
 
 /**
- * A small tooltip with an arrow pointing down at an anchor, a point of the window: the value a
- * click on a slider would set, while the pointer is over it. It shows at once, with no delay or
- * fade, and it's drawn over everything, from `<body>`. Centered above the anchor, it shifts to stay
- * clear of the window's edges, and its arrow then moves along it to keep pointing at the anchor.
- * Screen readers don't hear it: it only previews what the pointer would do.
+ * A small tooltip with an arrow pointing down at an anchor, a point of the window, while the pointer
+ * is over a control: the value a click on a slider would set, or why a button is disabled. It shows
+ * at once, with no delay or fade, and it's drawn over everything, from `<body>`. Centered above the
+ * anchor, it shifts to stay clear of the window's edges, and its arrow then moves along it to keep
+ * pointing at the anchor. Screen readers don't hear it: a slider's value only previews what the
+ * pointer would do, and a button's reason is its description too.
  *
  * @summary Tooltip with an arrow pointing at an anchor, kept inside the window
  */

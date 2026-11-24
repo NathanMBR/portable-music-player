@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS: Settings = {
 
 const UPDATES_SWITCH = { name: 'Search automatically for updates' }
 const SONG_ORDER_SELECT = { name: /^Sort songs by/ }
+const CHECK_BUTTON = { name: 'Check for updates' }
 
 const outlineStyleOf = (element: HTMLElement) => getComputedStyle(element).outlineStyle
 
@@ -77,6 +78,20 @@ export const TurnsOffTheSearchForUpdates: Story = {
         settings: { ...DEFAULT_SETTINGS, checksForUpdates: false }
       })
     )
+  }
+}
+
+/**
+ * Beside the switch, a button checks for updates by hand, disabled while the switch is on, since the
+ * app then checks each time it opens.
+ */
+export const CheckForUpdatesBesideTheSwitch: Story = {
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.getByRole('button', CHECK_BUTTON)).toBeDisabled()
+
+    await userEvent.click(canvas.getByRole('switch', UPDATES_SWITCH))
+
+    await expect(canvas.getByRole('button', CHECK_BUTTON)).toBeEnabled()
   }
 }
 

@@ -8,7 +8,10 @@ const LABEL_CLASSES = 'font-medium text-ink'
 type SettingCardProps = {
   /** What the option sets, at the card's left; it also names the control. */
   label: string
-  /** The control that sets it, at the card's right, like a `Switch` or a `Select`. */
+  /**
+   * The control that sets it, at the card's right, like a `Switch` or a `Select`, maybe with a
+   * button beside it, like Check for updates.
+   */
   children: ReactNode
 }
 

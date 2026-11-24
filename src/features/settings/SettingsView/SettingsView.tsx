@@ -2,6 +2,7 @@ import { Select } from '../../../components/Select/Select'
 import { Switch } from '../../../components/Switch/Switch'
 import { ViewHeader } from '../../../components/ViewHeader/ViewHeader'
 import { ViewLayout } from '../../../components/ViewLayout/ViewLayout'
+import { CheckForUpdatesButton } from '../../updates/CheckForUpdatesButton/CheckForUpdatesButton'
 import { SETTINGS_ICON, SETTINGS_TITLE } from '../constants'
 import { SettingCard } from '../SettingCard/SettingCard'
 import { useSettingsStore } from '../settingsStore'
@@ -18,7 +19,10 @@ const UpdateSearchSetting = () => {
 
   return (
     <SettingCard label="Search automatically for updates">
-      <Switch checked={checksForUpdates} onChange={setChecksForUpdates} />
+      <div className="flex items-center gap-3">
+        <CheckForUpdatesButton />
+        <Switch checked={checksForUpdates} onChange={setChecksForUpdates} />
+      </div>
     </SettingCard>
   )
 }
@@ -36,11 +40,11 @@ const SongOrderSetting = () => {
 
 /**
  * The Settings category: whether the player looks for a newer release each time it opens (on by
- * default), and whether the songs list sorts by filename or by title, which is the title tag or,
- * for a song without one, its filename. Each option is a `SettingCard`, its
- * label at the left and its control at the right, spanning the width between the side margins.
- * Each choice applies at once and is saved in settings.json next to the executable; if saving
- * fails, the choice still applies and a notification says why.
+ * default), with a button beside it to look by hand while that's off, and whether the songs list
+ * sorts by filename or by title, which is the title tag or, for a song without one, its filename.
+ * Each option is a `SettingCard`, its label at the left and its controls at the right, spanning the
+ * width between the side margins. Each choice applies at once and is saved in settings.json next to
+ * the executable; if saving fails, the choice still applies and a notification says why.
  *
  * @summary Settings category view
  */

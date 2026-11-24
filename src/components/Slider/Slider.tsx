@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { clamp } from '../../clamp'
 import { DISABLED_CLASSES } from '../buttonStyles'
+import { canHover } from '../pointerHover'
 import { type FillEnd, fillEnd } from '../sliderFill'
 import { valueAtPointer } from '../sliderPointer'
 import { snapToStep } from '../sliderStep'
@@ -63,9 +64,6 @@ const THUMB_SIZE = 14
 
 // How far above the thumb the tooltip's arrow points.
 const TOOLTIP_OFFSET = 2
-
-// A finger has no hover, so only these show the tooltip.
-const POINTERS_WITH_HOVER = new Set(['mouse', 'pen'])
 
 // The browser's own slider leaves the end of its track uncovered at the maximum, so the track and
 // the thumb are drawn here. The thumb stays inside the track, so at the maximum it covers its end.
@@ -157,7 +155,7 @@ export const Slider = ({
 
   // The tooltip's arrow points at the pointer, just above the thumb, which is taller than the track.
   const followPointer = (event: PointerEvent<HTMLInputElement>) => {
-    if (!formatPointerValue || !POINTERS_WITH_HOVER.has(event.pointerType)) {
+    if (!formatPointerValue || !canHover(event.pointerType)) {
       return
     }
 

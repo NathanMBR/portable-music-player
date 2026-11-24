@@ -1,6 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn } from 'storybook/test'
+import { expect, fn, within } from 'storybook/test'
+import { untilBrowserPointerSettles } from '../../testing/browserPointer'
 import { Button } from './Button'
+
+const REASON = 'Disabled while automatic update checks are on'
+
+// The reason is also in the page as the button's description, hidden, apart from the tooltip.
+const TOOLTIP_TEXT = { ignore: '[hidden]' }
+
+// A disabled button lets the pointer through to what wraps it, which shows the tooltip.
+const hoverAreaOf = (button: HTMLElement) => button.parentElement as HTMLElement
 
 const meta = {
   component: Button,
@@ -31,7 +40,6 @@ export const Outlined: Story = {
   args: { children: 'Open folder', variant: 'outlined' }
 }
 
-/** Proves the app's Tailwind theme loaded in Storybook: the button is filled with `pen`. */
 /** An action that can't run yet, like Save before a new playlist has a title: faded, ignoring clicks. */
 export const Disabled: Story = {
   args: { children: 'Save', isDisabled: true },
@@ -45,6 +53,52 @@ export const Disabled: Story = {
   }
 }
 
+/**
+ * A disabled button that says why, like Check for updates while automatic update checks are on: a
+ * tooltip above it while the pointer is over it, and its description for screen readers.
+ */
+export const DisabledWithReason: Story = {
+  args: {
+    children: 'Check for updates',
+    variant: 'outlined',
+    isDisabled: true,
+    disabledReason: REASON
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const button = canvas.getByRole('button', { name: 'Check for updates' })
+    await expect(button).toHaveAccessibleDescription(REASON)
+    await untilBrowserPointerSettles()
+
+    await userEvent.hover(hoverAreaOf(button))
+
+    const tooltip = page.getByText(REASON, TOOLTIP_TEXT)
+    await expect(tooltip).toBeVisible()
+    await expect(tooltip.getBoundingClientRect().bottom).toBeLessThan(
+      button.getBoundingClientRect().top
+    )
+
+    await userEvent.unhover(hoverAreaOf(button))
+
+    await expect(page.queryByText(REASON, TOOLTIP_TEXT)).not.toBeInTheDocument()
+  }
+}
+
+/** A button that can act keeps its reason to itself: no tooltip, no description. */
+export const NoReasonWhileEnabled: Story = {
+  args: { children: 'Check for updates', variant: 'outlined', disabledReason: REASON },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const button = canvas.getByRole('button', { name: 'Check for updates' })
+    await expect(button).not.toHaveAccessibleDescription()
+
+    await userEvent.hover(button)
+
+    await expect(page.queryByText(REASON)).not.toBeInTheDocument()
+  }
+}
+
+/** Proves the app's Tailwind theme loaded in Storybook: the button is filled with `pen`. */
 export const CssCheck: Story = {
   tags: ['!autodocs', '!manifest'],
   globals: { theme: 'light' },

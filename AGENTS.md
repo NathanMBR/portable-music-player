@@ -99,7 +99,8 @@ src/
       <Component>.stories.tsx  its stories: its documentation and component tests
   docs/                 Storybook MDX pages (Introduction, Design tokens)
   testing/              helpers shared by tests and stories (mockCommands, resetStores, shownNotifications,
-                        loggedMessages, withNotificationArea, covers, unit test setup)
+                        loggedMessages, withNotificationArea, covers, untilBrowserPointerSettles, unit
+                        test setup)
 ```
 
 - Components are `PascalCase.tsx`, each in a `<Component>/` folder with its stories; other modules are `camelCase.ts` and stay at the root of their feature (or of `components/`).
@@ -109,12 +110,14 @@ src/
 - The theme is the `data-theme` attribute (`light` or `dark`) on `<html>`, and the dark values of the same tokens live under `:root[data-theme="dark"]`, so components never use `dark:`.
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
-- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
+- Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, controls at the right), the update search's switch with `CheckForUpdatesButton` before it; the theme toggle stays in the side menu.
   - `checksForUpdates` (on by default) has the app look for a newer release each time it opens (see Updates).
   - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
 - Updates: the update store (`src/features/updates/updateStore.ts`) looks for a newer stable release through Rust's `check_for_update` (`updates.rs`), and keeps the one it finds (`foundUpdate`).
   - `main.tsx` calls `checkAtLaunch` once the settings load, and it checks only while `checksForUpdates` is on.
   - A check at launch that fails is only logged, never notified: a flash drive often runs on offline computers, where a notification at every launch would nag.
+  - `CheckForUpdatesButton`, in the Settings view, checks by hand (`checkByHand`): it says when nothing newer is found (`notify`), and notifies a failure. It's disabled while `checksForUpdates` is on, and while any check runs (`isChecking`), when it reads "Checking for updates…".
+  - A disabled `Button` says why in a `Tooltip` above it while a mouse or pen is over it (`disabledReason`, also its description for screen readers), like "Disabled while automatic update checks are on". A disabled `<button>` may get no pointer events, depending on the webview, so the button lets the pointer through (`pointer-events-none`) to a wrapper, which follows it and shows the not-allowed cursor. Which pointers hover is `canHover` (`pointerHover.ts`), shared with `Slider`.
 - Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. Every header looks the same: the view's icon, title and buttons above the rule, nothing else; anything more about the view, like the Songs view's song count, goes below the rule, at the top of its content (`StatusLine`). A page inside a category, like a playlist, has a back button in the icon's place (`back`). A view with nothing to list says so in its middle (`EmptyState`). A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`main`).
   - The app draws every scrollbar itself: `::-webkit-scrollbar` base styles in `src/index.css`, `scrollbar` spacing token for the width. WebKitGTK and WebView2 both draw those, and WebView2 would ignore them if `scrollbar-color` or `scrollbar-width` were set.
@@ -283,7 +286,7 @@ These follow from the project goal and are easy to get wrong:
   - It must render, its `play` function must pass, and the axe accessibility check must find no violations. That check is `a11y.test: 'error'` in `.storybook/preview.tsx`, run on the whole `<body>` so portaled dialogs are included.
   - Write a `play` only when it proves something the render doesn't: an interaction, async content, an aria state.
   - In a `play`, use the `canvas` and `userEvent` it receives. Query portaled content, like the side menu, with `within(canvasElement.ownerDocument.body)`.
-  - In some runs the browser's real pointer rests on the story's top-left corner and, a frame after the story renders, hovers whatever is there, for `:hover` and Headless UI's `data-hover` alike. That hover also ends any `data-hover` the story started elsewhere, so never assert that an element there is unhovered, and let two frames pass before hovering (see `HoveredSong` in `TrackList.stories.tsx`).
+  - In some runs the browser's real pointer rests on the story's top-left corner and, a frame after the story renders, hovers whatever is there, for `:hover` and Headless UI's `data-hover` alike. That hover also ends any `data-hover` the story started elsewhere, so never assert that an element there is unhovered, and let two frames pass before hovering (`untilBrowserPointerSettles`, `src/testing/browserPointer.ts`).
   - The `CssCheck` story in `Button.stories.tsx` proves the app's CSS loads in Storybook; there is only one.
 - **Rust commands stay thin**:
   - a command resolves its path from `portable::root_dir()` and delegates to a function that takes it (`ensure_songs_dir_in`, `read_settings`, `write_settings`);

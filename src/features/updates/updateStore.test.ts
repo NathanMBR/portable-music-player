@@ -77,3 +77,46 @@ describe('checkAtLaunch', () => {
     expect(useUpdateStore.getState()).toMatchObject({ isChecking: false, foundUpdate: null })
   })
 })
+
+describe('checkByHand', () => {
+  it('offers the newer release it finds', async () => {
+    mockCommands({ check_for_update: () => NEW_VERSION })
+
+    await useUpdateStore.getState().checkByHand()
+
+    expect(useUpdateStore.getState().foundUpdate).toEqual(NEW_VERSION)
+    expect(loggedMessages()).toEqual(['Found update to version 0.2.0'])
+  })
+
+  it('checks even while automatic update checks are off', async () => {
+    mockCommands({ check_for_update: () => NEW_VERSION })
+    turnOffAutomaticChecks()
+
+    await useUpdateStore.getState().checkByHand()
+
+    expect(useUpdateStore.getState().foundUpdate).toEqual(NEW_VERSION)
+  })
+
+  it('says when the release running is the latest', async () => {
+    mockCommands({ check_for_update: () => null })
+
+    await useUpdateStore.getState().checkByHand()
+
+    expect(useUpdateStore.getState().foundUpdate).toBeNull()
+    expect(shownNotifications()).toEqual([
+      { type: 'info', title: 'No update found', description: 'You have the latest version.' }
+    ])
+    expect(loggedMessages()).toEqual(['Found no update'])
+  })
+
+  it('notifies why a check failed', async () => {
+    mockCommands({ check_for_update: failingCommand(CHECK_ERROR) })
+
+    await useUpdateStore.getState().checkByHand()
+
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't check for updates", description: CHECK_ERROR }
+    ])
+    expect(useUpdateStore.getState().isChecking).toBe(false)
+  })
+})

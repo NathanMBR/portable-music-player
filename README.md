@@ -31,7 +31,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Remembers the volume, repeat, shuffle and the song in the player, with its position and playlist
 - Side menu with the categories
 - Settings page
-- Checks for updates when the app opens
+- Checks for updates when the app opens, or from the Settings page
 - Dark theme
 - Error and success notifications in the bottom-right corner
 - Remembers the window size on each computer

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { log } from '../logging/log'
+import { notify, notifyError } from '../notifications/notify'
 import { useSettingsStore } from '../settings/settingsStore'
 import type { FoundUpdate } from './types'
 import { checkForUpdate } from './updatesApi'
@@ -15,6 +16,11 @@ type UpdateStore = {
    * would nag.
    */
   checkAtLaunch: () => Promise<void>
+  /**
+   * Looks for a newer release when asked from the Settings view, whatever the settings say. It
+   * says so when there's none, and notifies a failure.
+   */
+  checkByHand: () => Promise<void>
 }
 
 export const useUpdateStore = create<UpdateStore>()(set => {
@@ -40,6 +46,17 @@ export const useUpdateStore = create<UpdateStore>()(set => {
         set({ foundUpdate: await findUpdate() })
       } catch (error) {
         log(`Couldn't check for updates: ${String(error)}`)
+      }
+    },
+    checkByHand: async () => {
+      try {
+        const foundUpdate = await findUpdate()
+        set({ foundUpdate })
+        if (!foundUpdate) {
+          notify('No update found', 'You have the latest version.')
+        }
+      } catch (error) {
+        notifyError("Couldn't check for updates", error)
       }
     }
   }

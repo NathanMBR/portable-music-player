@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor } from 'storybook/test'
+import { untilBrowserPointerSettles } from '../../../testing/browserPointer'
 import { drawCover, noCover, UNTIL_COVER_SHOWS } from '../../../testing/covers'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
@@ -69,14 +70,6 @@ const rowOf = (title: HTMLElement) => {
 }
 
 const backgroundOf = (element: HTMLElement) => getComputedStyle(element).backgroundColor
-
-/**
- * Waits two frames, for the browser to hover whatever the story drew under its own pointer. In some
- * runs that pointer rests on the story's top-left corner, and the browser hovers what's there a
- * frame after the story renders, which would end a hover the story had started by then.
- */
-const untilBrowserPointerSettles = () =>
-  new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
 const meta = {
   component: TrackList,

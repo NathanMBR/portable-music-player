@@ -1,8 +1,9 @@
-import { DataInteractive, Description } from '@headlessui/react'
+import { Description } from '@headlessui/react'
 import { ArrowPathIcon } from '@heroicons/react/20/solid'
 import { useState } from 'react'
 import { Button } from '../../../components/Button/Button'
 import { Modal, ModalButtons, ModalTitle } from '../../../components/Modal/Modal'
+import { ScrollBox } from '../../../components/ScrollBox/ScrollBox'
 import { formatSongCount } from '../../library/libraryStatus'
 import { type SongDropStep, useSongDropStore } from '../songDropStore'
 import { listTakenNames, summarizeTakenNames } from '../takenNames'
@@ -31,35 +32,14 @@ const BusyStep = ({ message }: { message: string }) => (
   </>
 )
 
-// The box keeps the scrollbar off its border: as far from its top as from its bottom, so the
-// scrollbar's usual space at the bottom is dropped, and a little from its right side.
-const TAKEN_NAMES_BOX_CLASSES = 'mt-3 rounded-md border border-rule py-2 pr-1'
-
-// The list in the box has the focus, but the ring goes around the box, like FOCUS_CLASSES' ring.
-const BOX_FOCUS_CLASSES =
-  'has-data-focus:outline-2 has-data-focus:outline-solid has-data-focus:outline-offset-2 has-data-focus:outline-pen'
-
-// Room for six names and part of a seventh, so a longer list shows it scrolls, even in a small
-// window.
-const TAKEN_NAMES_LIST_CLASSES =
-  'max-h-40 overflow-y-auto px-3 text-sm text-ink outline-none [&::-webkit-scrollbar-track]:mb-0'
-
-// Focusable, since WebKitGTK scrolls a box from the keyboard only while it has the focus.
 const TakenNamesList = ({ conflicts }: { conflicts: string[] }) => (
-  <div className={`${TAKEN_NAMES_BOX_CLASSES} ${BOX_FOCUS_CLASSES}`}>
-    <DataInteractive
-      as="ul"
-      aria-label="Songs with the same name"
-      tabIndex={0}
-      className={TAKEN_NAMES_LIST_CLASSES}
-    >
-      {listTakenNames(conflicts).map(name => (
-        <li key={name} className="truncate py-0.5">
-          {name}
-        </li>
-      ))}
-    </DataInteractive>
-  </div>
+  <ScrollBox as="ul" label="Songs with the same name">
+    {listTakenNames(conflicts).map(name => (
+      <li key={name} className="truncate py-0.5">
+        {name}
+      </li>
+    ))}
+  </ScrollBox>
 )
 
 const TakenNamesQuestion = ({ droppedSongs }: { droppedSongs: DroppedSongs }) => {

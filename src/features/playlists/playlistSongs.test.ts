@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { Track } from '../library/types'
+import type { ScanOutcome, Track } from '../library/types'
 import {
   editedSongs,
   findPlaylistSongs,
+  hasMissingSongs,
+  missingSongsOf,
   pickedFileNames,
   pickedPathsIn,
   playableTracksOf,
   songNameOf
 } from './playlistSongs'
+import type { SavedPlaylist } from './types'
 
 const overYourHead: Track = {
   path: 'Songs/Over Your Head.mp3',
@@ -24,6 +27,52 @@ const getawayCar: Track = {
   title: 'Getaway Car',
   artist: 'Audioslave'
 }
+
+const sideBySide: SavedPlaylist = {
+  fileName: '1763581234567-Side_by_side.json',
+  title: 'Side by side',
+  description: '',
+  allSongsFound: true,
+  songs: ['Getaway Car.mp3', 'Soldier Side.mp3']
+}
+
+describe('missingSongsOf', () => {
+  it("names the songs the scan lacks, in the playlist's order, a name in another case included", () => {
+    const missing = missingSongsOf(
+      ['Getaway Car.mp3', 'over your head.MP3', 'Soldier Side.mp3'],
+      [overYourHead, soldierSide]
+    )
+
+    expect(missing).toEqual(['Getaway Car.mp3', 'over your head.MP3'])
+  })
+})
+
+describe('hasMissingSongs', () => {
+  it('says so once the scan lacks one of its songs, whatever its file says', () => {
+    const scan: ScanOutcome = { kind: 'loaded', tracks: [getawayCar] }
+
+    expect(hasMissingSongs(sideBySide, scan)).toBe(true)
+  })
+
+  it('says none are missing once the scan has them all, whatever its file says', () => {
+    const scan: ScanOutcome = { kind: 'loaded', tracks: [soldierSide, getawayCar] }
+
+    expect(hasMissingSongs({ ...sideBySide, allSongsFound: false }, scan)).toBe(false)
+  })
+
+  it('says what its file says until the first scan ends', () => {
+    expect(hasMissingSongs(sideBySide, null)).toBe(false)
+    expect(hasMissingSongs({ ...sideBySide, allSongsFound: false }, null)).toBe(true)
+  })
+
+  it("finds them all missing when the Songs folder couldn't be scanned", () => {
+    expect(hasMissingSongs(sideBySide, { kind: 'failed' })).toBe(true)
+  })
+
+  it('finds none missing in a playlist without songs', () => {
+    expect(hasMissingSongs({ ...sideBySide, songs: [] }, { kind: 'failed' })).toBe(false)
+  })
+})
 
 describe('findPlaylistSongs', () => {
   it("pairs each file name with the scanned song it names, in the playlist's order", () => {
@@ -47,10 +96,10 @@ describe('findPlaylistSongs', () => {
     ])
   })
 
-  it('finds a song whatever the case of its file name, like the drive does', () => {
+  it('finds no song for a file name in another case, like the check in Rust', () => {
     const songs = findPlaylistSongs(['soldier side.MP3'], [soldierSide])
 
-    expect(songs).toEqual([{ fileName: 'soldier side.MP3', track: soldierSide }])
+    expect(songs).toEqual([{ fileName: 'soldier side.MP3', track: null }])
   })
 })
 
@@ -99,13 +148,13 @@ const setItOff: Track = { path: 'Songs/Set It Off.mp3', title: 'Set It Off', art
 const attitude: Track = { path: 'Songs/Attitude.mp3', title: 'Attitude', artist: 'Metallica' }
 
 describe('pickedPathsIn', () => {
-  it("holds the paths of the playlist's songs the scan found, whatever their case", () => {
+  it("holds the paths of the playlist's songs the scan found, by their exact file name", () => {
     const picked = pickedPathsIn(
       ['Set It Off.mp3', 'Chop Suey!.mp3', 'crossing.MP3'],
       [crossing, nothingToSay, setItOff]
     )
 
-    expect(picked).toEqual(new Set([setItOff.path, crossing.path]))
+    expect(picked).toEqual(new Set([setItOff.path]))
   })
 })
 
@@ -143,9 +192,10 @@ describe('editedSongs', () => {
     expect(songs).toEqual(['Chop Suey!.mp3', 'Set It Off.mp3'])
   })
 
-  it("keeps a song's file name as the playlist writes it, whatever its case", () => {
+  it('keeps a name in another case as a missing song, apart from the scanned song picked', () => {
     expect(editedSongs(['set it off.MP3'], tracks, new Set([setItOff.path]))).toEqual([
-      'set it off.MP3'
+      'set it off.MP3',
+      'Set It Off.mp3'
     ])
   })
 })

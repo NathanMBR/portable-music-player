@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     ffi::OsStr,
     fs::{self, File},
     io::{self, BufReader},
@@ -219,10 +220,23 @@ fn cover_among(tags: &[Tag]) -> Option<&Picture> {
         .or_else(|| pictures().next())
 }
 
-/// Whether `file_name` names a song of `root`'s Songs folder that is there now. The drive's file
-/// system applies its own case rules, as FAT and NTFS ignore case.
-pub(crate) fn has_song_in(root: &Path, file_name: &str) -> bool {
-    is_song_file_name(file_name) && root.join(SONGS_FOLDER_NAME).join(file_name).is_file()
+/// Those of `file_names` that a scan of `root`'s Songs folder wouldn't list, in their order: all of
+/// them when the folder can't be read, as when it's missing, since the player couldn't play them.
+/// It looks at the same listing as the scan (`song_files_in`) and pairs names exactly, case
+/// included, the way the webview pairs a playlist's songs with the scanned ones, so both always
+/// agree on which songs are there, whatever the drive's file system.
+pub(crate) fn missing_songs_in(root: &Path, file_names: &[String]) -> Vec<String> {
+    let listed: HashSet<String> = song_files_in(&root.join(SONGS_FOLDER_NAME))
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|song| song.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .collect();
+    file_names
+        .iter()
+        .filter(|name| !listed.contains(*name))
+        .cloned()
+        .collect()
 }
 
 /// A name the scan would list as a song: a plain file name, not hidden, ending in `.mp3`.
@@ -236,18 +250,27 @@ fn is_plain_file_name(name: &str) -> bool {
 }
 
 fn find_tracks(songs_dir: &Path) -> Result<Vec<Track>, LibraryError> {
+    Ok(song_files_in(songs_dir)?
+        .iter()
+        .map(|song| track_from(song))
+        .collect())
+}
+
+/// The songs of `songs_dir`: its MP3 files, hidden ones skipped. The scan and the search for a
+/// playlist's songs both look at this listing, so they never disagree on which songs are there.
+fn song_files_in(songs_dir: &Path) -> Result<Vec<PathBuf>, LibraryError> {
     let read_error = |source: io::Error| LibraryError::ReadFolder {
         path: songs_dir.to_path_buf(),
         source,
     };
-    let mut tracks = Vec::new();
+    let mut songs = Vec::new();
     for entry in fs::read_dir(songs_dir).map_err(read_error)? {
         let path = entry.map_err(read_error)?.path();
         if is_mp3(&path) {
-            tracks.push(track_from(&path));
+            songs.push(path);
         }
     }
-    Ok(tracks)
+    Ok(songs)
 }
 
 fn track_from(file: &Path) -> Track {
@@ -507,6 +530,41 @@ mod tests {
         titles.sort();
 
         assert_eq!(titles, ["LASTING CHILD", "Spread Your Fire"]);
+    }
+
+    #[test]
+    fn finds_missing_the_songs_the_scan_wouldnt_list() {
+        let root = tempfile::tempdir().unwrap();
+        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
+        fs::write(songs_dir.join("Nothing Left to Say but Goodbye.mp3"), b"").unwrap();
+        fs::write(songs_dir.join("._Unfinished Allegro.mp3"), b"").unwrap();
+        fs::create_dir(songs_dir.join("I Love You.mp3")).unwrap();
+        let file_names = [
+            "Nothing Left to Say but Goodbye.mp3",
+            "nothing left to say but goodbye.MP3",
+            "Unfinished Allegro.mp3",
+            "I Love You.mp3",
+            "Z.I.T.O..mp3",
+        ]
+        .map(str::to_owned);
+
+        assert_eq!(
+            missing_songs_in(root.path(), &file_names),
+            [
+                "nothing left to say but goodbye.MP3",
+                "Unfinished Allegro.mp3",
+                "I Love You.mp3",
+                "Z.I.T.O..mp3"
+            ]
+        );
+    }
+
+    #[test]
+    fn finds_every_song_missing_without_a_songs_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let file_names = ["Silence and Distance.mp3".to_owned()];
+
+        assert_eq!(missing_songs_in(root.path(), &file_names), file_names);
     }
 
     #[test]

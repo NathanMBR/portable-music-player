@@ -50,13 +50,13 @@ pub struct SavedPlaylist {
     songs: Vec<String>,
 }
 
-/// A playlist as `check_playlist` left it, and how many of its songs are missing. Mirrors
-/// `PlaylistCheck` in src/features/playlists/types.ts.
+/// A playlist as `check_playlist` left it, and those of its songs that are missing, in its order.
+/// Mirrors `PlaylistCheck` in src/features/playlists/types.ts.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaylistCheck {
     playlist: SavedPlaylist,
-    missing_count: usize,
+    missing_songs: Vec<String>,
 }
 
 /// Why a playlist's contents can't be kept.
@@ -211,16 +211,16 @@ fn save_playlist_in(
 fn check_playlist_in(root: &Path, file_name: &str) -> Result<PlaylistCheck, PlaylistError> {
     let path = playlist_path_in(root, file_name)?;
     let mut file = read_playlist_file(&path, file_name)?;
-    let missing_count = missing_count_in(root, &file.songs);
+    let missing_songs = library::missing_songs_in(root, &file.songs);
     let was_found = file.all_songs_found;
-    file.all_songs_found = missing_count == 0;
+    file.all_songs_found = missing_songs.is_empty();
     if file.all_songs_found != was_found {
         write_playlist(&path, file_name, &file)?;
     }
-    log_song_search(&file.title, Some(was_found), missing_count);
+    log_song_search(&file.title, Some(was_found), missing_songs.len());
     Ok(PlaylistCheck {
         playlist: saved_playlist(file_name, file),
-        missing_count,
+        missing_songs,
     })
 }
 
@@ -336,7 +336,7 @@ fn playlist_file_from(
     if let Some(problem) = problem_with(&contents.title, &contents.songs) {
         return Err(PlaylistError::InvalidContents(problem));
     }
-    let missing_count = missing_count_in(root, &contents.songs);
+    let missing_count = library::missing_songs_in(root, &contents.songs).len();
     let file = PlaylistFile {
         title: contents.title,
         description: contents.description,
@@ -364,13 +364,6 @@ fn problem_with(title: &str, songs: &[String]) -> Option<ContentsProblem> {
         }
     }
     None
-}
-
-fn missing_count_in(root: &Path, songs: &[String]) -> usize {
-    songs
-        .iter()
-        .filter(|song| !library::has_song_in(root, song))
-        .count()
 }
 
 /// Pulling the drive mid-save can't leave a half-written playlist (`write_atomically`).
@@ -699,7 +692,10 @@ mod tests {
 
         let check = check_playlist_in(root.path(), file_name).unwrap();
 
-        assert_eq!(check.missing_count, 2);
+        assert_eq!(
+            check.missing_songs,
+            ["Devil's Dance.mp3", "Spread Your Fire.mp3"]
+        );
         assert!(!check.playlist.all_songs_found);
         assert_eq!(read_playlist_json(&root, file_name)["allSongsFound"], false);
     }
@@ -719,7 +715,7 @@ mod tests {
 
         let check = check_playlist_in(root.path(), file_name).unwrap();
 
-        assert_eq!(check.missing_count, 0);
+        assert!(check.missing_songs.is_empty());
         assert!(check.playlist.all_songs_found);
         assert_eq!(
             read_playlist_json(&root, file_name),
@@ -728,6 +724,25 @@ mod tests {
                 "songs": ["Distant Thunder.mp3", "The Outlaw Torn.mp3"]
             })
         );
+    }
+
+    #[test]
+    fn checking_finds_missing_a_song_named_in_another_case_like_the_webview() {
+        let root = player_with_songs(&["Shape of Things to Come.mp3"]);
+        let file_name = "1763581234567-Cased.json";
+        write_playlist_file(
+            &root,
+            file_name,
+            serde_json::json!({
+                "title": "Cased", "description": "", "allSongsFound": true,
+                "songs": ["shape of things to come.MP3"]
+            }),
+        );
+
+        let check = check_playlist_in(root.path(), file_name).unwrap();
+
+        assert_eq!(check.missing_songs, ["shape of things to come.MP3"]);
+        assert!(!check.playlist.all_songs_found);
     }
 
     #[test]
@@ -991,7 +1006,7 @@ mod tests {
                 all_songs_found: false,
                 songs: vec!["Horizons into Battlegrounds.mp3".to_owned()],
             },
-            missing_count: 1,
+            missing_songs: vec!["Horizons into Battlegrounds.mp3".to_owned()],
         };
 
         assert_eq!(
@@ -1004,7 +1019,7 @@ mod tests {
                     "allSongsFound": false,
                     "songs": ["Horizons into Battlegrounds.mp3"]
                 },
-                "missingCount": 1
+                "missingSongs": ["Horizons into Battlegrounds.mp3"]
             })
         );
     }

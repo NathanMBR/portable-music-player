@@ -4,6 +4,7 @@ import { IconButton } from '../../../components/IconButton/IconButton'
 import { MISSING_SONGS_LABEL } from '../constants'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
+import { useHasMissingSongs } from '../useHasMissingSongs'
 
 type PlaylistPlayButtonProps = {
   /** The playlist the button plays. */
@@ -22,15 +23,17 @@ const MissingSongsAlert = ({ isLarge }: { isLarge: boolean }) => (
 /**
  * Button that plays a playlist from its first song, with its songs as the queue. Rust first looks
  * for them in the Songs folder: if some are missing, nothing plays and a notification says how
- * many. While the playlist's file says songs are missing, a red alert takes the button's place,
- * the same size, until a recheck finds them. It's disabled for a playlist without songs.
+ * many, and the song list is scanned again when it said they were there. While the song list lacks
+ * some of the playlist's songs, a red alert takes the button's place, the same size, until they're
+ * found. It's disabled for a playlist without songs.
  *
  * @summary Button playing a playlist from its first song
  */
 export const PlaylistPlayButton = ({ playlist, isLarge = false }: PlaylistPlayButtonProps) => {
   const playPlaylist = usePlaylistsStore(state => state.playPlaylist)
+  const hasMissingSongs = useHasMissingSongs(playlist)
 
-  if (!playlist.allSongsFound) {
+  if (hasMissingSongs) {
     return <MissingSongsAlert isLarge={isLarge} />
   }
   return (

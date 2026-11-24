@@ -73,6 +73,16 @@ const stormyWeather: SavedPlaylist = {
   allSongsFound: true,
   songs: ['Ride Into The Storm.mp3', 'Streets of Tomorrow.mp3']
 }
+const rideIntoTheStorm: Track = {
+  path: 'Songs/Ride Into The Storm.mp3',
+  title: 'Ride Into The Storm',
+  artist: 'Angra'
+}
+const streetsOfTomorrow: Track = {
+  path: 'Songs/Streets of Tomorrow.mp3',
+  title: 'Streets of Tomorrow',
+  artist: 'Angra'
+}
 
 /** The list of playlists on screen. */
 const onThePlaylists = () => {
@@ -225,7 +235,18 @@ export const NotifiesAboveThePlayer: Story = {
 export const NotifiesAboveTheNewPlaylistButton: Story = {
   beforeEach: () => {
     onThePlaylists()
-    mockCommands({ check_playlist: () => ({ playlist: stormyWeather, missingCount: 1 }) })
+    // The song list still has the song gone since: the rescan the check calls for drops it.
+    useLibraryStore.setState({
+      lastScan: { kind: 'loaded', tracks: [rideIntoTheStorm, streetsOfTomorrow] }
+    })
+    mockCommands({
+      check_playlist: () => ({
+        playlist: { ...stormyWeather, allSongsFound: false },
+        missingSongs: ['Streets of Tomorrow.mp3']
+      }),
+      load_music_library: () => [rideIntoTheStorm],
+      read_cover: noCover
+    })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)

@@ -4,8 +4,8 @@ import { QueueListIcon } from '@heroicons/react/20/solid'
 export const PLAYLISTS_TITLE = 'Playlists'
 export const PLAYLISTS_ICON = QueueListIcon
 
-// The alert after a playlist's title, on its row and in its page's header, while its file says
-// songs are missing.
+// The alert in a playlist's play button's place, on its row and in its page's header, while songs
+// are missing.
 export const MISSING_SONGS_LABEL = 'Some songs are missing'
 
 // Long enough for any title, short enough that a playlist's file name stays far below the 255

@@ -51,6 +51,8 @@ const MISSING_ERROR =
 const DELETE_ERROR =
   "Couldn't delete the playlist 1763581234567-Road_trip.json: Read-only file system (os error 30)"
 const TAKEN_ERROR = 'A playlist named 1763581234567-Road_trip.json already exists'
+const READ_SONGS_ERROR =
+  "Couldn't read the Songs folder at /media/usb/Songs: Input/output error (os error 5)"
 
 const playlists = () => usePlaylistsStore.getState()
 
@@ -60,17 +62,32 @@ const listed = (...shown: SavedPlaylist[]) =>
 const scanned = (tracks: Track[]) =>
   useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks } })
 
-/** What `check_playlist` answers when `missingCount` of the playlist's songs aren't found. */
-const checkFinding = (playlist: SavedPlaylist, missingCount: number): PlaylistCheck => ({
-  playlist: { ...playlist, allSongsFound: missingCount === 0 },
-  missingCount
+/** What `check_playlist` answers when `missingSongs` of the playlist aren't found. */
+const checkFinding = (playlist: SavedPlaylist, missingSongs: string[]): PlaylistCheck => ({
+  playlist: { ...playlist, allSongsFound: missingSongs.length === 0 },
+  missingSongs
 })
 
-/** Answers `check_playlist` with `check`, and returns its spy. */
-const mockCheck = (check: PlaylistCheck) => {
+/**
+ * Answers `check_playlist` with `check`, and a scan of the Songs folder with `rescanned`, and
+ * returns their spies.
+ */
+const mockCheck = (check: PlaylistCheck, rescanned: Track[] = []) => {
   const checkPlaylist = vi.fn((_args?: InvokeArgs) => check)
-  mockCommands({ check_playlist: checkPlaylist })
-  return checkPlaylist
+  const loadMusicLibrary = vi.fn(() => rescanned)
+  mockCommands({ check_playlist: checkPlaylist, load_music_library: loadMusicLibrary })
+  return { checkPlaylist, loadMusicLibrary }
+}
+
+const SONG_LIST_UPDATED = (songCount: string) => ({
+  type: 'success',
+  title: 'Song list updated',
+  description: `${songCount} in the Songs folder`
+})
+
+const scannedTracks = () => {
+  const { lastScan } = useLibraryStore.getState()
+  return lastScan?.kind === 'loaded' ? lastScan.tracks : []
 }
 
 describe('loadPlaylists', () => {
@@ -246,7 +263,7 @@ describe('playPlaylist', () => {
   it('checks that its songs are in the Songs folder first', async () => {
     listed(roadTrip)
     scanned([blackened, makeBelieve, sadStatue])
-    const checkPlaylist = mockCheck(checkFinding(roadTrip, 0))
+    const { checkPlaylist } = mockCheck(checkFinding(roadTrip, []))
 
     await playlists().playPlaylist(roadTrip.fileName)
 
@@ -256,7 +273,7 @@ describe('playPlaylist', () => {
   it("plays its songs in the playlist's order, from the first one", async () => {
     listed(roadTrip)
     scanned([blackened, reason, sadStatue, makeBelieve])
-    mockCheck(checkFinding(roadTrip, 0))
+    mockCheck(checkFinding(roadTrip, []))
 
     await playlists().playPlaylist(roadTrip.fileName)
 
@@ -270,7 +287,7 @@ describe('playPlaylist', () => {
   it('starts from the song whose play was clicked', async () => {
     listed(roadTrip)
     scanned([blackened, makeBelieve, sadStatue])
-    mockCheck(checkFinding(roadTrip, 0))
+    mockCheck(checkFinding(roadTrip, []))
 
     await playlists().playPlaylist(roadTrip.fileName, 'Blackened.mp3')
 
@@ -283,27 +300,38 @@ describe('playPlaylist', () => {
   it('plays them as songs of this playlist, by its file name', async () => {
     listed(roadTrip)
     scanned([blackened, makeBelieve, sadStatue])
-    mockCheck(checkFinding(roadTrip, 0))
+    mockCheck(checkFinding(roadTrip, []))
 
     await playlists().playPlaylist(roadTrip.fileName)
 
     expect(usePlaybackStore.getState().session?.source).toEqual(playlistSource(roadTrip.fileName))
   })
 
-  it('skips the songs the last scan lacks', async () => {
+  it('leaves the song list as it is when Rust finds the songs it holds', async () => {
     listed(roadTrip)
-    scanned([sadStatue, makeBelieve])
-    mockCheck(checkFinding(roadTrip, 0))
+    scanned([blackened, makeBelieve, sadStatue])
+    const { loadMusicLibrary } = mockCheck(checkFinding(roadTrip, []))
 
     await playlists().playPlaylist(roadTrip.fileName)
 
-    expect(usePlaybackStore.getState().session?.queue).toEqual([makeBelieve, sadStatue])
+    expect(loadMusicLibrary).not.toHaveBeenCalled()
+    expect(shownNotifications()).toEqual([])
+  })
+
+  it('scans the Songs folder again when Rust finds songs the song list lacks, then plays them', async () => {
+    listed(roadTrip)
+    scanned([sadStatue, makeBelieve])
+    mockCheck(checkFinding(roadTrip, []), [sadStatue, blackened, makeBelieve])
+
+    await playlists().playPlaylist(roadTrip.fileName)
+
+    expect(usePlaybackStore.getState().session?.queue).toEqual([makeBelieve, blackened, sadStatue])
   })
 
   it("plays nothing while songs are missing, and says how many aren't found", async () => {
     listed(roadTrip)
-    scanned([blackened, makeBelieve, sadStatue])
-    mockCheck(checkFinding(roadTrip, 2))
+    scanned([makeBelieve])
+    mockCheck(checkFinding(roadTrip, ['Blackened.mp3', 'Sad Statue.mp3']))
 
     await playlists().playPlaylist(roadTrip.fileName)
 
@@ -318,15 +346,38 @@ describe('playPlaylist', () => {
     ])
   })
 
+  it('takes the songs Rust finds missing off the song list at once, by scanning again', async () => {
+    listed(roadTrip)
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCheck(checkFinding(roadTrip, ['Blackened.mp3']), [makeBelieve, sadStatue])
+
+    await playlists().playPlaylist(roadTrip.fileName)
+
+    expect(scannedTracks()).toEqual([makeBelieve, sadStatue])
+    expect(usePlaybackStore.getState().session).toBeNull()
+    expect(shownNotifications()).toEqual([
+      SONG_LIST_UPDATED('2 songs'),
+      {
+        type: 'error',
+        title: `Couldn't play "Road trip"`,
+        description: '1 song is missing from the Songs folder.'
+      }
+    ])
+  })
+
   it('says so when none of its songs is in the song list', async () => {
     listed(calmEvening)
-    scanned([reason])
-    mockCheck(checkFinding(calmEvening, 0))
+    useLibraryStore.setState({ lastScan: { kind: 'failed' } })
+    mockCommands({
+      check_playlist: () => checkFinding(calmEvening, []),
+      load_music_library: failingCommand(READ_SONGS_ERROR)
+    })
 
     await playlists().playPlaylist(calmEvening.fileName)
 
     expect(usePlaybackStore.getState().session).toBeNull()
     expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't load your music", description: READ_SONGS_ERROR },
       {
         type: 'error',
         title: `Couldn't play "Calm evening"`,
@@ -352,7 +403,8 @@ describe('playPlaylist', () => {
 describe('recheckPlaylist', () => {
   it('turns its plays on again once every song is found', async () => {
     listed({ ...roadTrip, allSongsFound: false })
-    mockCheck(checkFinding(roadTrip, 0))
+    scanned([blackened, makeBelieve, sadStatue])
+    mockCheck(checkFinding(roadTrip, []))
 
     await playlists().recheckPlaylist(roadTrip.fileName)
 
@@ -362,9 +414,24 @@ describe('recheckPlaylist', () => {
     ])
   })
 
+  it('puts the songs found again on the song list at once, by scanning again', async () => {
+    listed({ ...roadTrip, allSongsFound: false })
+    scanned([makeBelieve, sadStatue])
+    mockCheck(checkFinding(roadTrip, []), [makeBelieve, blackened, sadStatue])
+
+    await playlists().recheckPlaylist(roadTrip.fileName)
+
+    expect(scannedTracks()).toEqual([makeBelieve, blackened, sadStatue])
+    expect(shownNotifications()).toEqual([
+      SONG_LIST_UPDATED('3 songs'),
+      { type: 'success', title: 'Found every song of "Road trip"', description: undefined }
+    ])
+  })
+
   it('says how many songs are still missing', async () => {
     listed({ ...roadTrip, allSongsFound: false })
-    mockCheck(checkFinding(roadTrip, 1))
+    scanned([makeBelieve, sadStatue])
+    mockCheck(checkFinding(roadTrip, ['Blackened.mp3']))
 
     await playlists().recheckPlaylist(roadTrip.fileName)
 

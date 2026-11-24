@@ -152,7 +152,7 @@ export const SongPlayingFromTheSongsView: Story = {
     playingDartsFrom(SONGS_SOURCE)
     mockCommands({
       read_cover: noCover,
-      check_playlist: () => ({ playlist: lateDrive, missingCount: 0 })
+      check_playlist: () => ({ playlist: lateDrive, missingSongs: [] })
     })
   },
   play: async ({ canvas, userEvent }) => {

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect } from 'storybook/test'
+import { expect, waitFor } from 'storybook/test'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import { useLibraryStore } from '../../library/libraryStore'
@@ -24,6 +24,12 @@ const sundayMorning: SavedPlaylist = {
   songs: ['Born to Be.mp3', 'The Other Side.mp3']
 }
 
+/** The Other Side was gone from the Songs folder at the last scan, and the playlist's file says so. */
+const theOtherSideMissing = () => {
+  useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: [bornToBe] } })
+  usePlaylistsStore.setState({ playlists: [{ ...sundayMorning, allSongsFound: false }] })
+}
+
 const meta = {
   component: PlaylistPlayButton,
   args: { playlist: sundayMorning },
@@ -31,7 +37,7 @@ const meta = {
   beforeEach: () => {
     usePlaylistsStore.setState({ playlists: [sundayMorning], loadStatus: 'loaded' })
     useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks: [theOtherSide, bornToBe] } })
-    mockCommands({ check_playlist: () => ({ playlist: sundayMorning, missingCount: 0 }) })
+    mockCommands({ check_playlist: () => ({ playlist: sundayMorning, missingSongs: [] }) })
   }
 } satisfies Meta<typeof PlaylistPlayButton>
 
@@ -59,11 +65,12 @@ export const Large: Story = {
 }
 
 /**
- * While the playlist's file says songs are missing, a red alert takes the button's place, in a box
- * of the button's size, until a recheck finds them; the mouse resting on it says why.
+ * While the song list lacks one of the playlist's songs, a red alert takes the button's place, in a
+ * box of the button's size, until a recheck finds them; the mouse resting on it says why.
  */
 export const SongsMissing: Story = {
   args: { playlist: { ...sundayMorning, allSongsFound: false } },
+  beforeEach: theOtherSideMissing,
   play: async ({ canvas }) => {
     const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
 
@@ -76,11 +83,37 @@ export const SongsMissing: Story = {
 /** The large alert taking the place of the page's large play button, the same size. */
 export const LargeSongsMissing: Story = {
   args: { playlist: { ...sundayMorning, allSongsFound: false }, isLarge: true },
+  beforeEach: theOtherSideMissing,
   play: async ({ canvas }) => {
     const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
 
     await expect(canvas.queryByRole('button')).toBeNull()
     await expect(alert.parentElement?.getBoundingClientRect().width).toBe(40)
+  }
+}
+
+/**
+ * When Rust finds a song gone since the last scan, nothing plays, and the song list is scanned
+ * again at once, so the alert takes the button's place, as everywhere the song shows.
+ */
+export const FindingASongGone: Story = {
+  beforeEach: () => {
+    mockCommands({
+      check_playlist: () => ({
+        playlist: { ...sundayMorning, allSongsFound: false },
+        missingSongs: ['The Other Side.mp3']
+      }),
+      load_music_library: () => [bornToBe]
+    })
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Play Sunday morning' }))
+
+    await expect(await canvas.findByRole('img', { name: 'Some songs are missing' })).toBeVisible()
+    await waitFor(() =>
+      expect(useLibraryStore.getState().lastScan).toEqual({ kind: 'loaded', tracks: [bornToBe] })
+    )
+    await expect(usePlaybackStore.getState().session).toBeNull()
   }
 }
 

@@ -54,27 +54,6 @@ const tellNothingToAdd = ({ failures }: DroppedSongs) => {
   }
 }
 
-const untilScanEnds = () =>
-  new Promise<void>(resolve => {
-    if (!useLibraryStore.getState().isScanning) {
-      return resolve()
-    }
-    const stopWatching = useLibraryStore.subscribe(({ isScanning }) => {
-      if (isScanning) {
-        return
-      }
-      stopWatching()
-      resolve()
-    })
-  })
-
-// A scan already running, like the one at launch on a slow drive, may have listed the Songs folder
-// before the copy, and a scan asked for meanwhile would be ignored.
-const scanAfterTheRunningOne = async () => {
-  await untilScanEnds()
-  await useLibraryStore.getState().scanLibrary()
-}
-
 const songCountCopied = ({ songCount, conflicts }: DroppedSongs, choice: ConflictChoice) =>
   choice === 'skip' ? songCount - conflicts.length : songCount
 
@@ -85,7 +64,7 @@ export const useSongDropStore = create<SongDropStore>()((set, get) => {
       const { copiedCount, failures } = await copyDroppedSongs(paths, onConflict)
       log(`Copied ${formatSongCount(copiedCount)} to the Songs folder`)
       notifyFailures(PARTIAL_FAILURE_TITLE, failures)
-      await scanAfterTheRunningOne()
+      await useLibraryStore.getState().scanAgain()
     } catch (error) {
       notifyError(DROP_FAILURE_TITLE, error)
     }

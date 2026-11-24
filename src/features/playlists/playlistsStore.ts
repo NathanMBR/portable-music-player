@@ -3,12 +3,13 @@ import { create } from 'zustand'
 import { compareNames } from '../../compareNames'
 import { formatSongCount } from '../library/libraryStatus'
 import { useLibraryStore } from '../library/libraryStore'
+import { tracksOf } from '../library/scannedTracks'
 import { log } from '../logging/log'
 import { notifyError, notifySuccess, notifyUndoable } from '../notifications/notify'
 import { playlistSource } from '../playback/playbackSource'
 import { usePlaybackStore } from '../playback/playbackStore'
 import { playlistFileName } from './playlistFileName'
-import { findPlaylistSongs, playableTracksOf, songNameOf } from './playlistSongs'
+import { findPlaylistSongs, missingSongsOf, playableTracksOf, songNameOf } from './playlistSongs'
 import {
   checkPlaylistSongs,
   createPlaylistFile,
@@ -42,10 +43,14 @@ type PlaylistsStore = {
   showList: () => void
   /**
    * Looks for the playlist's songs in the Songs folder first, and plays them only if they're all
-   * there: from `fromSong`, a song's file name, or else from the first song.
+   * there: from `fromSong`, a song's file name, or else from the first song. The song list follows
+   * what was found either way.
    */
   playPlaylist: (fileName: string, fromSong?: string) => Promise<void>
-  /** Looks for the playlist's songs again, so its plays turn on once they're all back. */
+  /**
+   * Looks for the playlist's songs again, so its plays turn on once they're all back, and the song
+   * list follows what was found.
+   */
   recheckPlaylist: (fileName: string) => Promise<void>
   /** Deletes the playlist's file, which the notification's Undo writes again. */
   deletePlaylist: (fileName: string) => Promise<void>
@@ -71,10 +76,15 @@ const contentsOf = ({ title, description, songs }: SavedPlaylist): PlaylistConte
 const describeMissingSongs = (missingCount: number) =>
   `${formatSongCount(missingCount)} ${missingCount === 1 ? 'is' : 'are'} missing from the Songs folder.`
 
-const scannedTracks = () => {
-  const { lastScan } = useLibraryStore.getState()
-  return lastScan?.kind === 'loaded' ? lastScan.tracks : []
-}
+const scannedTracks = () => tracksOf(useLibraryStore.getState().lastScan)
+
+const isSameList = (first: string[], second: string[]) =>
+  first.length === second.length && first.every((item, index) => item === second[index])
+
+// Rust looks in the Songs folder on its own, the same way as the scan. When it finds other songs
+// missing than the song list does, songs came or went since the last scan.
+const isSongListBehind = ({ playlist, missingSongs }: PlaylistCheck) =>
+  !isSameList(missingSongs, missingSongsOf(playlist.songs, scannedTracks()))
 
 /** A song of a playlist by its title, or by its file name when the last scan lacks it. */
 const nameOfSong = (songFileName: string) => {
@@ -110,19 +120,26 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
       )
     })
 
-  // The check may rewrite the file's allSongsFound, so the store takes the playlist it answers.
-  const checkOrNotify = async (
+  // Every search for a playlist's songs goes through here, so what it finds reaches every part of
+  // the app at once: the check may rewrite the file's allSongsFound, so the store takes the
+  // playlist it answers, and a song list behind it is scanned again, since the Songs view, the
+  // playlists' rows and everything else showing whether a song is there read the song list.
+  const lookForSongsOf = async (
     playlist: SavedPlaylist,
     failureTitle: string
   ): Promise<PlaylistCheck | null> => {
+    let check: PlaylistCheck
     try {
-      const check = await checkPlaylistSongs(playlist.fileName)
-      replacePlaylist(check.playlist)
-      return check
+      check = await checkPlaylistSongs(playlist.fileName)
     } catch (error) {
       notifyError(failureTitle, error)
       return null
     }
+    replacePlaylist(check.playlist)
+    if (isSongListBehind(check)) {
+      await useLibraryStore.getState().scanAgain()
+    }
+    return check
   }
 
   // A save may rewrite the file's allSongsFound, so the store takes the playlist it answers.
@@ -225,12 +242,12 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
       }
 
       const failureTitle = `Couldn't play "${playlist.title}"`
-      const check = await checkOrNotify(playlist, failureTitle)
+      const check = await lookForSongsOf(playlist, failureTitle)
       if (!check) {
         return
       }
-      if (check.missingCount > 0) {
-        notifyError(failureTitle, describeMissingSongs(check.missingCount))
+      if (check.missingSongs.length > 0) {
+        notifyError(failureTitle, describeMissingSongs(check.missingSongs.length))
         return
       }
       playSongsOf(check.playlist, fromSong)
@@ -241,16 +258,16 @@ export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
         return
       }
 
-      const check = await checkOrNotify(playlist, `Couldn't check "${playlist.title}"`)
+      const check = await lookForSongsOf(playlist, `Couldn't check "${playlist.title}"`)
       if (!check) {
         return
       }
-      if (check.missingCount === 0) {
+      if (check.missingSongs.length === 0) {
         notifySuccess(`Found every song of "${playlist.title}"`)
       } else {
         notifyError(
           `Couldn't find every song of "${playlist.title}"`,
-          describeMissingSongs(check.missingCount)
+          describeMissingSongs(check.missingSongs.length)
         )
       }
     },

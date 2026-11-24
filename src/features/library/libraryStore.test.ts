@@ -139,6 +139,39 @@ describe('scanLibrary', () => {
   })
 })
 
+describe('scanAgain', () => {
+  it('scans at once when no scan runs', async () => {
+    const theCurse = trackTitled('The Curse', 'Audioslave')
+    mockCommands({ load_music_library: () => [theCurse] })
+
+    await useLibraryStore.getState().scanAgain()
+
+    expect(useLibraryStore.getState().lastScan).toEqual({ kind: 'loaded', tracks: [theCurse] })
+  })
+
+  it('scans once the running scan ends, since that one may have listed the folder too early', async () => {
+    const theCurse = trackTitled('The Curse', 'Audioslave')
+    const paradise = trackTitled('Paradise', 'Angra')
+    let endRunningScan = (_tracks: Track[]) => {}
+    const loadMusicLibrary = vi
+      .fn<() => Track[] | Promise<Track[]>>()
+      .mockImplementationOnce(() => new Promise(resolve => (endRunningScan = resolve)))
+      .mockImplementationOnce(() => [theCurse, paradise])
+    mockCommands({ load_music_library: loadMusicLibrary })
+    const runningScan = scanLibrary()
+
+    const scannedAgain = useLibraryStore.getState().scanAgain()
+    endRunningScan([theCurse])
+    await Promise.all([runningScan, scannedAgain])
+
+    expect(loadMusicLibrary).toHaveBeenCalledTimes(2)
+    expect(useLibraryStore.getState().lastScan).toEqual({
+      kind: 'loaded',
+      tracks: [theCurse, paradise]
+    })
+  })
+})
+
 describe('openFolder', () => {
   it('asks Rust to open the Songs folder', async () => {
     const openSongsFolder = vi.fn()

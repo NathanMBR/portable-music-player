@@ -1,5 +1,7 @@
+import { tracksOf } from '../library/scannedTracks'
 import { fileNameOf, withoutExtension } from '../library/trackName'
-import type { Track } from '../library/types'
+import type { ScanOutcome, Track } from '../library/types'
+import type { SavedPlaylist } from './types'
 
 /** A song of a playlist, with the scanned song its file name names, or `null` if the scan lacks it. */
 export type PlaylistSong = {
@@ -7,17 +9,29 @@ export type PlaylistSong = {
   track: Track | null
 }
 
-// Lowercase, like the drive's file system may compare names: FAT and NTFS ignore case.
-const nameKeyOf = (fileName: string) => fileName.toLowerCase()
-
-/** Pairs each of a playlist's file names with the scanned song it names, in the playlist's order. */
+/**
+ * Pairs each of a playlist's file names with the scanned song it names, in the playlist's order.
+ * Names pair exactly, case included, the same way as Rust's check (`missing_songs_in` in
+ * `library.rs`), so both find the same songs missing.
+ */
 export const findPlaylistSongs = (fileNames: string[], tracks: Track[]): PlaylistSong[] => {
-  const trackByName = new Map(tracks.map(track => [nameKeyOf(fileNameOf(track)), track]))
-  return fileNames.map(fileName => ({
-    fileName,
-    track: trackByName.get(nameKeyOf(fileName)) ?? null
-  }))
+  const trackByName = new Map(tracks.map(track => [fileNameOf(track), track]))
+  return fileNames.map(fileName => ({ fileName, track: trackByName.get(fileName) ?? null }))
 }
+
+/** The file names of a playlist's songs that the scan lacks, in the playlist's order. */
+export const missingSongsOf = (fileNames: string[], tracks: Track[]) =>
+  findPlaylistSongs(fileNames, tracks).flatMap(({ fileName, track }) => (track ? [] : fileName))
+
+/**
+ * Whether some of the playlist's songs are missing from the Songs folder, as the last scan says,
+ * the app's one record of the songs there. Until the first scan ends, nothing is known of them yet,
+ * so it's what the playlist's file says, as Rust last found.
+ */
+export const hasMissingSongs = (playlist: SavedPlaylist, lastScan: ScanOutcome | null) =>
+  lastScan === null
+    ? !playlist.allSongsFound
+    : missingSongsOf(playlist.songs, tracksOf(lastScan)).length > 0
 
 /** The song's title, or for a song the scan lacks, its file name without the extension. */
 export const songNameOf = ({ fileName, track }: PlaylistSong) =>

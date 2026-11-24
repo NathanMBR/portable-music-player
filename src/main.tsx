@@ -16,7 +16,7 @@ import './index.css'
 // Runs once per launch; a mount effect would run twice in development under StrictMode.
 const settingsLoaded = useSettingsStore.getState().restoreSettings()
 const libraryScanned = useLibraryStore.getState().scanLibrary()
-// Scans never list them again: whether their songs are all there is checked when they're played.
+// Scans never list them again: whether their songs are there is read from the song list.
 void usePlaylistsStore.getState().loadPlaylists()
 connectSongAudio(new Audio())
 connectWindowTitle()

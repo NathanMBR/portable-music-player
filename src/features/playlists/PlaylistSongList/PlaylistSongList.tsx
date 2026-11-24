@@ -17,6 +17,7 @@ import { usePlaylistsStore } from '../playlistsStore'
 import { SongPosition } from '../SongPosition/SongPosition'
 import type { SavedPlaylist } from '../types'
 import { useDialogAbout } from '../useDialogAbout'
+import { useHasMissingSongs } from '../useHasMissingSongs'
 
 type PlaylistSongListProps = {
   /** The playlist whose songs the list shows. */
@@ -41,13 +42,14 @@ type SongPlayButtonProps = {
 
 const SongPlayButton = ({ playlist, song, track, source }: SongPlayButtonProps) => {
   const playPlaylist = usePlaylistsStore(state => state.playPlaylist)
+  const hasMissingSongs = useHasMissingSongs(playlist)
 
   return (
     <PlayButton
       track={track}
       source={source}
       onPlay={() => void playPlaylist(playlist.fileName, song.fileName)}
-      isDisabled={!playlist.allSongsFound}
+      isDisabled={hasMissingSongs}
     />
   )
 }

@@ -4,6 +4,8 @@ import { expect, fn, waitFor, within } from 'storybook/test'
 import { loggedMessages } from '../../../testing/logs'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import { useLibraryStore } from '../../library/libraryStore'
+import type { Track } from '../../library/types'
 import { connectButtonLog } from '../../logging/buttonLog'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
@@ -17,8 +19,30 @@ const cityLights: SavedPlaylist = {
   songs: ['Know.mp3', 'Stealing Society.mp3', 'Wuthering Heights.mp3', 'Shift.mp3']
 }
 
+const know: Track = { path: 'Songs/Know.mp3', title: 'Know', artist: 'System of a Down' }
+const stealingSociety: Track = {
+  path: 'Songs/Stealing Society.mp3',
+  title: 'Stealing Society',
+  artist: 'System of a Down'
+}
+const wutheringHeights: Track = {
+  path: 'Songs/Wuthering Heights.mp3',
+  title: 'Wuthering Heights',
+  artist: 'Angra'
+}
+const shift: Track = { path: 'Songs/Shift.mp3', title: 'Shift', artist: 'Woodkid' }
+
+const scanned = (tracks: Track[]) =>
+  useLibraryStore.setState({ lastScan: { kind: 'loaded', tracks } })
+
+/** Shift was gone from the Songs folder at the last scan, and the playlist's file says so. */
+const shiftMissing = () => {
+  scanned([know, stealingSociety, wutheringHeights])
+  usePlaylistsStore.setState({ playlists: [{ ...cityLights, allSongsFound: false }] })
+}
+
 // Rust finds every song again.
-const checkPlaylist = fn((_args?: InvokeArgs) => ({ playlist: cityLights, missingCount: 0 }))
+const checkPlaylist = fn((_args?: InvokeArgs) => ({ playlist: cityLights, missingSongs: [] }))
 
 /** Where a real click at the middle of the element lands, whatever covers it. */
 const elementAtTheMiddleOf = (element: Element) => {
@@ -57,6 +81,7 @@ const meta = {
   ],
   beforeEach: () => {
     usePlaylistsStore.setState({ playlists: [cityLights], loadStatus: 'loaded' })
+    scanned([know, stealingSociety, wutheringHeights, shift])
   }
 } satisfies Meta<typeof PlaylistRow>
 
@@ -92,12 +117,13 @@ export const WithoutDescription: Story = {
 }
 
 /**
- * While its file says songs are missing, a red alert takes the play button's place, before the
- * square, and nothing follows the title. The alert sits above the row, so the mouse resting on it
- * says why.
+ * While the song list lacks one of its songs, a red alert takes the play button's place, before
+ * the square, and nothing follows the title. The alert sits above the row, so the mouse resting on
+ * it says why.
  */
 export const SongsMissing: Story = {
   args: { playlist: { ...cityLights, allSongsFound: false } },
+  beforeEach: shiftMissing,
   play: async ({ canvas }) => {
     const alert = canvas.getByRole('img', { name: 'Some songs are missing' })
     const title = canvas.getByRole('button', { name: 'See City lights' })
@@ -121,6 +147,7 @@ export const LongName: Story = {
         'Late trains and empty streets, the windows of the last bus and the lights of the bridge at three in the morning'
     }
   },
+  beforeEach: shiftMissing,
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('button', { name: 'More for City lights' })).toBeVisible()
   }
@@ -184,9 +211,12 @@ export const ClickableAllOver: Story = {
 export const ButtonsAboveTheRow: Story = {
   args: { playlist: { ...cityLights, allSongsFound: false } },
   beforeEach: () => {
-    usePlaylistsStore.setState({ playlists: [{ ...cityLights, allSongsFound: false }] })
+    shiftMissing()
     mockCommands({
-      check_playlist: () => ({ playlist: { ...cityLights, allSongsFound: false }, missingCount: 1 })
+      check_playlist: () => ({
+        playlist: { ...cityLights, allSongsFound: false },
+        missingSongs: ['Shift.mp3']
+      })
     })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -228,13 +258,17 @@ export const Menu: Story = {
 
 /**
  * While songs are missing, the menu starts with Recheck songs, which looks for them in the Songs
- * folder again; once they're all back, the play button takes the alert's place.
+ * folder again; once they're all back, the song list is scanned again, and the play button takes
+ * the alert's place.
  */
 export const RecheckingFromTheMenu: Story = {
   args: { playlist: { ...cityLights, allSongsFound: false } },
   beforeEach: () => {
-    usePlaylistsStore.setState({ playlists: [{ ...cityLights, allSongsFound: false }] })
-    mockCommands({ check_playlist: checkPlaylist })
+    shiftMissing()
+    mockCommands({
+      check_playlist: checkPlaylist,
+      load_music_library: () => [know, stealingSociety, wutheringHeights, shift]
+    })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)
@@ -253,5 +287,6 @@ export const RecheckingFromTheMenu: Story = {
       expect(checkPlaylist).toHaveBeenCalledWith({ fileName: cityLights.fileName })
     )
     await waitFor(() => expect(usePlaylistsStore.getState().playlists[0]?.allSongsFound).toBe(true))
+    await expect(await canvas.findByRole('button', { name: 'Play City lights' })).toBeEnabled()
   }
 }

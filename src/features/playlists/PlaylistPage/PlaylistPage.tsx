@@ -20,12 +20,12 @@ type PlaylistPageProps = {
 
 /**
  * One playlist, opened from its row in the Playlists view. Its header has a back button to the
- * list of playlists, the playlist's title, then a Recheck button while the playlist's file says
- * songs are missing, an Edit button, which opens the playlist's dialog filled with its values
+ * list of playlists, the playlist's title, then a Recheck button while the song list lacks some of
+ * its songs, an Edit button, which opens the playlist's dialog filled with its values
  * (`PlaylistDialog`), and a large play button, which always starts from the first song, or a red
- * alert in its place while songs are missing. Below the rule, the status line counts the songs and gives the description, and
- * the songs follow, to play, reorder and remove (`PlaylistSongList`). While songs are missing,
- * every play button of the playlist is disabled.
+ * alert in its place while songs are missing. Below the rule, the status line counts the songs and
+ * gives the description, and the songs follow, to play, reorder and remove (`PlaylistSongList`).
+ * While songs are missing, every play button of the playlist is disabled.
  *
  * @summary Page of one playlist and its songs
  */

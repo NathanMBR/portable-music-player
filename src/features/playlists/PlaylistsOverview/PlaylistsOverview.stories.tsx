@@ -68,7 +68,7 @@ const meta = {
       lastScan: { kind: 'loaded', tracks: [suggestions, silenceAndDistance, outOfExile] }
     })
     mockCommands({
-      check_playlist: () => ({ playlist: roadTrip, missingCount: 0 }),
+      check_playlist: () => ({ playlist: roadTrip, missingSongs: [] }),
       delete_playlist: deletePlaylist,
       create_playlist: createPlaylist,
       save_playlist: savePlaylist,

@@ -90,10 +90,15 @@ songs are sorted as the Settings view says: by title, the default, or by filenam
 (`PlaylistsOverview`), or, without any, says so in the middle of the view. Each row
 (`PlaylistRow`) has a play button, then the playlist's title and description, and a click anywhere
 else on it opens the playlist. At its right end, a menu (`ActionMenu`) holds Recheck songs while
-songs are missing, Edit playlist, and Delete playlist, which asks first (`ConfirmDialog`), then notifies with an Undo. Playing a playlist first has Rust look for its songs in the `Songs` folder: if some are
-missing, nothing plays, a notification says how many, and its file remembers it. Until a recheck
-finds them all, from its row's menu or its page's Recheck button (`RecheckButton`), a red alert
-(`AlertMark`) takes the place of its play buttons and its songs' are disabled. An open playlist (`PlaylistPage`) has its title in the header, with a back button, a
+songs are missing, Edit playlist, and Delete playlist, which asks first (`ConfirmDialog`), then
+notifies with an Undo. The last scan of the `Songs` folder, the song list, is the app's one record
+of which songs are there: while it lacks some of a playlist's songs, a red alert (`AlertMark`) takes
+the place of the playlist's play buttons and its songs' are disabled. Playing a playlist first has
+Rust look for its songs in the `Songs` folder, as does a recheck, from its row's menu or its page's
+Recheck button (`RecheckButton`): if some are missing, nothing plays and a notification says how
+many, its file remembers it, and when Rust finds other songs than the song list holds, the folder is
+scanned again, so the Songs view and every playlist follow at once. An open playlist
+(`PlaylistPage`) has its title in the header, with a back button, a
 large play button that starts from its first song, and its songs below, each with its own play
 button; a song the `Songs` folder lacks is listed under its file name in a lighter ink. Its song in
 the player has the same pen tint as in the song list, but only when it plays from this playlist,

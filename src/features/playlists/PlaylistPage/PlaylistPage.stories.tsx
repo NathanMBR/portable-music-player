@@ -81,7 +81,7 @@ const meta = {
     })
     mockCommands({
       read_cover: noCover,
-      check_playlist: () => ({ playlist: workout, missingCount: 0 })
+      check_playlist: () => ({ playlist: workout, missingSongs: [] })
     })
   }
 } satisfies Meta<typeof PlaylistPage>

@@ -9,6 +9,7 @@ import { PLAYLISTS_ICON } from '../constants'
 import { PlaylistPlayButton } from '../PlaylistPlayButton/PlaylistPlayButton'
 import { usePlaylistsStore } from '../playlistsStore'
 import type { SavedPlaylist } from '../types'
+import { useHasMissingSongs } from '../useHasMissingSongs'
 
 type PlaylistRowProps = {
   /** The playlist the row shows. */
@@ -22,13 +23,14 @@ type PlaylistRowProps = {
 // Recheck songs shows only while songs are missing, first, as what the alert calls for.
 const useMenuItems = ({ playlist, onEdit, onDelete }: PlaylistRowProps) => {
   const recheckPlaylist = usePlaylistsStore(state => state.recheckPlaylist)
+  const hasMissingSongs = useHasMissingSongs(playlist)
   const recheck = {
     label: 'Recheck songs',
     icon: ArrowPathIcon,
     onClick: () => void recheckPlaylist(playlist.fileName)
   }
   return [
-    ...(playlist.allSongsFound ? [] : [recheck]),
+    ...(hasMissingSongs ? [recheck] : []),
     { label: 'Edit playlist', icon: PencilIcon, onClick: onEdit },
     { label: 'Delete playlist', icon: TrashIcon, onClick: onDelete }
   ]
@@ -52,8 +54,8 @@ const RaisedControls = ({ children }: { children: ReactNode }) => (
 /**
  * Row of one playlist in the Playlists view, like a song's row: a round play button, a square with
  * the Playlists icon, then the playlist's title and, when it has one, a middle dot and its
- * description in a lighter ink. While its file says songs are missing, a red alert takes the play
- * button's place. A name too long for the row is cut with an ellipsis, and hovering shows it
+ * description in a lighter ink. While the song list lacks some of its songs, a red alert takes the
+ * play button's place. A name too long for the row is cut with an ellipsis, and hovering shows it
  * whole. A click anywhere on the row outside its controls opens the playlist, under a pointer
  * cursor, and so does Enter on its title from the keyboard, whose focus ring goes around the row.
  * At the row's right end, a menu holds Recheck songs while songs are missing, which looks for them

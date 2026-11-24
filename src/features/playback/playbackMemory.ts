@@ -6,7 +6,7 @@ import { fileNameOf } from '../library/trackName'
 import type { Track } from '../library/types'
 import { notifyError } from '../notifications/notify'
 import { findPlaylistSongs, playableTracksOf } from '../playlists/playlistSongs'
-import { usePlaylistsStore } from '../playlists/playlistsStore'
+import { findPlaylist, usePlaylistsStore } from '../playlists/playlistsStore'
 import { useSettingsStore } from '../settings/settingsStore'
 import type { SavedPlayback, SavedSong } from '../settings/types'
 import { PLAYBACK_SAVE_DELAY_MS } from './constants'
@@ -53,7 +53,7 @@ const shownTracks = (tracks: Track[]) =>
 
 /** The songs the playlist named `fileName` holds, in its order, or `null` once it's gone. */
 const playlistTracks = (fileName: string, tracks: Track[]) => {
-  const playlist = usePlaylistsStore.getState().playlists.find(each => each.fileName === fileName)
+  const playlist = findPlaylist(usePlaylistsStore.getState().playlists, fileName)
   return playlist ? playableTracksOf(findPlaylistSongs(playlist.songs, tracks)) : null
 }
 

@@ -61,6 +61,9 @@ const LONG_LIST: Track[] = [
   'Angels and Demons'
 ].map(title => ({ path: `Songs/${title}.mp3`, title, artist: 'Angra' }))
 
+// While a song plays, the player's name slides with a copy of it, hidden from screen readers.
+const SKIPPING_THE_NAMES_COPY = { ignore: '[aria-hidden="true"] *' }
+
 const SAVE_ERROR =
   "Couldn't save the settings at /media/usb/settings.json: Read-only file system (os error 30)"
 
@@ -182,7 +185,9 @@ export const ShowsThePlayerWhenASongPlays: Story = {
 
     const player = await canvas.findByRole('region', { name: 'Player' })
     await expect(player).toBeVisible()
-    await expect(within(player).getByText(playingTrack.title)).toBeVisible()
+    await expect(
+      within(player).getByText(playingTrack.title, SKIPPING_THE_NAMES_COPY)
+    ).toBeVisible()
   }
 }
 
@@ -198,7 +203,9 @@ export const KeepsPlayingAcrossCategories: Story = {
     await expect(canvas.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
     const player = canvas.getByRole('region', { name: 'Player' })
-    await expect(within(player).getByText(playingTrack.title)).toBeVisible()
+    await expect(
+      within(player).getByText(playingTrack.title, SKIPPING_THE_NAMES_COPY)
+    ).toBeVisible()
     await expect(within(player).getByRole('button', { name: 'Pause' })).toBeVisible()
   }
 }

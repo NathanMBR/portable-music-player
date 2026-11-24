@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor, within } from 'storybook/test'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
 import type { Track } from '../../library/types'
-import { SONGS_SOURCE } from '../playbackSource'
+import { usePlaylistsStore } from '../../playlists/playlistsStore'
+import { playlistSource, SONGS_SOURCE } from '../playbackSource'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { AudioPlayer } from './AudioPlayer'
 
@@ -22,6 +23,49 @@ const thirdTrack: Track = {
   artist: 'Angra'
 }
 const queue = [firstTrack, secondTrack, thirdTrack]
+
+// While the name slides, a copy of it follows, hidden from screen readers: queries skip it.
+const COPY_SELECTOR = '[aria-hidden="true"]'
+const SKIPPING_THE_COPY = { ignore: `${COPY_SELECTOR} *` }
+
+/** The song's name titled `title`, as the line shows it, not the copy that follows it. */
+const nameTitled = (scope: ReturnType<typeof within>, title: string) => {
+  const name = scope
+    .getAllByTitle(title)
+    .find((element: HTMLElement) => !element.closest(COPY_SELECTOR))
+  if (!name) {
+    throw new Error(`No name titled "${title}"`)
+  }
+  return name
+}
+
+/** The marquee the song's name slides through, which spans the line above the progress. */
+const nameFrameOf = (name: HTMLElement) => {
+  const frame = name.parentElement?.parentElement?.parentElement
+  if (!frame) {
+    throw new Error('The name sits outside its marquee')
+  }
+  return frame
+}
+
+const ROAD_TRIP = '1763600000000-Road_trip.json'
+
+/** The song is played from the playlist Road trip. */
+const loadSessionFromRoadTrip = (overrides: Partial<PlaybackSession> = {}) => {
+  usePlaylistsStore.setState({
+    playlists: [
+      {
+        fileName: ROAD_TRIP,
+        title: 'Road trip',
+        description: '',
+        allSongsFound: true,
+        songs: ['A Monster in Her Eyes.mp3']
+      }
+    ],
+    loadStatus: 'loaded'
+  })
+  loadSession({ source: playlistSource(ROAD_TRIP), ...overrides })
+}
 
 const LONG_TITLE =
   'Deus Le Volt! (Live in São Paulo, Remastered with the Full Orchestral Prelude and a Bonus Reprise)'
@@ -60,7 +104,7 @@ export const Playing: Story = {
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('region', { name: 'Player' })).toBeVisible()
-    await expect(canvas.getByText(secondTrack.title)).toBeVisible()
+    await expect(canvas.getByText(secondTrack.title, SKIPPING_THE_COPY)).toBeVisible()
   }
 }
 
@@ -76,10 +120,55 @@ export const WithArtist: Story = {
   },
   play: async ({ canvas }) => {
     const player = within(canvas.getByRole('region', { name: 'Player' }))
+    const name = nameTitled(player, 'So Handsome Hello · Woodkid')
 
-    await expect(player.getByTitle('So Handsome Hello · Woodkid')).toHaveTextContent(
-      /^So Handsome Hello · Woodkid$/
+    await expect(name).toHaveTextContent(/^So Handsome Hello · Woodkid$/)
+    // Played from the Songs view, the line names no list.
+    await expect(name.parentElement).toHaveTextContent(/^So Handsome Hello · Woodkid$/)
+  }
+}
+
+/**
+ * A song played from a playlist shows the playlist's title last, behind another middle dot, in the
+ * artist's type and lighter ink.
+ */
+export const FromAPlaylist: Story = {
+  beforeEach: () => {
+    loadSessionFromRoadTrip()
+  },
+  play: async ({ canvas }) => {
+    const shownName = nameTitled(canvas, 'A Monster in Her Eyes · Angra').parentElement
+
+    await expect(shownName).toHaveTextContent(/^A Monster in Her Eyes · Angra · Road trip$/)
+    const playlistStyle = getComputedStyle(canvas.getByText(/Road trip$/, SKIPPING_THE_COPY))
+    const artistStyle = getComputedStyle(canvas.getByText(/Angra$/, SKIPPING_THE_COPY))
+
+    await expect(playlistStyle.fontStretch).toBe(artistStyle.fontStretch)
+    await expect(playlistStyle.color).toBe(artistStyle.color)
+    await expect(playlistStyle.fontWeight).toBe(artistStyle.fontWeight)
+  }
+}
+
+/**
+ * The name slides between the start of the left time's digits and the end of the length's, and
+ * follows the left time as it switches to the countdown.
+ */
+export const NameBetweenTheTimes: Story = {
+  beforeEach: () => {
+    loadSession()
+  },
+  play: async ({ canvas, userEvent }) => {
+    const frame = nameFrameOf(nameTitled(canvas, 'A Monster in Her Eyes · Angra'))
+    const leftOf = (element: Element) => element.getBoundingClientRect().left
+
+    await waitFor(() => expect(leftOf(frame)).toBeCloseTo(leftOf(canvas.getByText('01:23'))))
+    await expect(frame.getBoundingClientRect().right).toBeCloseTo(
+      canvas.getByText('04:30').getBoundingClientRect().right
     )
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Elapsed time 01:23' }))
+
+    await waitFor(() => expect(leftOf(frame)).toBeCloseTo(leftOf(canvas.getByText('-03:07'))))
   }
 }
 
@@ -92,7 +181,7 @@ export const WithoutArtist: Story = {
   play: async ({ canvas }) => {
     const player = within(canvas.getByRole('region', { name: 'Player' }))
 
-    await expect(player.getByTitle('Orion')).toHaveTextContent(/^Orion$/)
+    await expect(nameTitled(player, 'Orion')).toHaveTextContent(/^Orion$/)
   }
 }
 
@@ -100,6 +189,55 @@ export const WithoutArtist: Story = {
 export const Paused: Story = {
   beforeEach: () => {
     loadSession({ isPlaying: false })
+  }
+}
+
+/**
+ * While the song is paused, its name holds still in the middle of its line, with its playlist.
+ * Once the song plays on, it slides from where it stands, and pausing again puts it back in the
+ * middle; the line keeps its height throughout.
+ */
+export const StillWhilePaused: Story = {
+  beforeEach: () => {
+    loadSessionFromRoadTrip({ isPlaying: false })
+  },
+  play: async ({ canvas, userEvent }) => {
+    const name = canvas.getByTitle('A Monster in Her Eyes · Angra')
+    const line = name.closest('p')
+    const frame = nameFrameOf(name)
+    const middleOf = (element: Element) => {
+      const box = element.getBoundingClientRect()
+      return box.left + box.width / 2
+    }
+
+    const track = name.parentElement as Element
+    const slides = () => frame.getAnimations({ subtree: true })
+    const lineHeight = line?.getBoundingClientRect().height
+    const stillLeft = track.getBoundingClientRect().left
+
+    await expect(line).toHaveTextContent(/^A Monster in Her Eyes · Angra · Road trip$/)
+    await expect(slides()).toEqual([])
+    await expect(middleOf(track)).toBeCloseTo(middleOf(frame), 0)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Play' }))
+    const slide = await waitFor(() => {
+      const [running] = slides()
+      if (!running) {
+        throw new Error('The name is not sliding')
+      }
+      return running
+    })
+    slide.pause()
+
+    await expect(track.getBoundingClientRect().left).toBeCloseTo(stillLeft, -1)
+    await expect(line?.getBoundingClientRect().height).toBe(lineHeight)
+
+    slide.play()
+    await userEvent.click(canvas.getByRole('button', { name: 'Pause' }))
+
+    await expect(slides()).toEqual([])
+    await expect(middleOf(track)).toBeCloseTo(middleOf(frame), 0)
+    await expect(line?.getBoundingClientRect().height).toBe(lineHeight)
   }
 }
 
@@ -113,21 +251,21 @@ export const UnknownLength: Story = {
   }
 }
 
-/** A name too long for the player is cut with an ellipsis, and hovering shows it whole. */
+/**
+ * The name slides from right to left without end, above the progress, so even a name longer than
+ * its line passes whole; hovering shows it whole too.
+ */
 export const LongTitle: Story = {
   beforeEach: () => {
     const longTrack: Track = { path: `Songs/${LONG_TITLE}.mp3`, title: LONG_TITLE, artist: 'Angra' }
     loadSession({ track: longTrack, queue: [longTrack], playOrder: [longTrack] })
   },
   play: async ({ canvas }) => {
-    const name = canvas.getByTitle(`${LONG_TITLE} · Angra`)
-    const line = name.closest('p')
-    if (!line) {
-      throw new Error('The name sits outside its line')
-    }
+    const name = nameTitled(canvas, `${LONG_TITLE} · Angra`)
+    const frame = nameFrameOf(name)
 
-    await expect(getComputedStyle(line).textOverflow).toBe('ellipsis')
-    await expect(line.scrollWidth).toBeGreaterThan(line.clientWidth)
+    await waitFor(() => expect(frame.getAnimations({ subtree: true })).toHaveLength(1))
+    await expect(name.getBoundingClientRect().width).toBeGreaterThan(frame.offsetWidth)
   }
 }
 
@@ -149,7 +287,9 @@ export const WideWindow: Story = {
   },
   play: async ({ canvas }) => {
     const controls = canvas.getByRole('button', { name: 'Shuffle' }).parentElement
-    const progress = canvas.getByText(secondTrack.title).closest('p')?.parentElement
+    const progress = canvas
+      .getByText(secondTrack.title, SKIPPING_THE_COPY)
+      .closest('p')?.parentElement
     const volume = canvas.getByRole('button', { name: 'Mute' }).parentElement
     if (!controls || !progress || !volume) {
       throw new Error('The player lost one of its parts')
@@ -182,11 +322,11 @@ export const SkipsSongs: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Next song' }))
-    await expect(canvas.getByText(thirdTrack.title)).toBeVisible()
+    await expect(canvas.getByText(thirdTrack.title, SKIPPING_THE_COPY)).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Next song' })).toBeDisabled()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Previous song' }))
-    await expect(canvas.getByText(secondTrack.title)).toBeVisible()
+    await expect(canvas.getByText(secondTrack.title, SKIPPING_THE_COPY)).toBeVisible()
   }
 }
 
@@ -201,7 +341,7 @@ export const RestartsTheSong: Story = {
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Previous song' }))
 
-    await expect(canvas.getByText(firstTrack.title)).toBeVisible()
+    await expect(canvas.getByText(firstTrack.title, SKIPPING_THE_COPY)).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Elapsed time 00:00' })).toBeVisible()
   }
 }

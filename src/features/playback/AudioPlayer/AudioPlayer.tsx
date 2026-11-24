@@ -1,6 +1,9 @@
 import { Transition } from '@headlessui/react'
 import { useState } from 'react'
+import { Marquee } from '../../../components/Marquee/Marquee'
 import { TrackName } from '../../library/TrackName/TrackName'
+import { TITLE_ARTIST_SEPARATOR } from '../../library/trackName'
+import { findPlaylist, usePlaylistsStore } from '../../playlists/playlistsStore'
 import { PlaybackControls } from '../PlaybackControls/PlaybackControls'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { findNextTrack, findPreviousTrack, restartsOnPrevious } from '../playOrder'
@@ -15,6 +18,26 @@ const useSessionShownWhileClosing = (session: PlaybackSession | null) => {
     setLastSession(session)
   }
   return session ?? lastSession
+}
+
+/** The song's name, then, played from a playlist, a middle dot and the playlist's title. */
+const SongName = ({ session }: { session: PlaybackSession }) => {
+  const { source } = session
+  const playlist = usePlaylistsStore(state =>
+    source.kind === 'playlist' ? findPlaylist(state.playlists, source.fileName) : undefined
+  )
+
+  return (
+    <>
+      <TrackName track={session.track} />
+      {playlist && (
+        <span className="font-stretch-semi-condensed text-ink-faded">
+          {TITLE_ARTIST_SEPARATOR}
+          {playlist.title}
+        </span>
+      )}
+    </>
+  )
 }
 
 const PlayerContent = ({ session }: { session: PlaybackSession }) => {
@@ -34,11 +57,12 @@ const PlayerContent = ({ session }: { session: PlaybackSession }) => {
       {/* The progress grows up to a set width only: a longer bar is harder to follow, so in wide
           windows the player spreads the space left between its three parts instead. */}
       <div className="min-w-0 max-w-xl flex-1">
-        {/* The line cuts the name, since the name inside it is inline. */}
-        <p aria-live="polite" className="mb-1 truncate text-center font-semibold">
-          <TrackName track={track} />
-        </p>
         <SongProgress
+          songName={
+            <Marquee isSliding={session.isPlaying}>
+              <SongName session={session} />
+            </Marquee>
+          }
           elapsedSeconds={session.elapsedSeconds}
           durationSeconds={session.durationSeconds}
         />
@@ -53,9 +77,13 @@ const PlayerContent = ({ session }: { session: PlaybackSession }) => {
  * and away when it's stopped. The app shell renders it outside the views, so a song keeps playing
  * when the category changes. It holds the controls on the left, the song's name and progress in
  * the middle, and the volume on the right. The name is the song's title, then, when its tags name
- * one, a middle dot and its artist in a lighter ink, as in the song list: cut with an ellipsis when
- * it's too long, and shown whole on hover. The progress stops growing at a set width, so in wide
- * windows the spaces around it widen instead. The songs themselves play through `songAudio.ts`,
+ * one, a middle dot and its artist in a lighter ink, as in the song list, and, for a song played
+ * from a playlist, another middle dot and the playlist's title, in the artist's type and ink. While
+ * the song plays, it slides from right to left without end above the progress, from the start of
+ * the left time's digits to the end of the length's (`Marquee`), whatever its length, coming in
+ * again from the right one second after it starts going off on the left; while it's paused, the name holds still in the middle, cut with an ellipsis when it's too long. Hovering
+ * the song's part shows it whole. The progress stops growing at a set width, so in wide windows
+ * the spaces around it widen instead. The songs themselves play through `songAudio.ts`,
  * which follows the same playback store.
  *
  * @summary Audio player bar at the bottom of the window

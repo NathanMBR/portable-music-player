@@ -105,13 +105,16 @@ const playSongsOf = (playlist: SavedPlaylist, fromSong: string | undefined) => {
   usePlaybackStore.getState().playTrack(firstTrack, queue, playlistSource(playlist.fileName))
 }
 
+/** The playlist saved under `fileName`, or `undefined` once it's gone. */
+export const findPlaylist = (playlists: SavedPlaylist[], fileName: string | null) =>
+  playlists.find(playlist => playlist.fileName === fileName)
+
 /** The playlist on screen, or `undefined` while the list is, as when the open one was deleted. */
 export const selectShownPlaylist = ({ playlists, shownPlaylist }: PlaylistsStore) =>
-  playlists.find(playlist => playlist.fileName === shownPlaylist)
+  findPlaylist(playlists, shownPlaylist)
 
 export const usePlaylistsStore = create<PlaylistsStore>()((set, get) => {
-  const playlistNamed = (fileName: string) =>
-    get().playlists.find(playlist => playlist.fileName === fileName)
+  const playlistNamed = (fileName: string) => findPlaylist(get().playlists, fileName)
 
   const replacePlaylist = (changed: SavedPlaylist) =>
     set({

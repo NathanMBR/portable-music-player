@@ -28,8 +28,12 @@ The **audio player** (`AudioPlayer`) slides up along the bottom of the window wh
 and away when it's stopped. `App` renders it outside the views, so a song keeps playing when the
 category changes. It holds shuffle, previous, play or pause, stop, next and repeat on the left, the
 song's title and artist, as in the song list, above its progress bar in the middle, and the speaker
-and volume on the right. The bar has the elapsed time on its left, which a click turns into the
-time left counted down, and the song's length on its right. The progress stops growing at a set
+and volume on the right. For a song played from a playlist, the playlist's title follows the
+artist, behind another middle dot, in the artist's type and ink. While the song plays, the name
+slides from right to left without end (`Marquee`), from the start of the left time's digits to the
+end of the length's, and comes in again from the right one second after it starts going off on the
+left; while it's paused, the name holds still in the middle. The bar has the elapsed
+time on its left, which a click turns into the time left counted down, and the song's length on its right. The progress stops growing at a set
 width, so in wide windows the spaces around it widen instead.
 Clicking the speaker mutes, and clicking it again brings the volume back, and the mouse wheel over
 the volume turns it up or down by 5%. The song plays at the volume slider's value as it's dragged,

@@ -9,7 +9,7 @@ import { SongProgress } from './SongProgress'
 
 const meta = {
   component: SongProgress,
-  args: { elapsedSeconds: 83, durationSeconds: 270 },
+  args: { songName: 'Original Fire · Audioslave', elapsedSeconds: 83, durationSeconds: 270 },
   // About as wide as the middle of the audio player.
   decorators: [
     Story => (

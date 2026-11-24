@@ -131,7 +131,10 @@ any computer. It has a weight axis and a width axis (`font-stretch`):
   the track, so the `pen` part ends there too (`fillEnd` in `src/components/sliderFill.ts`) and
   meets the thumb at every value. The thumb stops on the slider's `step` (tenths of a second for
   the song's position), and the `pen` part is drawn from that same step (`snapToStep`).
-- **Motion:** spins, transitions and marching dashes stop for users who prefer reduced motion
-  (`motion-safe:` and `motion-reduce:`). `animate-march` moves an SVG stroke's dashes forward along
-  its path, looping without a jump when the element's dash offset is one period of its dash pattern:
-  the song drop box's border marches clockwise this way.
+- **Motion:** spins, transitions, marching dashes and sliding text stop for users who prefer
+  reduced motion (`motion-safe:` and `motion-reduce:` in CSS). `animate-march` moves an SVG stroke's dashes
+  forward along its path, looping without a jump when the element's dash offset is one period of
+  its dash pattern: the song drop box's border marches clockwise this way. `Marquee` slides the
+  song's name in the player from script (the Web Animations API), so a slide can set off from
+  where the name stands; CSS can't stop that, so it reads the setting itself
+  (`usePrefersReducedMotion`) and holds the name still in the middle, cut with an ellipsis.

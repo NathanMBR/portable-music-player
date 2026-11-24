@@ -33,6 +33,8 @@ export type Settings = {
   theme: Theme | null
   /** Whether the player looks for a newer release each time it opens. */
   checksForUpdates: boolean
+  /** The version of the release the user skipped, which the check at launch no longer offers. */
+  skipUpdateVersion: string | null
   songOrder: SongOrder
   playback: SavedPlayback
 }

@@ -8,6 +8,7 @@ import type { SavedPlayback, Settings, SongOrder, Theme } from './types'
 const DEFAULT_SETTINGS: Settings = {
   theme: null,
   checksForUpdates: true,
+  skipUpdateVersion: null,
   songOrder: 'title',
   playback: {
     volume: 1,
@@ -25,6 +26,8 @@ type SettingsStore = {
   restoreSettings: () => Promise<void>
   setTheme: (theme: Theme) => Promise<void>
   setChecksForUpdates: (checksForUpdates: boolean) => Promise<void>
+  /** Saves the version of the release the user skipped, so the check at launch passes over it. */
+  setSkipUpdateVersion: (skipUpdateVersion: string) => Promise<void>
   setSongOrder: (songOrder: SongOrder) => Promise<void>
   /** Saves what the player is left with, for the app to put back when it opens again. */
   savePlayback: (playback: SavedPlayback) => Promise<void>
@@ -64,6 +67,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
     },
     setChecksForUpdates: checksForUpdates =>
       saveChoice({ checksForUpdates }, "Couldn't save the update setting"),
+    setSkipUpdateVersion: skipUpdateVersion =>
+      saveChoice({ skipUpdateVersion }, "Couldn't save the skipped update"),
     setSongOrder: songOrder => saveChoice({ songOrder }, "Couldn't save the song order"),
     savePlayback: playback => saveChoice({ playback }, "Couldn't save the player's state")
   }

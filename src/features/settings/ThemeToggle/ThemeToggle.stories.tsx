@@ -48,6 +48,7 @@ export const SwitchesToDark: Story = {
         settings: {
           theme: 'dark',
           checksForUpdates: true,
+          skipUpdateVersion: null,
           songOrder: 'title',
           playback: {
             volume: 1,

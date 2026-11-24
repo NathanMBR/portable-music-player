@@ -39,7 +39,8 @@ pub fn run() {
             settings::save_settings,
             song_drop::check_dropped_songs,
             song_drop::copy_dropped_songs,
-            updates::check_for_update
+            updates::check_for_update,
+            updates::install_update
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

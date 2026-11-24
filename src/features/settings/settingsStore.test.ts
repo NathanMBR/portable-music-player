@@ -9,6 +9,7 @@ const SAVE_ERROR = "Couldn't save the settings at settings.json: read-only file 
 const SAVED_DEFAULTS: Settings = {
   theme: null,
   checksForUpdates: true,
+  skipUpdateVersion: null,
   songOrder: 'title',
   playback: {
     volume: 1,
@@ -119,6 +120,31 @@ describe('setChecksForUpdates', () => {
     expect(useSettingsStore.getState().settings.checksForUpdates).toBe(false)
     expect(shownNotifications()).toEqual([
       { type: 'error', title: "Couldn't save the update setting", description: SAVE_ERROR }
+    ])
+  })
+})
+
+describe('setSkipUpdateVersion', () => {
+  it('saves the skipped version to settings.json, along with the other settings', async () => {
+    const saveSettings = vi.fn()
+    mockCommands({ save_settings: saveSettings })
+
+    await useSettingsStore.getState().setSkipUpdateVersion('0.2.0')
+
+    expect(useSettingsStore.getState().settings.skipUpdateVersion).toBe('0.2.0')
+    expect(saveSettings).toHaveBeenCalledWith({
+      settings: { ...SAVED_DEFAULTS, skipUpdateVersion: '0.2.0' }
+    })
+  })
+
+  it('keeps the skipped version and notifies why saving failed', async () => {
+    mockCommands({ save_settings: failingCommand(SAVE_ERROR) })
+
+    await useSettingsStore.getState().setSkipUpdateVersion('0.2.0')
+
+    expect(useSettingsStore.getState().settings.skipUpdateVersion).toBe('0.2.0')
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't save the skipped update", description: SAVE_ERROR }
     ])
   })
 })

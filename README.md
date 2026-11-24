@@ -32,6 +32,8 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Side menu with the categories
 - Settings page
 - Checks for updates when the app opens, or from the Settings page
+- Update notice in the side menu with the new version's changes
+- Updates installed builds in place; portable builds download in the browser
 - Dark theme
 - Error and success notifications in the bottom-right corner
 - Remembers the window size on each computer

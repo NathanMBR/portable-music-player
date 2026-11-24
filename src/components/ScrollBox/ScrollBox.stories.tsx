@@ -1,5 +1,7 @@
+import { DataInteractive } from '@headlessui/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, within } from 'storybook/test'
+import { FOCUS_CLASSES } from '../buttonStyles'
 import { ScrollBox } from './ScrollBox'
 
 // More than the box has room for.
@@ -82,5 +84,34 @@ export const Region: Story = {
     await expect(canvas.getByRole('region', { name: 'Patch notes' })).toHaveTextContent(
       'Checks for updates each time the app opens.'
     )
+  }
+}
+
+/**
+ * A control inside the content, like a patch note's link, rings only itself when focused: the box's
+ * ring says the content has the focus, for the arrow keys to scroll it.
+ */
+export const FocusedControlInside: Story = {
+  args: {
+    label: 'Patch notes',
+    as: 'div',
+    children: (
+      <p>
+        Read the{' '}
+        <DataInteractive as="a" href="#notes" className={FOCUS_CLASSES}>
+          notes
+        </DataInteractive>
+        .
+      </p>
+    )
+  },
+  play: async ({ canvas, userEvent }) => {
+    const box = canvas.getByRole('region', { name: 'Patch notes' }).parentElement as HTMLElement
+
+    await userEvent.tab()
+    await userEvent.tab()
+
+    await expect(canvas.getByRole('link', { name: 'notes' })).toHaveFocus()
+    await expect(getComputedStyle(box).outlineStyle).toBe('none')
   }
 }

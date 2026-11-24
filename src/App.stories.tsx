@@ -9,6 +9,7 @@ import { SONGS_SOURCE } from './features/playback/playbackSource'
 import { usePlaybackStore } from './features/playback/playbackStore'
 import { usePlaylistsStore } from './features/playlists/playlistsStore'
 import type { SavedPlaylist } from './features/playlists/types'
+import { useUpdateStore } from './features/updates/updateStore'
 import { noCover } from './testing/covers'
 import { failingCommand, mockCommands } from './testing/mockCommands'
 import { renderInOwnFrame } from './testing/storyParameters'
@@ -149,6 +150,29 @@ export const NavigatesFromTheSideMenu: Story = {
     await waitFor(() => expect(page.queryByRole('dialog')).not.toBeInTheDocument())
     await expect(canvas.getByRole('heading', { name: 'Settings' })).toBeVisible()
     await expect(canvas.queryByRole('heading', { name: 'Songs' })).not.toBeInTheDocument()
+  }
+}
+
+/**
+ * Once a check finds a newer release, a dot on the menu button leads to the side menu's Update
+ * option, which opens the update's dialog in place of the menu.
+ */
+export const OffersTheUpdateFromTheSideMenu: Story = {
+  beforeEach: () => {
+    useUpdateStore.setState({
+      foundUpdate: { version: '0.2.0', notes: '## New features\n\n- Checks for updates' }
+    })
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Open menu' }))
+    await userEvent.click(await page.findByRole('button', { name: 'Update' }))
+
+    await expect(await page.findByRole('dialog', { name: 'Update found!' })).toBeVisible()
+    await waitFor(() =>
+      expect(page.queryByRole('dialog', { name: 'Portable Music Player' })).not.toBeInTheDocument()
+    )
   }
 }
 

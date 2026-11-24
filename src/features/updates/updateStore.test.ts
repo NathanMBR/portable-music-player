@@ -120,3 +120,112 @@ describe('checkByHand', () => {
     expect(useUpdateStore.getState().isChecking).toBe(false)
   })
 })
+
+const offerNewVersion = () => {
+  useUpdateStore.setState({ foundUpdate: NEW_VERSION })
+}
+
+describe('openDialog', () => {
+  it('opens the dialog of the update found', () => {
+    offerNewVersion()
+
+    useUpdateStore.getState().openDialog()
+
+    expect(useUpdateStore.getState().isDialogOpen).toBe(true)
+  })
+})
+
+describe('closeDialog', () => {
+  it('closes the dialog and still offers the update', () => {
+    offerNewVersion()
+    useUpdateStore.getState().openDialog()
+
+    useUpdateStore.getState().closeDialog()
+
+    expect(useUpdateStore.getState()).toMatchObject({
+      isDialogOpen: false,
+      foundUpdate: NEW_VERSION
+    })
+  })
+
+  it('keeps the dialog open while the update downloads', () => {
+    offerNewVersion()
+    useUpdateStore.setState({ isDialogOpen: true, isDownloading: true })
+
+    useUpdateStore.getState().closeDialog()
+
+    expect(useUpdateStore.getState().isDialogOpen).toBe(true)
+  })
+})
+
+describe('skipUpdate', () => {
+  it('stops offering the update and saves its version as skipped', async () => {
+    const saveSettings = vi.fn()
+    mockCommands({ save_settings: saveSettings })
+    offerNewVersion()
+    useUpdateStore.getState().openDialog()
+
+    await useUpdateStore.getState().skipUpdate()
+
+    expect(useUpdateStore.getState()).toMatchObject({ isDialogOpen: false, foundUpdate: null })
+    expect(useSettingsStore.getState().settings.skipUpdateVersion).toBe('0.2.0')
+    expect(saveSettings).toHaveBeenCalledOnce()
+    expect(loggedMessages()).toEqual(['Skipped update to version 0.2.0'])
+  })
+})
+
+describe('downloadUpdate', () => {
+  it('downloads the update and closes the dialog', async () => {
+    const installUpdate = vi.fn()
+    mockCommands({ install_update: installUpdate })
+    offerNewVersion()
+    useUpdateStore.getState().openDialog()
+
+    await useUpdateStore.getState().downloadUpdate()
+
+    expect(installUpdate).toHaveBeenCalledOnce()
+    expect(useUpdateStore.getState()).toMatchObject({ isDialogOpen: false, isDownloading: false })
+  })
+
+  it('still offers the update, until the new version runs', async () => {
+    mockCommands({ install_update: () => undefined })
+    offerNewVersion()
+
+    await useUpdateStore.getState().downloadUpdate()
+
+    expect(useUpdateStore.getState().foundUpdate).toEqual(NEW_VERSION)
+  })
+
+  it('says the update downloads until it ends', async () => {
+    let finishDownload: () => void = () => undefined
+    mockCommands({
+      install_update: () =>
+        new Promise<void>(resolve => {
+          finishDownload = resolve
+        })
+    })
+    offerNewVersion()
+
+    const downloaded = useUpdateStore.getState().downloadUpdate()
+    expect(useUpdateStore.getState().isDownloading).toBe(true)
+
+    finishDownload()
+    await downloaded
+    expect(useUpdateStore.getState().isDownloading).toBe(false)
+  })
+
+  it('keeps the dialog open and notifies why the download failed', async () => {
+    const downloadError =
+      "Couldn't open the download in the browser: No such file or directory (os error 2)"
+    mockCommands({ install_update: failingCommand(downloadError) })
+    offerNewVersion()
+    useUpdateStore.getState().openDialog()
+
+    await useUpdateStore.getState().downloadUpdate()
+
+    expect(useUpdateStore.getState()).toMatchObject({ isDialogOpen: true, isDownloading: false })
+    expect(shownNotifications()).toEqual([
+      { type: 'error', title: "Couldn't download the update", description: downloadError }
+    ])
+  })
+})

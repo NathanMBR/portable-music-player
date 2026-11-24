@@ -16,6 +16,7 @@ import { useIsNewPlaylistButtonShown } from './features/playlists/useIsNewPlayli
 import { SettingsView } from './features/settings/SettingsView/SettingsView'
 import { SongDropDialog } from './features/songDrop/SongDropDialog/SongDropDialog'
 import { SongDropOverlay } from './features/songDrop/SongDropOverlay/SongDropOverlay'
+import { UpdateDialog } from './features/updates/UpdateDialog/UpdateDialog'
 
 // Kept here, where the features meet, so the navigation feature never imports the views it
 // switches between.
@@ -71,6 +72,7 @@ export const App = () => {
       <AudioPlayer />
       <SongDropOverlay />
       <SongDropDialog />
+      <UpdateDialog />
       <NotificationArea bottomClearance={notificationClearance} />
     </>
   )

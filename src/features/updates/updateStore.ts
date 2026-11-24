@@ -3,13 +3,17 @@ import { log } from '../logging/log'
 import { notify, notifyError } from '../notifications/notify'
 import { useSettingsStore } from '../settings/settingsStore'
 import type { FoundUpdate } from './types'
-import { checkForUpdate } from './updatesApi'
+import { checkForUpdate, installUpdate } from './updatesApi'
 
 type UpdateStore = {
   /** Whether a check for a newer release runs. */
   isChecking: boolean
   /** The newer release the last check found, `null` while there's none to offer. */
   foundUpdate: FoundUpdate | null
+  /** Whether the dialog offering the update found is open. */
+  isDialogOpen: boolean
+  /** Whether the update found downloads, which keeps its dialog open. */
+  isDownloading: boolean
   /**
    * Looks for a newer release as the app opens, when the settings say to. A failure is only
    * logged: a flash drive often runs on offline computers, where a notification at every launch
@@ -21,9 +25,23 @@ type UpdateStore = {
    * says so when there's none, and notifies a failure.
    */
   checkByHand: () => Promise<void>
+  openDialog: () => void
+  /** Closes the dialog, except while the update downloads, and still offers the update. */
+  closeDialog: () => void
+  /**
+   * Stops offering the update found, and saves its version as skipped, so the check at launch
+   * passes over it.
+   */
+  skipUpdate: () => Promise<void>
+  /**
+   * Downloads the update found, then closes its dialog. The update is still offered until the new
+   * version runs, since a portable build's download only opens in the browser. A failure keeps the
+   * dialog open and notifies why.
+   */
+  downloadUpdate: () => Promise<void>
 }
 
-export const useUpdateStore = create<UpdateStore>()(set => {
+export const useUpdateStore = create<UpdateStore>()((set, get) => {
   const findUpdate = async () => {
     set({ isChecking: true })
     try {
@@ -38,6 +56,8 @@ export const useUpdateStore = create<UpdateStore>()(set => {
   return {
     isChecking: false,
     foundUpdate: null,
+    isDialogOpen: false,
+    isDownloading: false,
     checkAtLaunch: async () => {
       if (!useSettingsStore.getState().settings.checksForUpdates) {
         return
@@ -57,6 +77,32 @@ export const useUpdateStore = create<UpdateStore>()(set => {
         }
       } catch (error) {
         notifyError("Couldn't check for updates", error)
+      }
+    },
+    openDialog: () => set({ isDialogOpen: true }),
+    closeDialog: () => {
+      if (!get().isDownloading) {
+        set({ isDialogOpen: false })
+      }
+    },
+    skipUpdate: async () => {
+      const { foundUpdate } = get()
+      if (!foundUpdate) {
+        return
+      }
+      log(`Skipped update to version ${foundUpdate.version}`)
+      set({ foundUpdate: null, isDialogOpen: false })
+      await useSettingsStore.getState().setSkipUpdateVersion(foundUpdate.version)
+    },
+    downloadUpdate: async () => {
+      set({ isDownloading: true })
+      try {
+        await installUpdate()
+        set({ isDialogOpen: false })
+      } catch (error) {
+        notifyError("Couldn't download the update", error)
+      } finally {
+        set({ isDownloading: false })
       }
     }
   }

@@ -45,7 +45,10 @@
       "requireSignedVersion": true,
       "endpoints": [
         "https://github.com/NathanMBR/portable-music-player/releases/latest/download/latest.json"
-      ]
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

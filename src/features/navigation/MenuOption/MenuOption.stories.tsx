@@ -1,4 +1,4 @@
-import { Cog6ToothIcon, MusicalNoteIcon } from '@heroicons/react/20/solid'
+import { ArrowDownTrayIcon, Cog6ToothIcon, MusicalNoteIcon } from '@heroicons/react/20/solid'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'
 import { MenuOption } from './MenuOption'
@@ -35,5 +35,17 @@ export const Current: Story = {
       'aria-current',
       'page'
     )
+  }
+}
+
+/**
+ * An option that leads to something new, like an update found, has a dot on its icon's corner. Its
+ * name stays the same.
+ */
+export const WithNotificationDot: Story = {
+  args: { icon: ArrowDownTrayIcon, label: 'Update', hasNotificationDot: true },
+  play: async ({ canvas }) => {
+    const option = canvas.getByRole('button', { name: 'Update' })
+    await expect(option.querySelector('[data-notification-dot]')).toBeVisible()
   }
 }

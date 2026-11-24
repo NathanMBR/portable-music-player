@@ -1,15 +1,39 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
-import { XMarkIcon } from '@heroicons/react/20/solid'
+import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { IconButton } from '../../../components/IconButton/IconButton'
 import { APP_TITLE_LINES } from '../../../constants'
 import { ThemeToggle } from '../../settings/ThemeToggle/ThemeToggle'
+import { useUpdateStore } from '../../updates/updateStore'
 import { CategoryList } from '../CategoryList/CategoryList'
+import { MenuOption } from '../MenuOption/MenuOption'
 import { useNavigationStore } from '../navigationStore'
+
+// Not a page: it opens the update's dialog, once the menu is closed, so the two never stack.
+const UpdateOption = () => {
+  const hasUpdate = useUpdateStore(state => state.foundUpdate !== null)
+  const openDialog = useUpdateStore(state => state.openDialog)
+  const closeMenu = useNavigationStore(state => state.closeMenu)
+
+  if (!hasUpdate) {
+    return null
+  }
+  const openUpdate = () => {
+    closeMenu()
+    openDialog()
+  }
+  return (
+    <div className="mt-1">
+      <MenuOption icon={ArrowDownTrayIcon} label="Update" hasNotificationDot onClick={openUpdate} />
+    </div>
+  )
+}
 
 /**
  * Drawer that slides in from the left over a dimmed page, with the app's name, the categories and
- * the theme toggle. Its close button sits exactly where the menu button was. It closes with that
- * button, Escape, a click outside, or by choosing a category.
+ * the theme toggle. While an update is offered, an Update option follows the categories, with a
+ * dot on its icon, and opens the update's dialog. Its close button sits exactly where the menu
+ * button was. It closes with that button, Escape, a click outside, by choosing a category, or with
+ * Update.
  *
  * @summary Side menu drawer
  */
@@ -47,6 +71,7 @@ export const SideMenu = () => {
         </div>
         <div className="mt-8">
           <CategoryList />
+          <UpdateOption />
         </div>
         <div className="mt-auto border-t border-rule pt-4">
           <ThemeToggle />

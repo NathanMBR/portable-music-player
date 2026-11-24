@@ -14,9 +14,10 @@ type ScrollBoxProps = {
 // scrollbar's usual space at the bottom is dropped, and a little from its right side.
 const BOX_CLASSES = 'mt-3 rounded-md border border-rule py-2 pr-1'
 
-// The content has the focus, but the ring goes around the box, like FOCUS_CLASSES' ring.
+// The content has the focus, but the ring goes around the box, like FOCUS_CLASSES' ring. Only the
+// content itself rings the box: a control inside it, like a link, rings only itself.
 const BOX_FOCUS_CLASSES =
-  'has-data-focus:outline-2 has-data-focus:outline-solid has-data-focus:outline-offset-2 has-data-focus:outline-pen'
+  'has-[>[data-focus]]:outline-2 has-[>[data-focus]]:outline-solid has-[>[data-focus]]:outline-offset-2 has-[>[data-focus]]:outline-pen'
 
 // Room for six lines and part of a seventh, so longer content shows it scrolls, even in a small
 // window.

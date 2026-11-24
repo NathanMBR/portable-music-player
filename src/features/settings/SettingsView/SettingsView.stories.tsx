@@ -14,6 +14,7 @@ const SAVE_ERROR =
 const DEFAULT_SETTINGS: Settings = {
   theme: null,
   checksForUpdates: true,
+  skipUpdateVersion: null,
   songOrder: 'title',
   playback: {
     volume: 1,

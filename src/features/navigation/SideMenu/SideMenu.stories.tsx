@@ -2,12 +2,19 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, waitFor, within } from 'storybook/test'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
+import { useUpdateStore } from '../../updates/updateStore'
 import { MenuButton } from '../MenuButton/MenuButton'
 import { useNavigationStore } from '../navigationStore'
 import { SideMenu } from './SideMenu'
 
 const openMenu = () => {
   useNavigationStore.setState({ isMenuOpen: true })
+}
+
+const offerUpdate = () => {
+  useUpdateStore.setState({
+    foundUpdate: { version: '0.2.0', notes: '## New features\n\n- Checks for updates' }
+  })
 }
 
 const meta = {
@@ -51,6 +58,41 @@ export const Open: Story = {
     // The drawer renders in a portal on <body>, outside the story's canvas.
     const page = within(canvasElement.ownerDocument.body)
     await expect(await page.findByRole('dialog', { name: 'Portable Music Player' })).toBeVisible()
+    await expect(page.queryByRole('button', { name: 'Update' })).not.toBeInTheDocument()
+  }
+}
+
+/**
+ * Once a check finds a newer release, an Update option follows the categories, with a dot on its
+ * icon like the menu button's. It isn't a page, so it sits outside the categories' navigation.
+ */
+export const UpdateFound: Story = {
+  beforeEach: () => {
+    openMenu()
+    offerUpdate()
+  },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const update = await page.findByRole('button', { name: 'Update' })
+    await expect(update).toBeVisible()
+    await expect(update.querySelector('[data-notification-dot]')).toBeVisible()
+    await expect(within(page.getByRole('navigation')).queryByText('Update')).toBeNull()
+  }
+}
+
+/** Update opens the dialog of the update found, in place of the menu, which closes. */
+export const OpeningTheUpdate: Story = {
+  beforeEach: () => {
+    openMenu()
+    offerUpdate()
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+
+    await userEvent.click(await page.findByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(page.queryByRole('dialog')).not.toBeInTheDocument())
+    await expect(useUpdateStore.getState().isDialogOpen).toBe(true)
   }
 }
 

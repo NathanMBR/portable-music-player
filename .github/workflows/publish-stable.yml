@@ -74,6 +74,8 @@ jobs:
           releaseDraft: true
           prerelease: false
           releaseCommitish: ${{ github.event.workflow_run.head_sha }}
+          # The app's download of a portable build links to these names (download_url in updates.rs).
+          releaseAssetNamePattern: '[mainBinaryName]_[version]_[platform]_[arch][setup][ext]'
           # The bare executables are the player's portable builds.
           uploadPlainBinary: true
           # latest.json, which the app's update check reads.

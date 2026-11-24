@@ -18,6 +18,8 @@ pub struct Settings {
     theme: Option<Theme>,
     /// Whether the player looks for a newer release each time it opens.
     checks_for_updates: bool,
+    /// The version of the release the user skipped, which the check at launch no longer offers.
+    skip_update_version: Option<String>,
     song_order: SongOrder,
     playback: SavedPlayback,
 }
@@ -27,6 +29,7 @@ impl Default for Settings {
         Self {
             theme: None,
             checks_for_updates: true,
+            skip_update_version: None,
             song_order: SongOrder::default(),
             playback: SavedPlayback::default(),
         }
@@ -192,6 +195,7 @@ mod tests {
         let settings: Settings = serde_json::from_str(r#"{"theme":"dark"}"#).unwrap();
 
         assert!(settings.checks_for_updates);
+        assert_eq!(settings.skip_update_version, None);
         assert_eq!(settings.song_order, SongOrder::Title);
     }
 
@@ -263,6 +267,13 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_skipped_update() {
+        let settings: Settings = serde_json::from_str(r#"{"skipUpdateVersion":"0.2.0"}"#).unwrap();
+
+        assert_eq!(settings.skip_update_version.as_deref(), Some("0.2.0"));
+    }
+
+    #[test]
     fn missing_file_gives_defaults() {
         let (_test_dir, path) = temporary_settings_path();
         let settings = read_settings(&path).unwrap();
@@ -275,6 +286,7 @@ mod tests {
         let saved = Settings {
             theme: Some(Theme::Light),
             checks_for_updates: false,
+            skip_update_version: Some("0.2.0".to_owned()),
             song_order: SongOrder::FileName,
             playback: SavedPlayback {
                 volume: 0.65,
@@ -320,6 +332,7 @@ mod tests {
         let chosen = Settings {
             theme: Some(Theme::Dark),
             checks_for_updates: false,
+            skip_update_version: Some("0.2.0".to_owned()),
             song_order: SongOrder::FileName,
             playback: SavedPlayback {
                 volume: 0.8,
@@ -339,6 +352,7 @@ mod tests {
             serde_json::json!({
                 "theme": null,
                 "checksForUpdates": true,
+                "skipUpdateVersion": null,
                 "songOrder": "title",
                 "playback": {
                     "volume": 1.0,
@@ -354,6 +368,7 @@ mod tests {
             serde_json::json!({
                 "theme": "dark",
                 "checksForUpdates": false,
+                "skipUpdateVersion": "0.2.0",
                 "songOrder": "fileName",
                 "playback": {
                     "volume": 0.8,

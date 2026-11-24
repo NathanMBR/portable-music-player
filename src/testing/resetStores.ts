@@ -7,6 +7,7 @@ import { usePlaybackStore } from '../features/playback/playbackStore'
 import { usePlaylistsStore } from '../features/playlists/playlistsStore'
 import { useSettingsStore } from '../features/settings/settingsStore'
 import { useSongDropStore } from '../features/songDrop/songDropStore'
+import { useUpdateStore } from '../features/updates/updateStore'
 import { forgetLoggedMessages } from './logs'
 
 const resetStore = <State>(store: StoreApi<State>) => store.setState(store.getInitialState(), true)
@@ -24,6 +25,7 @@ export const resetStores = () => {
   resetStore(usePlaylistsStore)
   resetStore(useSettingsStore)
   resetStore(useSongDropStore)
+  resetStore(useUpdateStore)
   toast.dismiss()
   forgetLoggedMessages()
 }

@@ -127,9 +127,9 @@ open the same dialog as "Edit playlist",
 filled with the playlist's values: the songs still picked keep their place, and the newly picked
 ones follow.
 
-**Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default
-(nothing searches yet: only the choice is saved), and a choice to sort the songs by filename or by
-title (`Select`). Each option is a card (`SettingCard`), its label at the left and its control at
+**Settings** (`SettingsView`) holds a switch to search automatically for updates, on by default,
+which has the app look for a newer release each time it opens, and a choice to sort the songs by
+filename or by title (`Select`). Each option is a card (`SettingCard`), its label at the left and its control at
 the right. Each choice applies at once and is saved in `settings.json`; if saving fails, the choice
 still applies and a notification says why.
 

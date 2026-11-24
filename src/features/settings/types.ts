@@ -31,7 +31,7 @@ export type SavedPlayback = {
 export type Settings = {
   /** `null` until the user picks one, which means following the OS. */
   theme: Theme | null
-  /** Whether the player looks for new versions on its own. Nothing acts on it yet. */
+  /** Whether the player looks for a newer release each time it opens. */
   checksForUpdates: boolean
   songOrder: SongOrder
   playback: SavedPlayback

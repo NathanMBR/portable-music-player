@@ -16,7 +16,7 @@ const FULL_VOLUME: f64 = 1.0;
 pub struct Settings {
     /// `None` until the user picks one, which means following the OS.
     theme: Option<Theme>,
-    /// Whether the player looks for new versions on its own. Nothing acts on it yet.
+    /// Whether the player looks for a newer release each time it opens.
     checks_for_updates: bool,
     song_order: SongOrder,
     playback: SavedPlayback,

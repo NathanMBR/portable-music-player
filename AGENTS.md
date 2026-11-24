@@ -58,6 +58,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - pages: the navigation store logs them when the category changes;
   - playlists: the playlists store logs one created, opened, deleted or brought back, and a song moved, removed or put back;
   - drops: the song drop store logs the songs a drop holds and the songs it copied;
+  - updates: the update store logs what each check found, and a check at launch that failed;
   - Rust logs the app's opening and closing (see `logs.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
@@ -70,8 +71,8 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
 .storybook/             Storybook config: main.ts (addons, components manifest), preview.tsx (app CSS,
                         theme toolbar, fake Rust commands, store reset, a11y checks)
 src/
-  main.tsx              entry: font + CSS imports, restores settings, starts the first library scan, lists the
-                        playlists, renders <App />
+  main.tsx              entry: font + CSS imports, restores settings, checks for updates, starts the first
+                        library scan, lists the playlists, renders <App />
   App.tsx               page shell
   index.css             Tailwind import, @theme design tokens, dark overrides, base styles
   constants.ts          app-wide constants (APP_TITLE_LINES); feature constants live in their feature
@@ -109,8 +110,11 @@ src/
   - An inline script in `index.html` sets the attribute from the OS before the first paint.
   - `src/features/settings/settingsStore.ts` then applies the saved theme, if there is one, and the toggle saves new choices.
 - Settings: `settingsStore.ts` holds the settings of `settings.json` (theme, `checksForUpdates`, `songOrder`, and the player's state in `playback`) and saves each choice as it's made. The Settings view (`SettingsView`) shows the update search and song order, each in a `SettingCard` (label at the left, control at the right); the theme toggle stays in the side menu.
-  - Nothing searches for updates yet: `checksForUpdates` (on by default) is only a saved choice.
+  - `checksForUpdates` (on by default) has the app look for a newer release each time it opens (see Updates).
   - The library store keeps the songs in the order Rust lists them, and the Songs view sorts them (`sortTracks.ts`) as `songOrder` says: by title (the default), or by file name without its extension. Sorting at render applies a new order at once, and still sorts the first scan when the settings load after it.
+- Updates: the update store (`src/features/updates/updateStore.ts`) looks for a newer stable release through Rust's `check_for_update` (`updates.rs`), and keeps the one it finds (`foundUpdate`).
+  - `main.tsx` calls `checkAtLaunch` once the settings load, and it checks only while `checksForUpdates` is on.
+  - A check at launch that fails is only logged, never notified: a flash drive often runs on offline computers, where a notification at every launch would nag.
 - Navigation: `src/features/navigation/categories.ts` lists the side menu's categories. `App.tsx` maps each category id to its view, so navigation never imports feature views. `App.tsx` also renders `MenuButton` in the views' left margin, so views never include it. Every view is a `ViewLayout` (`src/components/`) with a `ViewHeader`, which keep equal side margins with `px-gutter` (the `gutter` spacing token), so nothing sits under the button. Every header looks the same: the view's icon, title and buttons above the rule, nothing else; anything more about the view, like the Songs view's song count, goes below the rule, at the top of its content (`StatusLine`). A page inside a category, like a playlist, has a back button in the icon's place (`back`). A view with nothing to list says so in its middle (`EmptyState`). A new category is one entry in `CATEGORIES` plus one view in `viewByCategory`.
 - Scrolling: the window never scrolls. `App.tsx` makes the page exactly the window's height, and each view keeps its header in place and scrolls only the content below it (`main`).
   - The app draws every scrollbar itself: `::-webkit-scrollbar` base styles in `src/index.css`, `scrollbar` spacing token for the width. WebKitGTK and WebView2 both draw those, and WebView2 would ignore them if `scrollbar-color` or `scrollbar-width` were set.
@@ -188,7 +192,7 @@ src/
   - Its threads must never panic: the release build aborts on panic, which would kill the app. A failed write only means the webview let go of the song.
   - Responses carry `Cache-Control: no-store`, so the webview doesn't copy songs into its cache on the computer.
 - `settings.rs`: user settings in `settings.json` next to the executable.
-  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default, not acted on yet), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name, position and the file name of the playlist it plays from, `SavedSong`, whose `playlist` is `None` from the Songs view or in a file saved before it existed).
+  - It holds the theme, whether to search for updates (`checks_for_updates`, on by default), the songs' order (`SongOrder`: title by default, or file name) and what the player was left with (`SavedPlayback`: volume, `is_muted`, `RepeatMode`, shuffle, and the song as its file name, position and the file name of the playlist it plays from, `SavedSong`, whose `playlist` is `None` from the Songs view or in a file saved before it existed).
   - A missing file gives the defaults, and `#[serde(default)]` keeps older files loading when fields are added, with the `Default` impl's values.
   - Saves go through `write_atomically` (`atomic_write.rs`), so pulling the drive mid-save can't corrupt it.
 - `song_drop.rs`: adds the songs of a drop to the Songs folder, through `check_dropped_songs` and `copy_dropped_songs`.
@@ -364,6 +368,9 @@ Every feature logs what the user does and what the app does in response, followi
 | The app opens and closes | `Opening app`, `Closing app` |
 | Rust finds songs of a playlist missing, when its file said they were all there or is new | `Found <count> songs missing from playlist "<title>"`, e.g. `Found 1 song missing from playlist "Road trip"` |
 | Rust finds every song of a playlist whose file said some were missing | `Found every song of playlist "<title>"` |
+| A check for updates finds a newer release | `Found update to version <version>`, e.g. `Found update to version 0.2.0` |
+| A check for updates finds none | `Found no update` |
+| The check for updates at launch fails | `Couldn't check for updates: <reason>`, the error Rust sent |
 
 - `<name>` is the control's accessible name, as screen readers hear it.
 - Buttons need no code of their own: `buttonLog.ts` logs them all. Give a two-state toggle `isPressed`, and a button with three or more states `state` (`IconButton`), so the log knows which pattern it follows. Selects built on `Select` log their opening, choice and closing on their own, menus built on `ActionMenu` their opening and closing, radio groups built on `RadioGroup` their choice, and checkboxes built on `Checkbox` their toggles.

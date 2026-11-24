@@ -11,6 +11,7 @@ import { connectWindowTitle } from './features/playback/windowTitle'
 import { usePlaylistsStore } from './features/playlists/playlistsStore'
 import { useSettingsStore } from './features/settings/settingsStore'
 import { connectSongDrop } from './features/songDrop/songDropEvents'
+import { useUpdateStore } from './features/updates/updateStore'
 import './index.css'
 
 // Runs once per launch; a mount effect would run twice in development under StrictMode.
@@ -23,6 +24,8 @@ connectWindowTitle()
 connectMediaSession()
 connectButtonLog()
 connectSongDrop()
+// Waits for the settings, which say whether to look for a newer release.
+void settingsLoaded.then(() => useUpdateStore.getState().checkAtLaunch())
 // The player's song is found among the scanned ones, in its playlist, and the player is saved only
 // once it's back.
 void Promise.all([settingsLoaded, libraryScanned, playlistsListed]).then(() => {

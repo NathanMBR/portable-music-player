@@ -36,7 +36,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 `pnpm test:report` runs `test/generate_test_report.sh`: Vitest writes a single-file HTML report to `private/test-report/typescript/index.html` (the `test-report` mode in `vite.config.ts`, through `@vitest/ui`), and nextest writes a JUnit report of the Rust tests, copied to `private/test-report/rust/junit.xml` (the `report` profile in `src-tauri/.config/nextest.toml`). Both suites always run, so one failing still reports the other. It needs cargo-nextest once per machine: `cargo install cargo-nextest --locked`.
 
 In dev the executable is `src-tauri/target/debug/portable-music-player`, so the app's `Songs` and `Logs` folders are `src-tauri/target/debug/Songs` and `src-tauri/target/debug/Logs` (gitignored). CI (`.github/workflows/quality-assurance.yml`) runs `pnpm lint:ci`, `pnpm test:ts` and `cargo test` on every push to `master` and `development`. `lint:ci` is only for that workflow; when working locally, always use `pnpm lint` so issues get fixed. Two workflows, each a copy of Tauri's official publish workflow, build the Linux (`ubuntu-22.04`) and Windows (`windows-latest`) releases: the bare executables, the AppImage, the Windows installers and the updater's `latest.json`. They differ only in their trigger and release settings, so a change to the build goes in both:
-- `publish-stable.yml`, when Quality Assurance passes on a push to `master` (`workflow_run`, so it builds and tags the commit QA tested): a draft release tagged `v<version>`, its files named `<binary>_<version>_<platform>_<arch>[-setup]<ext>` (`releaseAssetNamePattern`), the names a portable build's download links to (`download_url` in `updates.rs`);
+- `publish-stable.yml`, when Quality Assurance passes on a push to `master` (`workflow_run`, so it builds and tags the commit QA tested): a draft release tagged `v<version>`, whose description, and `latest.json`'s `notes`, are the version's patch notes (`patch-notes/v<major>-<minor>-<patch>.md`, read by its first step, which fails the build when the file is missing; see Releases), its files named `<binary>_<version>_<platform>_<arch>[-setup]<ext>` (`releaseAssetNamePattern`), the names a portable build's download links to (`download_url` in `updates.rs`);
 - `publish-unstable.yml`, on every push to `development`, without waiting for Quality Assurance: a pre-release tagged `v<version>-unstable.<run id>.<run attempt>`, with `unstable` and `<run id>_<run attempt>` (just before the extension) in every file name, so downloads of different builds never overwrite each other.
 
 Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets, and turn on `bundle.createUpdaterArtifacts` only in their build command, so a local `pnpm tauri build` needs no key. Signing requires the matching public key in `plugins.updater.pubkey` of `tauri.conf.json`: without it, bundling fails with `plugins > updater doesn't exist`. The app checks the stable releases only (see `updates.rs`): the unstable ones upload a `latest.json` too, which it never reads.
@@ -266,6 +266,7 @@ These follow from the project goal and are easy to get wrong:
   - stories that set store state use `renderInOwnFrame`, so they don't overwrite each other on Docs pages;
 - MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
 - `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
+- `patch-notes/` holds the patch notes of each stable release, one Markdown file per version, written when it's released (see Releases).
 - `private/` holds the user's own files and the generated test reports. Git tracks only its `.gitignore`, which ignores everything else in it. `private/tests.html` is a hand-written guide to the tests: never update it, even when the tests change, unless the user asks for it.
 - Update the stories, the docs and the README in the same change as the feature.
 
@@ -342,6 +343,17 @@ Features and fixes are developed test first. A test states a rule the system mus
 - There's no need to run them again before committing: the CI workflow runs every test on every push.
 
 Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
+
+## Releases
+
+A stable release is made by hand, in these steps:
+
+1. **Find the last stable release**: `git fetch --tags`, then the newest tag without a suffix, `git tag --list 'v*' --sort=-v:refname | grep -v -- - | head -1`. Unstable releases' tags carry `-unstable.`, and a draft gets its tag only once it's published. With no stable tag yet, the release covers the whole history.
+2. **Summarize the changes since then** from the commits: `git log <tag>..development --no-merges --format=%s` (or `development` alone with no tag). Write each change once, for the player's users: what changed for them, not how, in the README's plain style, with no commit types or hashes. Merge the commits of one change into one line, and condense the rest, like refactors, tests and CI, into a few lines.
+3. **Group them**: `feat` commits under **New features**, `fix` commits under **Bug fixes**, everything else under **Other**. Leave out a group with nothing in it.
+4. **Pick the version**, in semver: a breaking change raises the major, a new feature the minor, only fixes the patch. Set it in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` (then `cargo check --manifest-path src-tauri/Cargo.toml` updates `Cargo.lock`) and `package.json` (`pnpm version <version> --no-git-tag-version`). The tag, the release's name and the notes' file name all come from it.
+5. **Write the patch notes** in `patch-notes/v<major>-<minor>-<patch>.md`, at the repository's root, e.g. `patch-notes/v1-0-0.md` for 1.0.0: a `## New features`, `## Bug fixes` and `## Other` heading for each group, in that order, each followed by `- ` items, and no title, since the release's name says the version. The update dialog renders them as Markdown (`PatchNotes`), without images or HTML, and links open in the browser.
+6. **Commit** (`chore: release v<version>`), merge `development` into `master` and push. `publish-stable.yml` then builds the draft release, with the notes as its description and as `latest.json`'s `notes`, and fails if the notes' file is missing. Publish the draft by hand on GitHub: only then is it the latest release, the one the app's update check reads.
 
 ## Logging
 

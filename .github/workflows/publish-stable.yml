@@ -1,6 +1,8 @@
 # Tauri's official publish workflow (https://v2.tauri.app/distribute/pipelines/github/): every push
 # to master that passes Quality Assurance builds the Linux and Windows releases into a stable
-# release, kept as a draft until it's published by hand. macOS isn't a target of the player.
+# release, kept as a draft until it's published by hand. Its description, and latest.json's notes,
+# which the app's update dialog shows, are the version's patch notes, written by hand (see Releases
+# in AGENTS.md). macOS isn't a target of the player.
 name: 'publish stable'
 
 # Starts when Quality Assurance finishes on master, and builds only if it passed. A workflow_run
@@ -29,6 +31,26 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+
+      # First, so a release without patch notes fails before anything is built.
+      - name: read the patch notes
+        id: patch-notes
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          notes_file="patch-notes/v${version//./-}.md"
+          if [ ! -f "$notes_file" ]; then
+            echo "::error file=$notes_file::No patch notes for version $version: write $notes_file (see Releases in AGENTS.md)."
+            exit 1
+          fi
+          # A random delimiter, so no line of the notes can end the output early.
+          delimiter="NOTES_$(node -p "require('crypto').randomUUID()")"
+          {
+            echo "notes<<$delimiter"
+            cat "$notes_file"
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
 
       # GStreamer's base and good plugins play MP3 in WebKitGTK. The AppImage bundles the ones
       # installed here (bundleMediaFramework in tauri.conf.json).
@@ -70,7 +92,8 @@ jobs:
         with:
           tagName: 'v__VERSION__'
           releaseName: 'Portable Music Player v__VERSION__'
-          releaseBody: 'Run the bare executable for your OS, or the AppImage on Linux, from any folder, like a flash drive: nothing to install. The Windows installers are attached too.'
+          # Also latest.json's notes.
+          releaseBody: ${{ steps.patch-notes.outputs.notes }}
           releaseDraft: true
           prerelease: false
           releaseCommitish: ${{ github.event.workflow_run.head_sha }}

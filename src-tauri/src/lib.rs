@@ -2,11 +2,14 @@ mod atomic_write;
 mod library;
 mod logs;
 mod main_window;
+mod playback;
 mod playlists;
 mod portable;
 mod settings;
 mod song_drop;
 mod song_server;
+#[cfg(test)]
+mod test_songs;
 mod updates;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

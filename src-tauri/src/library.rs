@@ -361,17 +361,7 @@ mod tests {
     };
 
     use super::*;
-
-    /// Two silent MPEG-1 Layer III frames (128 kbit/s, 44.1 kHz): the shortest audio lofty decodes
-    /// as MP3, since it checks a frame against the next one.
-    fn silent_audio() -> Vec<u8> {
-        const FRAME_HEADER: [u8; 4] = [0xFF, 0xFB, 0x90, 0x64];
-        const FRAME_LENGTH: usize = 417;
-        const FRAME_COUNT: usize = 2;
-        let mut frame = vec![0; FRAME_LENGTH];
-        frame[..FRAME_HEADER.len()].copy_from_slice(&FRAME_HEADER);
-        frame.repeat(FRAME_COUNT)
-    }
+    use crate::test_songs::silent_audio;
 
     /// The bytes of `tag`, as lofty writes it into a file.
     fn bytes_of(tag: &Tag) -> Vec<u8> {

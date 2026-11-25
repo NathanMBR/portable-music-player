@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use serde::Deserialize;
 use tauri_plugin_log::log;
 
 use super::{
@@ -17,8 +18,9 @@ use super::{
 };
 
 /// A song the webview asks to play or queue.
-#[derive(Clone, Debug, PartialEq)]
-pub(super) struct SongRequest {
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SongRequest {
     pub(super) id: SongId,
     /// The track's path, `Songs/<file name>`.
     pub(super) path: String,
@@ -48,7 +50,7 @@ pub(super) struct ChainStart {
 
 /// An output's stream failed, as when its device was unplugged.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct OutputLost {
+pub(super) struct StreamFailure {
     pub(super) chain: u64,
     pub(super) reason: String,
 }
@@ -63,12 +65,12 @@ pub(super) struct OpenedOutput {
 /// Opens the sound output: cpal in the app, a fake in tests.
 pub(super) trait OutputOpener: Send + Sync {
     /// Opens the default device at `sample_rate`, or at its own rate when it refuses it, with a
-    /// song chain from `chain` running in its callback. The stream's errors go to `lost`.
+    /// song chain from `chain` running in its callback. The stream's errors go to `failures`.
     fn open(
         &self,
         sample_rate: u32,
         chain: ChainStart,
-        lost: Sender<OutputLost>,
+        failures: Sender<StreamFailure>,
     ) -> Result<OpenedOutput, PlaybackError>;
 
     /// The default device, to notice when it changes.
@@ -114,7 +116,7 @@ pub(super) struct Engine {
     opener: Box<dyn OutputOpener>,
     events: Arc<dyn PlaybackEvents>,
     chain_events: SyncSender<ChainEvent>,
-    output_lost: Sender<OutputLost>,
+    stream_failures: Sender<StreamFailure>,
     state: Mutex<EngineState>,
 }
 
@@ -304,13 +306,13 @@ impl Engine {
         opener: Box<dyn OutputOpener>,
         events: Arc<dyn PlaybackEvents>,
         chain_events: SyncSender<ChainEvent>,
-        output_lost: Sender<OutputLost>,
+        stream_failures: Sender<StreamFailure>,
     ) -> Self {
         Self {
             opener,
             events,
             chain_events,
-            output_lost,
+            stream_failures,
             state: Mutex::new(EngineState {
                 output: None,
                 current: None,
@@ -430,7 +432,7 @@ impl Engine {
         };
         let opened = self
             .opener
-            .open(sample_rate, chain, self.output_lost.clone())?;
+            .open(sample_rate, chain, self.stream_failures.clone())?;
         log::info!(
             "Opened sound output \"{}\" at {} Hz",
             opened.device_name,
@@ -637,12 +639,12 @@ impl Engine {
         }
     }
 
-    pub(super) fn handle_output_lost(&self, lost: OutputLost) {
+    pub(super) fn handle_stream_failure(&self, failure: StreamFailure) {
         let mut state = self.lock();
         let Some(output) = state
             .output
             .as_ref()
-            .filter(|output| output.number == lost.chain)
+            .filter(|output| output.number == failure.chain)
         else {
             return;
         };
@@ -804,7 +806,7 @@ mod tests {
             &self,
             sample_rate: u32,
             chain: ChainStart,
-            _lost: Sender<OutputLost>,
+            _failures: Sender<StreamFailure>,
         ) -> Result<OpenedOutput, PlaybackError> {
             let mut devices = self.0.lock();
             let Some(device) = devices.default_device.clone() else {
@@ -909,12 +911,12 @@ mod tests {
             let devices = Arc::new(FakeDevices::default());
             let events = Arc::new(RecordedEvents::default());
             let (chain_events, chain_event_receiver) = SongChain::event_channel();
-            let (output_lost, _) = mpsc::channel();
+            let (stream_failures, _) = mpsc::channel();
             let engine = Engine::new(
                 Box::new(FakeOpener(Arc::clone(&devices))),
                 Arc::clone(&events) as Arc<dyn PlaybackEvents>,
                 chain_events,
-                output_lost,
+                stream_failures,
             );
             Self {
                 engine,
@@ -1198,7 +1200,7 @@ mod tests {
         test.play(1, "Sad but True.mp3", true);
 
         test.devices.lock().default_device = None;
-        test.engine.handle_output_lost(OutputLost {
+        test.engine.handle_stream_failure(StreamFailure {
             chain: 1,
             reason: "The device was unplugged".to_owned(),
         });
@@ -1217,7 +1219,7 @@ mod tests {
 
         test.engine
             .handle_chain_event(ChainEvent::Ended { chain: 99, id: 1 });
-        test.engine.handle_output_lost(OutputLost {
+        test.engine.handle_stream_failure(StreamFailure {
             chain: 99,
             reason: "Gone".to_owned(),
         });

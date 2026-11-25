@@ -153,6 +153,24 @@ describe('loadCover', () => {
     )
     expect(heldBytes.size).toBe(MAX_CACHED_COVERS)
   })
+
+  it('keeps knowing which songs have no cover however many covers it frees', async () => {
+    const withoutCover = pathOf('One')
+    const trackNumbered = (number: number) =>
+      pathOf(`${String(number).padStart(3, '0')} I Love You`)
+    mockCommands({
+      read_cover: args => (requestedPath(args) === withoutCover ? NO_COVER : readEachCover(args))
+    })
+
+    await loadCover(withoutCover)
+    for (let number = 1; number <= MAX_CACHED_COVERS; number++) {
+      await loadCover(trackNumbered(number))
+    }
+
+    expect(coverOf(withoutCover)).toEqual({ kind: 'missing' })
+    expect(await shownText(trackNumbered(1))).toBe(`the front cover of ${trackNumbered(1)}`)
+    expect(heldBytes.size).toBe(MAX_CACHED_COVERS)
+  })
 })
 
 describe('dropUnreadableCover', () => {

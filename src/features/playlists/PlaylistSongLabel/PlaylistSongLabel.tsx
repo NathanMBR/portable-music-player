@@ -22,7 +22,7 @@ export const PlaylistSongLabel = ({ song, isInPlayer = false }: PlaylistSongLabe
   if (song.track) {
     return (
       <>
-        <CoverThumbnail path={song.track.path} />
+        <CoverThumbnail paths={[song.track.path]} />
         <TrackName track={song.track} isInPlayer={isInPlayer} />
       </>
     )

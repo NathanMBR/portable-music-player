@@ -30,7 +30,7 @@ export const TrackRow = ({ track, onPlay }: TrackRowProps) => {
   return (
     <ListRow isCurrent={isInPlayer}>
       <PlayButton track={track} source={SONGS_SOURCE} onPlay={onPlay} />
-      <CoverThumbnail path={track.path} />
+      <CoverThumbnail paths={[track.path]} />
       <TrackName track={track} isInPlayer={isInPlayer} />
     </ListRow>
   )

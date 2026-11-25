@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { InvokeArgs } from '@tauri-apps/api/core'
 import { expect, fn, waitFor, within } from 'storybook/test'
+import { drawCover, noCover, UNTIL_COVER_SHOWS } from '../../../testing/covers'
 import { loggedMessages } from '../../../testing/logs'
 import { mockCommands } from '../../../testing/mockCommands'
 import { renderInOwnFrame } from '../../../testing/storyParameters'
@@ -44,6 +45,21 @@ const shiftMissing = () => {
 // Rust finds every song again.
 const checkPlaylist = fn((_args?: InvokeArgs) => ({ playlist: cityLights, missingSongs: [] }))
 
+const requestedPath = (args?: InvokeArgs) => (args as { path: string }).path
+
+// None of the playlist's songs has a cover.
+const readNoCover = fn(noCover)
+
+// Know has no cover, and the songs after it each have one.
+const readCoversAfterKnow = fn((args?: InvokeArgs) =>
+  requestedPath(args) === know.path ? noCover() : drawCover()
+)
+
+/** The square before the playlist's name, where a song's row shows its cover. */
+const squareIn = (canvasElement: HTMLElement) =>
+  within(canvasElement).getByRole('button', { name: 'See City lights' }).parentElement
+    ?.previousElementSibling ?? null
+
 /** Where a real click at the middle of the element lands, whatever covers it. */
 const elementAtTheMiddleOf = (element: Element) => {
   const box = element.getBoundingClientRect()
@@ -82,6 +98,7 @@ const meta = {
   beforeEach: () => {
     usePlaylistsStore.setState({ playlists: [cityLights], loadStatus: 'loaded' })
     scanned([know, stealingSociety, wutheringHeights, shift])
+    mockCommands({ read_cover: noCover })
   }
 } satisfies Meta<typeof PlaylistRow>
 
@@ -89,9 +106,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Its play button, the square of the Playlists icon, the title and description, then the menu of
- * what can be done to it at the right end. The whole row is a button that opens the playlist, and
- * hovering it shows the name whole.
+ * Its play button, the square of its cover, the title and description, then the menu of what can be
+ * done to it at the right end. The whole row is a button that opens the playlist, and hovering it
+ * shows the name whole.
  */
 export const Default: Story = {
   play: async ({ canvas }) => {
@@ -101,6 +118,41 @@ export const Default: Story = {
       'City lights · Late trains and empty streets'
     )
     await expect(canvas.getByRole('button', { name: 'More for City lights' })).toBeVisible()
+  }
+}
+
+/**
+ * A playlist has no cover of its own, so its square shows the cover of its first song that has
+ * one, in the playlist's order: here Know has none, so the square shows Stealing Society's, and the
+ * songs after it are never read.
+ */
+export const CoverOfItsFirstSongWithOne: Story = {
+  beforeEach: () => {
+    mockCommands({ read_cover: readCoversAfterKnow })
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(
+      () => expect(squareIn(canvasElement)?.querySelector('img')?.naturalWidth).toBeGreaterThan(0),
+      UNTIL_COVER_SHOWS
+    )
+
+    await expect(readCoversAfterKnow.mock.calls.map(([args]) => requestedPath(args))).toEqual([
+      know.path,
+      stealingSociety.path
+    ])
+  }
+}
+
+/** When none of its songs has a cover, the square shows the Playlists icon. */
+export const WithoutCovers: Story = {
+  beforeEach: () => {
+    mockCommands({ read_cover: readNoCover })
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(readNoCover).toHaveBeenCalledTimes(4), UNTIL_COVER_SHOWS)
+
+    await waitFor(() => expect(squareIn(canvasElement)?.querySelector('svg')).not.toBeNull())
+    await expect(squareIn(canvasElement)?.querySelector('img')).toBeNull()
   }
 }
 
@@ -216,7 +268,8 @@ export const ButtonsAboveTheRow: Story = {
       check_playlist: () => ({
         playlist: { ...cityLights, allSongsFound: false },
         missingSongs: ['Shift.mp3']
-      })
+      }),
+      read_cover: noCover
     })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
@@ -267,7 +320,8 @@ export const RecheckingFromTheMenu: Story = {
     shiftMissing()
     mockCommands({
       check_playlist: checkPlaylist,
-      load_music_library: () => [know, stealingSociety, wutheringHeights, shift]
+      load_music_library: () => [know, stealingSociety, wutheringHeights, shift],
+      read_cover: noCover
     })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {

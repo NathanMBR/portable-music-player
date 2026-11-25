@@ -99,8 +99,9 @@ songs are sorted as the Settings view says: by title, the default, or by filenam
 
 **Playlists** (`PlaylistsView`) lists the playlists of the `Playlists` folder, sorted by title
 (`PlaylistsOverview`), or, without any, says so in the middle of the view. Each row
-(`PlaylistRow`) has a play button, then the playlist's title and description, and a click anywhere
-else on it opens the playlist. At its right end, a menu (`ActionMenu`) holds Recheck songs while
+(`PlaylistRow`) has a play button, the cover of its first song that has one, or the Playlists icon
+when none does, then the playlist's title and description, and a click anywhere else on it opens
+the playlist. At its right end, a menu (`ActionMenu`) holds Recheck songs while
 songs are missing, Edit playlist, and Delete playlist, which asks first (`ConfirmDialog`), then
 notifies with an Undo. The last scan of the `Songs` folder, the song list, is the app's one record
 of which songs are there: while it lacks some of a playlist's songs, a red alert (`AlertMark`) takes
@@ -173,9 +174,11 @@ Covers are read apart from the scan, one song at a time, only for the rows on sc
 asks for its cover once it has stayed on screen for a moment, so the rows a fast scroll flies past
 read nothing. `read_cover` sends the song's front cover, else its first picture, as raw bytes, or no
 bytes when it has none, and `coverStore.ts` shows them through an object URL. The store keeps a
-limited number of covers, freeing the ones asked for longest ago, and forgets them all after every
-scan, so changed covers are read again. Songs without a picture, with tags that can't be read, or
-with a picture the webview can't draw show the photo icon. A cover Rust can't read at all, because
+limited number of pictures, freeing the ones asked for longest ago, remembers every song found
+without one, and forgets them all after every scan, so changed covers are read again. A playlist's
+square reads the covers of its songs in its order, one after the other, until one has a cover.
+Songs without a picture, with tags that can't be read, or with a picture the webview can't draw
+show the photo icon. A cover Rust can't read at all, because
 the song vanished or the drive was pulled, shows it too, and raises one "Couldn't load a cover"
 notification, which every further failure replaces instead of stacking a copy per row.
 
@@ -225,7 +228,8 @@ work anyway:
   notifications render the notification area next to it with the `withNotificationArea` decorator.
 - **Drawn covers.** Stories have no songs to read covers from, so `drawCover`
   (`src/testing/covers.ts`) draws a small PNG in the browser for `read_cover` to answer, and
-  `noCover` answers a song without one. Every story that shows the song list mocks `read_cover`.
+  `noCover` answers a song without one. Every story that shows the song list or the list of
+  playlists mocks `read_cover`.
 - **One frame per story on Docs pages.** The stores are shared by everything on a page, so stories
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.

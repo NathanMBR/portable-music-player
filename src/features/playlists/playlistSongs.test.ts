@@ -3,6 +3,7 @@ import type { ScanOutcome, Track } from '../library/types'
 import {
   editedSongs,
   findPlaylistSongs,
+  foundPathsOf,
   hasMissingSongs,
   missingSongsOf,
   pickedFileNames,
@@ -135,6 +136,22 @@ describe('pickedFileNames', () => {
       'Over Your Head.mp3',
       'Soldier Side.mp3'
     ])
+  })
+})
+
+const ironSoul: Track = { path: 'Songs/Iron Soul.mp3', title: 'Iron Soul', artist: 'Shaman' }
+const boatSong: Track = { path: 'Songs/Boat Song.mp3', title: 'Boat Song', artist: 'Woodkid' }
+const sugar: Track = { path: 'Songs/Sugar.mp3', title: 'Sugar', artist: 'System of a Down' }
+
+describe('foundPathsOf', () => {
+  it("lists the paths of the songs the scan found in the playlist's order, without the missing ones", () => {
+    const paths = foundPathsOf(['Sugar.mp3', 'Iron Soul.mp3', 'Boat Song.mp3'], [boatSong, sugar])
+
+    expect(paths).toEqual([sugar.path, boatSong.path])
+  })
+
+  it('finds no song for a file name in another case, like the check in Rust', () => {
+    expect(foundPathsOf(['iron soul.mp3'], [ironSoul])).toEqual([])
   })
 })
 

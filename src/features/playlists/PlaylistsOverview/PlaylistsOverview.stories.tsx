@@ -135,7 +135,7 @@ export const Empty: Story = {
 export const LoadFailure: Story = {
   beforeEach: () => {
     usePlaylistsStore.setState({ playlists: [], loadStatus: 'failed' })
-    mockCommands({ list_playlists: () => [roadTrip] })
+    mockCommands({ list_playlists: () => [roadTrip], read_cover: noCover })
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
@@ -213,7 +213,7 @@ export const CancellingTheDelete: Story = {
 /** When the file can't be deleted, as on a write-protected drive, the playlist stays and a notification says why. */
 export const DeleteFailing: Story = {
   beforeEach: () => {
-    mockCommands({ delete_playlist: failingCommand(DELETE_ERROR) })
+    mockCommands({ delete_playlist: failingCommand(DELETE_ERROR), read_cover: noCover })
   },
   play: async ({ canvas, canvasElement, userEvent }) => {
     const page = within(canvasElement.ownerDocument.body)

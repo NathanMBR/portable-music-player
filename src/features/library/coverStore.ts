@@ -10,7 +10,10 @@ import { readCover } from './libraryApi'
 export type Cover = { kind: 'reading' } | { kind: 'shown'; url: string } | { kind: 'missing' }
 
 type CoverStore = {
-  /** The covers asked for, by track path, the one asked for longest ago first. */
+  /**
+   * The covers asked for, by track path, the one asked for longest ago first. At most
+   * `MAX_CACHED_COVERS` of them hold a picture, while every song known to have none stays known.
+   */
   covers: Map<string, Cover>
   /** Reads a song's cover from Rust, unless it was already asked for. */
   loadCover: (path: string) => Promise<void>
@@ -38,16 +41,27 @@ const free = (cover: Cover) => {
   }
 }
 
+// Read or being read, so it holds a picture's bytes or soon will.
+const holdsBytes = (cover: Cover) => cover.kind !== 'missing'
+
+const countHoldingBytes = (covers: Map<string, Cover>) =>
+  [...covers.values()].filter(holdsBytes).length
+
 // A copy of `covers` with room for one more, freeing the ones asked for longest ago: a Map keeps
-// the order its keys were added in.
+// the order its keys were added in. The songs known to have no cover hold nothing, so they're kept:
+// a thumbnail looking through a playlist's songs for a cover would otherwise read them again.
 const withRoomForOne = (covers: Map<string, Cover>) => {
   const kept = new Map(covers)
+  let heldCount = countHoldingBytes(kept)
   for (const [path, cover] of kept) {
-    if (kept.size < MAX_CACHED_COVERS) {
+    if (heldCount < MAX_CACHED_COVERS) {
       break
     }
-    free(cover)
-    kept.delete(path)
+    if (holdsBytes(cover)) {
+      free(cover)
+      kept.delete(path)
+      heldCount -= 1
+    }
   }
   return kept
 }

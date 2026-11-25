@@ -1,48 +1,55 @@
 import { PhotoIcon } from '@heroicons/react/20/solid'
-import { useEffect } from 'react'
+import { type ComponentType, useEffect } from 'react'
 import { COVER_READ_DELAY_MS } from '../constants'
+import { firstSongThatMayHaveCover } from '../coverSearch'
 import { useCoverStore } from '../coverStore'
-import { useIsOnScreen } from '../useIsOnScreen'
+import { useHasStayedOnScreen } from '../useHasStayedOnScreen'
 
 type CoverThumbnailProps = {
-  /** The song whose cover it shows, by its `Track.path`. */
-  path: string
+  /**
+   * The songs whose covers it looks through, by their `Track.path`, in order: one for a song's row,
+   * or the songs of a playlist. It shows the first cover found.
+   */
+  paths: readonly string[]
+  /** Heroicon shown when none of the songs has a cover: a photo, or a playlist's icon. */
+  placeholderIcon?: ComponentType<{ className?: string; 'aria-hidden'?: 'true' }>
 }
 
 /**
  * Square miniature of a song's embedded cover, between its play button and its title in the song
- * list. The library scan skips covers, so each one is read from its song only once the square has
- * stayed on screen for a moment, and the rows a fast scroll flies past read nothing. Until then,
- * and while Rust reads it, the square stays empty. A song without a cover, or whose cover can't be
- * read or drawn, shows a photo icon instead. The cover is cropped to fill the square, and is
- * decorative: the title next to it names the song.
+ * list, or of the first cover among several songs, like a playlist's. The library scan skips
+ * covers, so each one is read from its song only once the square has stayed on screen for a
+ * moment, and the rows a fast scroll flies past read nothing. Among several songs, it reads their
+ * covers one after the other, without waiting again, until one has a cover. Until then, and while
+ * Rust reads it, the square stays empty. When none of the songs has a cover, or its cover can't be
+ * read or drawn, the square shows a placeholder icon instead: a photo, or the icon given. The cover
+ * is cropped to fill the square, and is decorative: the name next to it says what it stands for.
  *
- * @summary Miniature of a song's cover
+ * @summary Miniature of a song's cover, or of the first cover among several songs
  */
-export const CoverThumbnail = ({ path }: CoverThumbnailProps) => {
-  const [isOnScreen, observeOnScreen] = useIsOnScreen()
-  const cover = useCoverStore(state => state.covers.get(path))
+export const CoverThumbnail = ({
+  paths,
+  placeholderIcon: Placeholder = PhotoIcon
+}: CoverThumbnailProps) => {
+  const [hasStayedOnScreen, observeOnScreen] = useHasStayedOnScreen(COVER_READ_DELAY_MS)
+  const path = useCoverStore(state => firstSongThatMayHaveCover(paths, state.covers))
+  const cover = useCoverStore(state => (path === undefined ? undefined : state.covers.get(path)))
   const loadCover = useCoverStore(state => state.loadCover)
   const dropUnreadableCover = useCoverStore(state => state.dropUnreadableCover)
+
   // Forgotten covers, like after a new scan, are read again while their square is on screen.
-  const isUnread = cover === undefined
-
-  // Read only once the square has stayed on screen, so a fast scroll doesn't read every song.
   useEffect(() => {
-    if (!isOnScreen || !isUnread) {
-      return
+    if (hasStayedOnScreen && path !== undefined && cover === undefined) {
+      void loadCover(path)
     }
-
-    const reading = setTimeout(() => void loadCover(path), COVER_READ_DELAY_MS)
-    return () => clearTimeout(reading)
-  }, [isOnScreen, isUnread, path, loadCover])
+  }, [hasStayedOnScreen, path, cover, loadCover])
 
   return (
     <div
       ref={observeOnScreen}
       className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded bg-rule"
     >
-      {cover?.kind === 'shown' && (
+      {path !== undefined && cover?.kind === 'shown' && (
         <img
           src={cover.url}
           alt=""
@@ -51,9 +58,7 @@ export const CoverThumbnail = ({ path }: CoverThumbnailProps) => {
           className="size-full object-cover"
         />
       )}
-      {cover?.kind === 'missing' && (
-        <PhotoIcon aria-hidden="true" className="size-5 text-ink-faded" />
-      )}
+      {path === undefined && <Placeholder aria-hidden="true" className="size-5 text-ink-faded" />}
     </div>
   )
 }

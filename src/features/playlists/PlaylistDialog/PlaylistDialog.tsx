@@ -56,7 +56,7 @@ const SongPicker = ({ tracks, pickedPaths, onPick, emptyMessage }: SongPickerPro
               checked={pickedPaths.has(track.path)}
               onChange={isPicked => onPick(track.path, isPicked)}
             >
-              <CoverThumbnail path={track.path} />
+              <CoverThumbnail paths={[track.path]} />
               <TrackName track={track} />
             </Checkbox>
           </ListRow>

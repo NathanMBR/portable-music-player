@@ -44,9 +44,13 @@ export const playableTracksOf = (songs: PlaylistSong[]) => songs.flatMap(({ trac
 export const pickedFileNames = (tracks: Track[], pickedPaths: ReadonlySet<string>) =>
   tracks.filter(track => pickedPaths.has(track.path)).map(fileNameOf)
 
+/** The paths of a playlist's songs the scan found, in its order. */
+export const foundPathsOf = (fileNames: string[], tracks: Track[]) =>
+  playableTracksOf(findPlaylistSongs(fileNames, tracks)).map(track => track.path)
+
 /** The paths of a playlist's songs the scan found, to start an edit with them picked. */
 export const pickedPathsIn = (fileNames: string[], tracks: Track[]): ReadonlySet<string> =>
-  new Set(playableTracksOf(findPlaylistSongs(fileNames, tracks)).map(track => track.path))
+  new Set(foundPathsOf(fileNames, tracks))
 
 /**
  * A playlist's songs after an edit: those still picked keep their place, the unpicked ones leave,

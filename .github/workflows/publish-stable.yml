@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          notes_file="patch-notes/v${version//./-}.md"
+          notes_file="docs/changelog/v${version//./-}.md"
           if [ ! -f "$notes_file" ]; then
             echo "::error file=$notes_file::No patch notes for version $version: write $notes_file (see Releases in AGENTS.md)."
             exit 1

@@ -7,7 +7,6 @@ mod playlists;
 mod portable;
 mod settings;
 mod song_drop;
-mod song_server;
 #[cfg(test)]
 mod test_songs;
 mod updates;
@@ -20,7 +19,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(main_window::size_memory_plugin())
-        .manage(song_server::LazySongServer::default())
         .manage(updates::PendingUpdate::default())
         .setup(move |app| {
             logs::log_opening(&logs_dir);
@@ -30,8 +28,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             library::load_music_library,
             library::open_songs_folder,
-            library::song_source,
-            library::read_song,
             library::read_cover,
             logs::write_log,
             playback::play_song,

@@ -81,10 +81,11 @@ const PlayerContent = ({ session }: { session: PlaybackSession }) => {
  * from a playlist, another middle dot and the playlist's title, in the artist's type and ink. While
  * the song plays, it slides from right to left without end above the progress, from the start of
  * the left time's digits to the end of the length's (`Marquee`), whatever its length, coming in
- * again from the right one second after it starts going off on the left; while it's paused, the name holds still in the middle, cut with an ellipsis when it's too long. Hovering
- * the song's part shows it whole. The progress stops growing at a set width, so in wide windows
- * the spaces around it widen instead. The songs themselves play through `songAudio.ts`,
- * which follows the same playback store.
+ * again from the right one second after it starts going off on the left; while it's paused, the
+ * name holds still in the middle, cut with an ellipsis when it's too long. Hovering the song's part
+ * shows it whole. The progress stops growing at a set width, so in wide windows the spaces around
+ * it widen instead. The songs themselves play in Rust, through `songEngine.ts`, which follows the
+ * same playback store.
  *
  * @summary Audio player bar at the bottom of the window
  */

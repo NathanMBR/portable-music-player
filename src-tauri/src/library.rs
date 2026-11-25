@@ -15,31 +15,17 @@ use lofty::{
     tag::{ItemKey, Tag},
 };
 use serde::{Serialize, Serializer};
-use tauri::{State, ipc::Response};
+use tauri::ipc::Response;
 
-use crate::{portable, song_server::LazySongServer};
+use crate::portable;
 
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 const MP3_EXTENSION: &str = "mp3";
-/// Linux's webview (WebKitGTK 2.48+) skips ahead in songs over 2 MiB played from memory, through a
-/// blob URL, so there songs stream from the song server. Windows' webview (WebView2) plays them from
-/// memory fine, and its planned Local Network Access checks would ask before reaching a local server.
-const STREAMS_SONGS: bool = cfg!(target_os = "linux");
 /// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
 /// "band/orchestra").
 const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
 /// Between the artists of a song whose tag names several, like ID3v2.4's multi-value frames.
 const ARTIST_SEPARATOR: &str = ", ";
-
-/// Where the webview plays a song from. Mirrors `SongSource` in src/features/library/types.ts.
-#[derive(Debug, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum SongSource {
-    /// The song's URL on the song server, which streams it from the drive.
-    Stream { url: String },
-    /// The whole file, which the webview fetches with `read_song` and plays from memory.
-    Memory,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,8 +56,6 @@ pub enum LibraryError {
     SongMissing { path: String },
     #[error("Couldn't read {path}: {source}")]
     ReadSong { path: String, source: io::Error },
-    #[error("Couldn't start streaming songs to the player: {0}")]
-    StartSongServer(io::Error),
 }
 
 impl Serialize for LibraryError {
@@ -92,25 +76,6 @@ pub async fn open_songs_folder() -> Result<(), LibraryError> {
     tauri_plugin_opener::open_path(&songs_dir, None::<&str>).map_err(LibraryError::OpenFolder)
 }
 
-/// Where the webview plays a song from on this OS, once its file is found.
-#[tauri::command]
-pub async fn song_source(
-    song_server: State<'_, LazySongServer>,
-    path: String,
-) -> Result<SongSource, LibraryError> {
-    let root = portable::root_dir().map_err(LibraryError::RootDir)?;
-    song_source_in(&root, &song_server, &path, STREAMS_SONGS)
-}
-
-/// The whole file of a song, sent as raw bytes rather than JSON, for the webviews that play songs
-/// from memory (`SongSource::Memory`). Neither webview can play media from a custom URI scheme
-/// like Tauri's asset protocol: WebKitGTK refuses it.
-#[tauri::command]
-pub async fn read_song(path: String) -> Result<Response, LibraryError> {
-    let root = portable::root_dir().map_err(LibraryError::RootDir)?;
-    read_song_in(&root, &path).map(Response::new)
-}
-
 /// A song's embedded cover, sent as raw bytes rather than JSON, or as no bytes at all when it has
 /// none. The scan leaves pictures out (`tags_only`), so the webview asks for each cover on its own,
 /// once the song's row is on screen.
@@ -119,26 +84,6 @@ pub async fn read_cover(path: String) -> Result<Response, LibraryError> {
     let root = portable::root_dir().map_err(LibraryError::RootDir)?;
     let cover = read_cover_in(&root, &path)?;
     Ok(Response::new(cover.unwrap_or_default()))
-}
-
-/// Checks that `track_path` is a song of `root`'s Songs folder, then says where it plays from:
-/// its URL on the song server when songs `stream`, started with the first one, or memory.
-fn song_source_in(
-    root: &Path,
-    song_server: &LazySongServer,
-    track_path: &str,
-    streams: bool,
-) -> Result<SongSource, LibraryError> {
-    find_song_in(root, track_path)?;
-    if !streams {
-        return Ok(SongSource::Memory);
-    }
-    let song_server = song_server
-        .get_or_start(root)
-        .map_err(LibraryError::StartSongServer)?;
-    Ok(SongSource::Stream {
-        url: song_server.url_of(track_path),
-    })
 }
 
 fn ensure_songs_dir() -> Result<PathBuf, LibraryError> {
@@ -174,14 +119,6 @@ pub(crate) fn find_song_in(root: &Path, track_path: &str) -> Result<PathBuf, Lib
         });
     }
     Ok(song)
-}
-
-fn read_song_in(root: &Path, track_path: &str) -> Result<Vec<u8>, LibraryError> {
-    let song = find_song_in(root, track_path)?;
-    fs::read(song).map_err(|source| LibraryError::ReadSong {
-        path: track_path.to_owned(),
-        source,
-    })
 }
 
 /// The cover of the song a `Track::path` points to. Only a song that can't be found or opened is
@@ -834,21 +771,6 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_bytes_of_a_song() {
-        let root = tempfile::tempdir().unwrap();
-        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
-        fs::write(
-            songs_dir.join("Evil Warning.mp3"),
-            b"ID3 and the frames of a song",
-        )
-        .unwrap();
-
-        let bytes = read_song_in(root.path(), "Songs/Evil Warning.mp3").unwrap();
-
-        assert_eq!(bytes, b"ID3 and the frames of a song");
-    }
-
-    #[test]
     fn reports_a_song_that_is_gone() {
         let root = tempfile::tempdir().unwrap();
         ensure_songs_dir_in(root.path()).unwrap();
@@ -975,98 +897,5 @@ mod tests {
             read_cover_in(root.path(), "Songs/Shift.mp3"),
             Err(LibraryError::SongMissing { .. })
         ));
-    }
-
-    #[test]
-    fn streams_songs_from_the_song_server_where_songs_stream() {
-        let root = tempfile::tempdir().unwrap();
-        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
-        fs::write(songs_dir.join("Holy Land.mp3"), b"").unwrap();
-        let song_server = LazySongServer::default();
-
-        let source =
-            song_source_in(root.path(), &song_server, "Songs/Holy Land.mp3", true).unwrap();
-
-        let expected_url = song_server
-            .get_or_start(root.path())
-            .unwrap()
-            .url_of("Songs/Holy Land.mp3");
-        assert!(matches!(source, SongSource::Stream { url } if url == expected_url));
-    }
-
-    #[test]
-    fn plays_songs_from_memory_where_songs_dont_stream() {
-        let root = tempfile::tempdir().unwrap();
-        let songs_dir = ensure_songs_dir_in(root.path()).unwrap();
-        fs::write(songs_dir.join("Judgement Day.mp3"), b"").unwrap();
-
-        let source = song_source_in(
-            root.path(),
-            &LazySongServer::default(),
-            "Songs/Judgement Day.mp3",
-            false,
-        )
-        .unwrap();
-
-        assert!(matches!(source, SongSource::Memory));
-    }
-
-    #[test]
-    fn gives_no_source_for_a_song_that_is_gone_or_isnt_a_song() {
-        let root = tempfile::tempdir().unwrap();
-        ensure_songs_dir_in(root.path()).unwrap();
-
-        for streams in [true, false] {
-            assert!(matches!(
-                song_source_in(
-                    root.path(),
-                    &LazySongServer::default(),
-                    "Songs/Streets of Tomorrow.mp3",
-                    streams
-                ),
-                Err(LibraryError::SongMissing { .. })
-            ));
-            assert!(matches!(
-                song_source_in(
-                    root.path(),
-                    &LazySongServer::default(),
-                    "../Running Alone.mp3",
-                    streams
-                ),
-                Err(LibraryError::NotASong { .. })
-            ));
-        }
-    }
-
-    #[test]
-    fn serializes_song_sources_like_the_frontend_song_source_type() {
-        // Mirrors `SongSource` in src/features/library/types.ts.
-        let stream = SongSource::Stream {
-            url: "http://127.0.0.1:41234/token/536f6e6773".into(),
-        };
-
-        assert_eq!(
-            serde_json::to_value(&stream).unwrap(),
-            serde_json::json!({ "kind": "stream", "url": "http://127.0.0.1:41234/token/536f6e6773" })
-        );
-        assert_eq!(
-            serde_json::to_value(SongSource::Memory).unwrap(),
-            serde_json::json!({ "kind": "memory" })
-        );
-    }
-
-    #[test]
-    fn serializes_a_failed_song_server_start_as_its_message() {
-        let error = LibraryError::StartSongServer(io::Error::new(
-            io::ErrorKind::AddrNotAvailable,
-            "address not available",
-        ));
-
-        assert_eq!(
-            serde_json::to_value(&error).unwrap(),
-            serde_json::json!(
-                "Couldn't start streaming songs to the player: address not available"
-            )
-        );
     }
 }

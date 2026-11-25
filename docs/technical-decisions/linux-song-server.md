@@ -2,7 +2,7 @@
 
 ## Status
 
-Current, since 2026-11-10 (commit `cc53d37`).
+Superseded by [native-playback-engine.md](native-playback-engine.md) (2026-11-25): songs now play in Rust, and the webview plays no audio. It was current from 2026-11-10 (commit `cc53d37`).
 
 ## Context
 

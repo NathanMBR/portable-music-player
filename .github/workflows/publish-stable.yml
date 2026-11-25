@@ -52,13 +52,12 @@ jobs:
             echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
-      # GStreamer's base and good plugins play MP3 in WebKitGTK. The AppImage bundles the ones
-      # installed here (bundleMediaFramework in tauri.conf.json).
+      # ALSA's headers build cpal, which plays the songs.
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils libasound2-dev
 
       - name: setup pnpm
         uses: pnpm/action-setup@v6

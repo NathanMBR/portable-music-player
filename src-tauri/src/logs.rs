@@ -6,7 +6,7 @@ use std::{
 
 use tauri::{RunEvent, Runtime, plugin::TauriPlugin};
 use tauri_plugin_log::{
-    RotationStrategy, Target, TargetKind,
+    FileOpenStrategy, RotationStrategy, Target, TargetKind,
     log::{self, LevelFilter},
 };
 
@@ -19,8 +19,9 @@ const LOG_FILE_EXTENSION: &str = "log";
 const LOG_LEVEL: LevelFilter = LevelFilter::Info;
 /// The plugin's own limit, 40 KB, would empty the log every few hundred lines.
 const MAX_LOG_FILE_BYTES: u128 = 1_000_000;
-/// Full log files kept beside the current one, each renamed with the date it filled up.
-const FULL_LOG_FILES_KEPT: usize = 3;
+/// Past log files kept beside the current one: earlier sessions' and full ones, each renamed with
+/// the date it was set aside.
+const PAST_LOG_FILES_KEPT: usize = 3;
 /// Where the webview's lines show in the log, in place of this module's path.
 const WEBVIEW_TARGET: &str = "webview";
 const OPENING_MESSAGE: &str = "Opening app";
@@ -45,6 +46,11 @@ pub fn writable_logs_dir() -> Result<PathBuf, LogsError> {
 /// through the `log` crate, by the app or by its crates. On Windows the release build has no
 /// console, so there only the file has it.
 pub fn plugin<R: Runtime>(logs_dir: Option<&Path>) -> TauriPlugin<R> {
+    builder(logs_dir).build()
+}
+
+/// The plugin's settings, before it's built.
+fn builder(logs_dir: Option<&Path>) -> tauri_plugin_log::Builder {
     let mut targets = vec![Target::new(TargetKind::Stdout)];
     if let Some(logs_dir) = logs_dir {
         targets.push(Target::new(TargetKind::Folder {
@@ -57,8 +63,8 @@ pub fn plugin<R: Runtime>(logs_dir: Option<&Path>) -> TauriPlugin<R> {
         .targets(targets)
         .level(LOG_LEVEL)
         .max_file_size(MAX_LOG_FILE_BYTES)
-        .rotation_strategy(RotationStrategy::KeepSome(FULL_LOG_FILES_KEPT))
-        .build()
+        .rotation_strategy(RotationStrategy::KeepSome(PAST_LOG_FILES_KEPT))
+        .file_open_strategy(FileOpenStrategy::Rotate)
 }
 
 /// Says the app is opening and, when the log can't be saved, why. It runs once the plugin does:
@@ -145,6 +151,34 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&full_log).unwrap(),
             "an older session's lines\n"
+        );
+    }
+
+    #[test]
+    fn starts_a_new_log_file_at_each_opening() {
+        let root = tempfile::tempdir().unwrap();
+        let logs_dir = writable_logs_dir_in(root.path()).unwrap();
+        let current_log = log_file_in(&logs_dir);
+        fs::write(&current_log, "the last session's lines\n").unwrap();
+        let app = tauri::test::mock_app();
+
+        let _logger = builder(Some(&logs_dir)).split(app.handle()).unwrap();
+
+        assert_eq!(fs::read_to_string(&current_log).unwrap(), "");
+        let set_aside_logs: Vec<PathBuf> = fs::read_dir(&logs_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path != &current_log)
+            .collect();
+        let [last_session_log] = set_aside_logs.as_slice() else {
+            panic!("expected one set-aside log, found {set_aside_logs:?}");
+        };
+        let last_session_name = last_session_log.file_name().unwrap().to_string_lossy();
+        assert!(last_session_name.starts_with(&format!("{LOG_FILE_NAME}_")));
+        assert!(last_session_name.ends_with(".log"));
+        assert_eq!(
+            fs::read_to_string(last_session_log).unwrap(),
+            "the last session's lines\n"
         );
     }
 

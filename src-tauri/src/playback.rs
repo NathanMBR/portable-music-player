@@ -3,6 +3,7 @@
 //! audio thread only copies its samples to the output (`song_chain`).
 
 mod song_bytes;
+mod song_chain;
 mod song_feeder;
 
 use std::io;

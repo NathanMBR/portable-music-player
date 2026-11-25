@@ -188,28 +188,25 @@ why. Raising the same failure again replaces the notification on screen instead 
 The view itself never shows red text: when a failure leaves it with nothing to show, like a failed
 scan, it shows a calm `Notice` with what to do next.
 
-Songs play through one more loop. `songAudio.ts`, connected once from `main.tsx`, is the only
-module that touches the audio. It follows the playback store's song, play state, position and
-volume, and reports the song's length, progress and end back to the store, which decides what plays
-next. Between the audio's own reports the progress runs on with the clock, because on Linux the
-audio's clock can hold still for seconds while the song plays on. To load a song it asks Rust where the song plays from (`song_source`). On Linux the song
-streams from a small HTTP server that Rust runs for this computer only, because the Linux webview
-skips ahead in large songs played from memory. On Windows Rust sends the song's file as raw bytes
-(`read_song`), and the audio plays them from memory, through an object URL. Neither webview can
-stream audio from Tauri's own file URLs. A song that can't play raises "Couldn't play" with its
-title, and the player pauses on it. Before loading, it asks the webview whether it can play MP3 at
-all: on Linux, a webview missing GStreamer's plugins freezes the app instead of reporting an error,
-so the player stops there and says what to install.
+Songs play through one more loop, in Rust rather than the webview, so one song follows the next
+without a gap. `songEngine.ts`, connected once from `main.tsx`, is the only module that drives
+Rust's player. It follows the playback store's song, play state, position and volume through
+Rust's commands, and reports the song's length, progress and end back to the store, which decides
+what plays next. Rust always holds that next song, decoded ahead, and starts it on the very sample
+after the current one ends; it then tells the webview, and the store moves to the same song,
+without loading anything again. Every song Rust is given carries a new id, which each of its
+events repeats, so an event about a song no longer in the player is ignored. The progress comes
+from the sound output's own clock, a few times a second. A song that can't play raises "Couldn't
+play" with its title, and the player pauses on it; a sound output lost with no other to move to
+raises "Lost the sound output", and the player pauses too.
 
 `windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the
 player, playing or paused, and after the app once it's stopped.
 
-`mediaSession.ts`, connected once from `main.tsx` too, hands the song in the player to the system
-through the webview's media session, so the keyboard's media keys and the system's media controls
-play, pause, stop, skip and seek it. WebView2 passes it on to Windows' media controls, and
-WebKitGTK to MPRIS on Linux. It gives the song's title, artist and play state only when they
-change, and leaves the position to the webview, which reads it from the audio. Webviews without a
-media session, like WebKitGTK before 2.46, simply don't get one.
+`mediaControls.ts`, connected once from `main.tsx` too, has the keyboard's media keys and the
+system's media controls play, pause, stop, skip and seek: Rust reaches them, MPRIS on Linux and
+Windows' media controls on Windows, shows them the song in the player, and sends their buttons'
+actions to the webview, which hands them to the playback store.
 
 ## How the stories run without Tauri
 
@@ -234,9 +231,9 @@ work anyway:
   that set store state render in their own iframe there (`renderInOwnFrame`), and don't overwrite
   each other's state.
 
-Stories never connect the audio (`songAudio.ts`), the window title (`windowTitle.ts`) or the media
-session (`mediaSession.ts`), so they're silent: the player shows whatever progress and length the
-story puts in the store.
+Stories never connect Rust's player (`songEngine.ts`), the window title (`windowTitle.ts`) or the
+media controls (`mediaControls.ts`), so they're silent: the player shows whatever progress and
+length the story puts in the store.
 
 The **theme** toolbar switches `data-theme` on `<html>` between `light` and `dark`, like the app's
 own toggle does.

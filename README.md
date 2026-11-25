@@ -6,7 +6,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 
 - Can run without installation on Windows and Linux
 - Keeps all its data next to the executable
-- Log of clicks, switches, songs, jumps and pages, in the terminal and the `Logs` folder
+- Log of clicks, switches, songs, jumps, pages and sound outputs, in the terminal and the `Logs` folder
 - Songs library from the `Songs` folder
 - Song titles and artists from their tags, in the song list and the player
 - Song cover miniatures from their tags
@@ -24,6 +24,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Move a playlist's song before or after another, found by name or position
 - Flags playlists whose songs are missing, until a recheck finds them
 - Audio player with shuffle, repeat, volume and seeking
+- Gapless playback between songs
 - Volume from the mouse wheel
 - Seeking from the arrow keys
 - Tooltips on the song's progress and the volume showing where a click lands

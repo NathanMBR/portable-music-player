@@ -269,6 +269,10 @@ These follow from the project goal and are easy to get wrong:
 - MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
 - `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
 - `docs/changelog/` holds the patch notes of each stable release, one Markdown file per version, written when it's released (see Releases). The folder is created with the first release's notes.
+- `docs/technical-decisions/` holds why parts of the app are built the way they are, one Markdown file per decision, named in kebab-case after what it decides, e.g. `linux-song-server.md`.
+  - The user chooses which decisions get a file. Suggest one when a change settles a choice worth explaining (an obvious approach that was rejected, a platform workaround, a constraint the code doesn't show), and write it only once the user agrees.
+  - Each file starts with a `# <title>`, then these sections in order: **Status** (`Current`, or `Superseded by <file>` with the date), **Context** (the problem and its constraints), **Decision**, **Why** (the evidence: measurements, bugs, documentation), **Alternatives rejected** (each with its reason), **Consequences** (what it costs, and the code it shapes) and **Revisit when** (what would make it worth deciding again).
+  - Update a file in the same change as the code it describes. A decision that's replaced is marked superseded, never deleted, so its reasons stay on record.
 - `private/` holds the user's own files and the generated test reports. Git tracks only its `.gitignore`, which ignores everything else in it. `private/tests.html` is a hand-written guide to the tests: never update it, even when the tests change, unless the user asks for it.
 - Update the stories, the docs and the README in the same change as the feature.
 

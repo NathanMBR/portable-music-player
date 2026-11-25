@@ -43,10 +43,24 @@ const FIELDS_BEFORE_DELAY_LENGTH: usize = 1 + 1 + 4 + 2 + 2 + 1 + 1;
 /// The delay and padding, 12 bits each.
 const DELAY_PADDING_BITS: u32 = 12;
 
+/// The header of a frame like `FRAME_HEADER`'s, at 48 kHz.
+const FRAME_HEADER_48_KHZ: [u8; 4] = [0xFF, 0xFB, 0x94, 0x64];
+/// The length of a frame with `FRAME_HEADER_48_KHZ`: 144 × 128,000 ÷ 48,000.
+const FRAME_LENGTH_48_KHZ: usize = 384;
+
 /// `count` silent MPEG frames, which decode as `count` × `SAMPLES_PER_FRAME` samples per channel.
 pub(crate) fn silent_frames(count: u32) -> Vec<u8> {
-    let mut frame = vec![0; FRAME_LENGTH];
-    frame[..FRAME_HEADER.len()].copy_from_slice(&FRAME_HEADER);
+    frames_of(&FRAME_HEADER, FRAME_LENGTH, count)
+}
+
+/// `count` silent MPEG frames at 48 kHz instead of `SAMPLE_RATE`.
+pub(crate) fn silent_frames_at_48_khz(count: u32) -> Vec<u8> {
+    frames_of(&FRAME_HEADER_48_KHZ, FRAME_LENGTH_48_KHZ, count)
+}
+
+fn frames_of(header: &[u8; 4], length: usize, count: u32) -> Vec<u8> {
+    let mut frame = vec![0; length];
+    frame[..header.len()].copy_from_slice(header);
     frame.repeat(count as usize)
 }
 

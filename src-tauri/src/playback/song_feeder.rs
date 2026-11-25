@@ -356,7 +356,7 @@ fn seek_decoder(decoder: &mut SongDecoder, position: Duration, path: &str) {
 }
 
 /// The frame at `position`, at `rate`, no further than the song's end.
-fn frame_at(position: Duration, duration: Option<Duration>, rate: u32) -> u64 {
+pub(super) fn frame_at(position: Duration, duration: Option<Duration>, rate: u32) -> u64 {
     let position = duration.map_or(position, |duration| position.min(duration));
     (position.as_secs_f64() * f64::from(rate)).round() as u64
 }

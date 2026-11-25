@@ -36,8 +36,10 @@ pub(super) enum ChainCommand {
         song: Option<ChainSong>,
     },
     SetPaused(bool),
-    /// The current song's feeder goes on from `frame`, with blocks of `generation`.
+    /// The feeder of song `id` goes on from `frame`, with blocks of `generation`. Ignored unless
+    /// `id` is the current song: the chain may have just moved on to the next one.
     Seek {
+        id: SongId,
         generation: u32,
         frame: u64,
     },
@@ -65,7 +67,7 @@ pub(super) struct ClockReading {
 }
 
 impl ChainClock {
-    fn set(&self, id: SongId, frame: u64) {
+    pub(super) fn set(&self, id: SongId, frame: u64) {
         let frame = frame.min(u64::from(u32::MAX));
         self.0
             .store((u64::from(id) << u32::BITS) | frame, Ordering::Relaxed);
@@ -179,8 +181,16 @@ impl SongChain {
                 }
             }
             ChainCommand::SetPaused(is_paused) => self.is_paused = is_paused,
-            ChainCommand::Seek { generation, frame } => {
-                if let Some(current) = self.current.as_mut() {
+            ChainCommand::Seek {
+                id,
+                generation,
+                frame,
+            } => {
+                if let Some(current) = self
+                    .current
+                    .as_mut()
+                    .filter(|current| current.song.id == id)
+                {
                     current.recycle_block();
                     current.song.generation = generation;
                     current.frame = frame;
@@ -552,6 +562,7 @@ mod tests {
         assert_eq!(chain.events(), [ChainEvent::Ended { chain: 7, id: 1 }]);
 
         chain.command(ChainCommand::Seek {
+            id: 1,
             generation: 1,
             frame: 0,
         });
@@ -610,6 +621,7 @@ mod tests {
         chain.fill(1);
 
         chain.command(ChainCommand::Seek {
+            id: 1,
             generation: 1,
             frame: 100,
         });
@@ -620,6 +632,24 @@ mod tests {
         assert_eq!(chain.fill(2), [0.9, 0.0]);
         let recycled: Vec<Vec<f32>> = feeder.recycled.try_iter().collect();
         assert_eq!(recycled.len(), 3);
+    }
+
+    #[test]
+    fn ignores_a_seek_meant_for_another_song() {
+        let mut chain = TestChain::new(MONO);
+        let (first, _first_feeder) = song_of(1, MONO, &[0.1]);
+        let (second, _second_feeder) = song_of(2, MONO, &[0.2, 0.3]);
+        chain.play(first);
+        chain.queue(1, second);
+        chain.fill(2);
+
+        chain.command(ChainCommand::Seek {
+            id: 1,
+            generation: 1,
+            frame: 0,
+        });
+
+        assert_eq!(chain.fill(2), [0.3, 0.0]);
     }
 
     #[test]

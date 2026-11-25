@@ -91,7 +91,7 @@ impl SongBytes {
     }
 
     #[cfg(test)]
-    fn loaded_length(&self) -> usize {
+    pub(super) fn loaded_length(&self) -> usize {
         self.lock().bytes.len()
     }
 }

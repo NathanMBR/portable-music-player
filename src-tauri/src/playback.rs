@@ -5,6 +5,8 @@
 mod song_bytes;
 mod song_feeder;
 
+use std::io;
+
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
@@ -16,6 +18,8 @@ pub enum PlaybackError {
     Library(#[from] LibraryError),
     #[error("Couldn't decode {path}: the file may be damaged")]
     Decode { path: String },
+    #[error("Couldn't start decoding {path}: {source}")]
+    StartDecoding { path: String, source: io::Error },
 }
 
 impl Serialize for PlaybackError {

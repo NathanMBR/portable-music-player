@@ -6,21 +6,28 @@
 mod controller;
 mod engine;
 mod media_controls;
+mod output;
 mod song_bytes;
 mod song_chain;
 mod song_feeder;
 
-use std::{io, sync::Arc, time::Duration};
+use std::{
+    io,
+    sync::{Arc, mpsc},
+    time::Duration,
+};
 
 use serde::{Serialize, Serializer};
-use tauri::{AppHandle, Emitter, Runtime, State};
+use tauri::{App, AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_log::log;
 use thiserror::Error;
 
-use crate::{library::LibraryError, portable};
+use crate::{library::LibraryError, main_window, portable};
+use controller::ControllerInputs;
 use engine::{Engine, NowPlaying, PlaybackEvents, SongRequest};
 use media_controls::{MediaControlAction, SystemMediaControls};
-use song_chain::SongId;
+use output::CpalOpener;
+use song_chain::{SongChain, SongId};
 
 /// The queued song took over, without a gap.
 const SONG_STARTED_EVENT: &str = "playback:song-started";
@@ -123,6 +130,36 @@ fn emit_media_control<R: Runtime>(app: &AppHandle<R>, action: MediaControlAction
     if let Err(error) = app.emit(MEDIA_CONTROL_EVENT, action) {
         log::warn!("Couldn't tell the webview about a media key: {error}");
     }
+}
+
+/// Starts the engine and the thread that drives it, and connects the system's media controls. The
+/// sound output only opens once a song plays.
+pub fn start(app: &App) -> tauri::Result<()> {
+    let window = app
+        .get_webview_window(main_window::LABEL)
+        .ok_or(tauri::Error::WindowNotFound)?;
+    let handle = app.handle().clone();
+    let media_controls =
+        SystemMediaControls::connect(&window, move |action| emit_media_control(&handle, action));
+    let events = AppEvents {
+        app: app.handle().clone(),
+        media_controls,
+    };
+    let (chain_events, chain_event_receiver) = SongChain::event_channel();
+    let (stream_failures, stream_failure_receiver) = mpsc::channel();
+    let engine = Arc::new(Engine::new(
+        Box::new(CpalOpener::default()),
+        Arc::new(events),
+        chain_events,
+        stream_failures,
+    ));
+    let inputs = ControllerInputs {
+        chain_events: chain_event_receiver,
+        stream_failures: stream_failure_receiver,
+    };
+    controller::start(Arc::clone(&engine), inputs)?;
+    app.manage(Playback(engine));
+    Ok(())
 }
 
 #[derive(Debug, Error)]

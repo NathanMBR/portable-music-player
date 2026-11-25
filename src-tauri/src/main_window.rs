@@ -7,7 +7,7 @@ use tauri::{
 use tauri_plugin_window_state::StateFlags;
 
 /// Must match the window label in tauri.conf.json.
-const LABEL: &str = "main";
+pub(crate) const LABEL: &str = "main";
 
 /// The fields this module reads from the window-state plugin's file. The plugin stores the size
 /// in physical pixels.

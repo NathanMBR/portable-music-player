@@ -24,6 +24,7 @@ pub fn run() {
         .manage(updates::PendingUpdate::default())
         .setup(move |app| {
             logs::log_opening(&logs_dir);
+            playback::start(app)?;
             main_window::show(app).map_err(Into::into)
         })
         .invoke_handler(tauri::generate_handler![
@@ -33,6 +34,12 @@ pub fn run() {
             library::read_song,
             library::read_cover,
             logs::write_log,
+            playback::play_song,
+            playback::queue_next_song,
+            playback::set_playing,
+            playback::seek_song,
+            playback::set_volume,
+            playback::stop_playback,
             playlists::list_playlists,
             playlists::create_playlist,
             playlists::save_playlist,

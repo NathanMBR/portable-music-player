@@ -696,7 +696,8 @@ impl Engine {
     }
 
     /// The current song's position.
-    pub(super) fn position(&self) -> Duration {
+    #[cfg(test)]
+    fn position(&self) -> Duration {
         self.lock().position()
     }
 

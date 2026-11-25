@@ -8,6 +8,7 @@ import {
   createPlayOrder,
   findNextTrack,
   findPreviousTrack,
+  findTrackAfterEnd,
   nextRepeatMode,
   type RepeatMode,
   restartsOnPrevious
@@ -246,10 +247,7 @@ export const usePlaybackStore = create<PlaybackStore>()((set, get) => {
         return
       }
 
-      const nextTrack =
-        repeatMode === 'one'
-          ? session.track
-          : findNextTrack(session.playOrder, session.track, repeatMode)
+      const nextTrack = findTrackAfterEnd(session.playOrder, session.track, repeatMode)
       if (nextTrack) {
         start(session, nextTrack)
         return

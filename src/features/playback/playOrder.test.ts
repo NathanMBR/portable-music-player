@@ -4,6 +4,7 @@ import {
   createPlayOrder,
   findNextTrack,
   findPreviousTrack,
+  findTrackAfterEnd,
   nextRepeatMode,
   type RepeatMode,
   restartsOnPrevious,
@@ -101,6 +102,21 @@ describe('findPreviousTrack', () => {
     for (const repeatMode of REPEAT_ON) {
       expect(findPreviousTrack(queue, firstTrack, repeatMode)).toBe(fourthTrack)
     }
+  })
+})
+
+describe('findTrackAfterEnd', () => {
+  it('plays the same song again with repeat one', () => {
+    expect(findTrackAfterEnd(queue, fourthTrack, 'one')).toBe(fourthTrack)
+  })
+
+  it('goes on to the next song otherwise', () => {
+    expect(findTrackAfterEnd(queue, secondTrack, 'off')).toBe(thirdTrack)
+    expect(findTrackAfterEnd(queue, fourthTrack, 'all')).toBe(firstTrack)
+  })
+
+  it('finds none after the last song without repeat', () => {
+    expect(findTrackAfterEnd(queue, fourthTrack, 'off')).toBeNull()
   })
 })
 

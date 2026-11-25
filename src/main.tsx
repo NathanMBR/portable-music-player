@@ -4,9 +4,9 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { useLibraryStore } from './features/library/libraryStore'
 import { connectButtonLog } from './features/logging/buttonLog'
-import { connectMediaSession } from './features/playback/mediaSession'
+import { connectMediaControls } from './features/playback/mediaControls'
 import { connectPlaybackMemory, restorePlayback } from './features/playback/playbackMemory'
-import { connectSongAudio } from './features/playback/songAudio'
+import { connectSongEngine } from './features/playback/songEngine'
 import { connectWindowTitle } from './features/playback/windowTitle'
 import { usePlaylistsStore } from './features/playlists/playlistsStore'
 import { useSettingsStore } from './features/settings/settingsStore'
@@ -19,9 +19,9 @@ const settingsLoaded = useSettingsStore.getState().restoreSettings()
 const libraryScanned = useLibraryStore.getState().scanLibrary()
 // Scans never list them again: whether their songs are there is read from the song list.
 const playlistsListed = usePlaylistsStore.getState().loadPlaylists()
-connectSongAudio(new Audio())
+connectSongEngine()
 connectWindowTitle()
-connectMediaSession()
+connectMediaControls()
 connectButtonLog()
 connectSongDrop()
 // Waits for the settings, which say whether to look for a newer release.

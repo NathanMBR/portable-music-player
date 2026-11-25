@@ -59,6 +59,13 @@ const findTrackOneStepAway = (
 export const findNextTrack = (playOrder: Track[], current: Track, repeatMode: RepeatMode) =>
   findTrackOneStepAway(playOrder, current, 1, repeatMode)
 
+/**
+ * The song that plays once `current` ends: the same one again with repeat one, else the next one.
+ * The store moves to it, and Rust queues it ahead, so the two never disagree.
+ */
+export const findTrackAfterEnd = (playOrder: Track[], current: Track, repeatMode: RepeatMode) =>
+  repeatMode === 'one' ? current : findNextTrack(playOrder, current, repeatMode)
+
 /** The song before `current`, mirroring `findNextTrack`. */
 export const findPreviousTrack = (playOrder: Track[], current: Track, repeatMode: RepeatMode) =>
   findTrackOneStepAway(playOrder, current, -1, repeatMode)

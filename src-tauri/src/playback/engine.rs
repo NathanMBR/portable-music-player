@@ -241,6 +241,19 @@ impl SongInPlayer {
     }
 }
 
+/// The song to queue: over the current song's bytes when it's the same song again.
+fn open_next(
+    root: &Path,
+    current_bytes: Option<Arc<SongBytes>>,
+    request: SongRequest,
+) -> Result<SongInPlayer, PlaybackError> {
+    let bytes = match current_bytes {
+        Some(bytes) => bytes,
+        None => SongBytes::open(root, &request.path)?,
+    };
+    SongInPlayer::with_bytes(bytes, request, Duration::ZERO)
+}
+
 impl EngineState {
     /// The current song's position from the chain's clock, while the chain plays it.
     fn clock_position(&self) -> Option<Duration> {
@@ -460,19 +473,18 @@ impl Engine {
         let Some(current_bytes) = self.bytes_of_current(after, request.as_ref()) else {
             return Ok(());
         };
-        let next = match request {
-            None => None,
-            Some(request) => {
-                let bytes = match current_bytes {
-                    Some(bytes) => bytes,
-                    None => SongBytes::open(root, &request.path)?,
-                };
-                Some(SongInPlayer::with_bytes(bytes, request, Duration::ZERO)?)
-            }
+        let opened = match request {
+            None => Ok(None),
+            Some(request) => open_next(root, current_bytes, request).map(Some),
+        };
+        // The webview no longer wants the song queued before, even when this one can't open.
+        let (next, result) = match opened {
+            Ok(next) => (next, Ok(())),
+            Err(error) => (None, Err(error)),
         };
         let mut state = self.lock();
         if !state.current_is(after) {
-            return Ok(());
+            return result;
         }
         if let Some(replaced) = state.queued.take().filter(|queued| queued.chain.is_some()) {
             state.replaced.push(replaced);
@@ -490,7 +502,7 @@ impl Engine {
         if current.is_in(output) {
             output.queue(after, queued.as_mut());
         }
-        Ok(())
+        result
     }
 
     /// `None` unless song `after` is the current one. Otherwise the current song's bytes when
@@ -1158,6 +1170,24 @@ mod tests {
             .install_play(newer_song, Duration::ZERO, true)
             .unwrap();
         assert_eq!(test.devices.opened(), [RATE_48_KHZ]);
+    }
+
+    #[test]
+    fn forgets_the_queued_song_when_the_next_one_cant_open() {
+        let test = TestEngine::with_songs(&[
+            ("Leper Messiah.mp3", &short_song()),
+            ("Gasoline.mp3", &short_song()),
+        ]);
+        test.play(1, "Leper Messiah.mp3", true);
+        test.queue(1, 2, "Gasoline.mp3");
+
+        let missing =
+            test.engine
+                .queue_next(test.root.path(), 1, Some(request(3, "Deer Dance.mp3")));
+        assert!(missing.is_err());
+
+        test.run_until(has_ended(1));
+        assert_eq!(test.recorded(), [Recorded::Ended(1)]);
     }
 
     #[test]

@@ -80,7 +80,7 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
 - The media keys work on any webview version, with no need for WebKitGTK 2.46's MPRIS support.
 - The app no longer opens a port on `127.0.0.1`, and a song put back when the app opens takes the sound device only once it plays.
 - The progress comes from the output's own clock, a frame count, so the estimate is gone. Seeking decodes from memory, to the exact sample.
-- A song fully read keeps playing when the drive is pulled. The player holds the files of two songs at most, plus about 1.5 s of decoded samples for each.
+- A song fully read keeps playing when the drive is pulled, if it's kept whole: one up to 128 MiB, nearly every song. A larger file keeps only a window around its readers, so it stops once the drive is pulled and its window runs out. The player holds the files of two songs at most, plus about 1.5 s of decoded samples for each.
 - Songs are about 47 ms shorter on Linux, with the padding cut. Windows already cut it.
 - Apple-encoded MP3s keep their padding of about 40 ms, since symphonia doesn't read the `iTunSMPB` comment, but the half-second gap still goes.
 - Following the output device is now this code's job:

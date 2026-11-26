@@ -98,3 +98,11 @@ fn info_frame(frame_count: u32, delay: u32, padding: u32) -> Vec<u8> {
     frame.resize(FRAME_LENGTH, 0);
     frame
 }
+
+/// `count` MPEG frames whose side information asks for audio data from before the song's start,
+/// which no decoder can decode: a damaged file's frames.
+pub(crate) fn damaged_frames(count: u32) -> Vec<u8> {
+    let mut frame = vec![0xFF; FRAME_LENGTH];
+    frame[..FRAME_HEADER.len()].copy_from_slice(&FRAME_HEADER);
+    frame.repeat(count as usize)
+}

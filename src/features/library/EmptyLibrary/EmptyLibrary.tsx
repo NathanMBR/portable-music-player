@@ -13,6 +13,6 @@ export const EmptyLibrary = () => (
   <EmptyState
     icon={FolderIcon}
     title={`Your ${SONGS_FOLDER_NAME} folder is empty`}
-    description="Copy .mp3 files into it, then scan again."
+    description="Copy songs into it, then scan again."
   />
 )

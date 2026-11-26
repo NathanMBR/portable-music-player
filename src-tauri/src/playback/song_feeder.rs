@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::{
         Arc,
         mpsc::{self, Receiver, RecvTimeoutError, Sender, SyncSender, TryRecvError, TrySendError},
@@ -7,17 +8,14 @@ use std::{
     time::Duration,
 };
 
-use rodio::{Decoder, SampleRate, Source, conversions::SampleRateConverter};
+use rodio::{ChannelCount, SampleRate, conversions::SampleRateConverter};
 use tauri_plugin_log::log;
 
 use super::{
-    PlaybackError,
-    song_bytes::{SongBytes, SongReader},
+    PlaybackError, channel_mix::ChannelLayout, song_bytes::SongBytes, song_decoder::SongDecoder,
 };
+use crate::crash_log;
 
-/// Every song of the library is an MP3: the hint spares the decoder from guessing.
-const MP3_EXTENSION: &str = "mp3";
-const MP3_MIME_TYPE: &str = "audio/mpeg";
 /// The frames of one block: about 23 ms at 44.1 kHz.
 pub(super) const BLOCK_FRAMES: usize = 1024;
 /// The blocks a feeder decodes ahead of the audio thread: about 1.5 s at 44.1 kHz.
@@ -52,8 +50,8 @@ pub(super) enum Feed {
 pub(super) struct FeedReceiver {
     pub(super) blocks: Receiver<Feed>,
     pub(super) recycle: SyncSender<Vec<f32>>,
-    /// The song's channels, which its samples interleave.
-    pub(super) channels: u16,
+    /// Where the song's channels play, in the order its samples interleave them.
+    pub(super) layout: ChannelLayout,
 }
 
 enum FeederCommand {
@@ -89,7 +87,8 @@ impl SongFeeder {
         thread::Builder::new()
             .name(FEEDER_THREAD_NAME.to_owned())
             .spawn(move || {
-                let decoder = match decoder_of(&bytes, &path) {
+                let _reading = crash_log::reading_song(Path::new(&path));
+                let decoder = match SongDecoder::open(Arc::clone(&bytes), &path) {
                     Ok(decoder) => decoder,
                     Err(error) => {
                         // The caller only stops waiting once it hears back.
@@ -135,7 +134,7 @@ impl SongFeeder {
         FeedReceiver {
             blocks: block_receiver,
             recycle,
-            channels: self.format.channels,
+            layout: self.format.layout,
         }
     }
 
@@ -196,8 +195,8 @@ fn feed(start: FeederStart) {
             Waited::Stopped => return,
         }
     };
-    let channels = usize::from(decoder.channels().get());
-    let duration = decoder.total_duration();
+    let channels = usize::from(decoder.channels());
+    let duration = decoder.duration();
     FeederThread {
         next_frame: frame_at(position, duration, output.rate),
         samples: Samples::new(decoder, output.rate),
@@ -350,7 +349,7 @@ fn wait_for_command(bytes: &SongBytes, commands: &Receiver<FeederCommand>) -> Wa
 }
 
 fn seek_decoder(decoder: &mut SongDecoder, position: Duration, path: &str) {
-    if let Err(error) = decoder.try_seek(position) {
+    if let Err(error) = decoder.seek(position) {
         log::warn!("Couldn't jump within {path}: {error}");
     }
 }
@@ -370,10 +369,9 @@ enum Samples {
 
 impl Samples {
     fn new(decoder: SongDecoder, output_rate: u32) -> Self {
-        let song_rate = decoder.sample_rate();
-        match SampleRate::new(output_rate) {
-            Some(output_rate) if output_rate != song_rate => {
-                let channels = decoder.channels();
+        let rates = SampleRate::new(decoder.sample_rate()).zip(SampleRate::new(output_rate));
+        match (rates, ChannelCount::new(decoder.channels())) {
+            (Some((song_rate, output_rate)), Some(channels)) if output_rate != song_rate => {
                 Self::Resampled(SampleRateConverter::new(
                     decoder,
                     song_rate,
@@ -404,13 +402,11 @@ impl Iterator for Samples {
     }
 }
 
-type SongDecoder = Decoder<SongReader>;
-
 /// What a song's decoder found out about it once it read its start.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct SongFormat {
     pub(super) sample_rate: u32,
-    pub(super) channels: u16,
+    pub(super) layout: ChannelLayout,
     /// Without the encoder's delay and padding. `None` when the song doesn't say.
     pub(super) duration: Option<Duration>,
 }
@@ -418,47 +414,21 @@ pub(super) struct SongFormat {
 impl SongFormat {
     fn of(decoder: &SongDecoder) -> Self {
         Self {
-            sample_rate: decoder.sample_rate().get(),
-            channels: decoder.channels().get(),
-            duration: decoder.total_duration(),
+            sample_rate: decoder.sample_rate(),
+            layout: decoder.layout(),
+            duration: decoder.duration(),
         }
     }
-}
-
-/// A decoder of the song `bytes` holds, which cuts the silence its encoder added at its start and
-/// end, so songs follow each other without a gap, and seeks to the exact sample.
-fn decoder_of(bytes: &Arc<SongBytes>, track_path: &str) -> Result<SongDecoder, PlaybackError> {
-    Decoder::builder()
-        .with_data(bytes.reader())
-        .with_byte_len(bytes.length())
-        .with_seekable(true)
-        .with_hint(MP3_EXTENSION)
-        .with_mime_type(MP3_MIME_TYPE)
-        .with_gapless(true)
-        .with_coarse_seek(false)
-        .build()
-        .map_err(|_| PlaybackError::Decode {
-            path: track_path.to_owned(),
-        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::playback::song_chain::{ChainCommand, ChainEvent, ChainSong, SongChain};
+    use crate::test_media::{OPUS_RATE, OpusSong, Signal, flac_song, ogg_opus_song, samples_of};
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, gapless_audio, root_with_songs, silent_frames,
     };
-
-    fn decoder_of_song(file_name: &str, contents: &[u8]) -> Result<SongDecoder, PlaybackError> {
-        let root = root_with_songs(&[(file_name, contents)]);
-        let track_path = format!("Songs/{file_name}");
-        let bytes = SongBytes::open(root.path(), &track_path).unwrap();
-        decoder_of(&bytes, &track_path)
-    }
-
-    fn frames_of(decoder: SongDecoder) -> usize {
-        decoder.count() / usize::from(CHANNELS)
-    }
 
     /// Long enough to fill a feeder's buffer several times over.
     const LONG_SONG_FRAMES: u32 = 300;
@@ -519,42 +489,6 @@ mod tests {
     }
 
     #[test]
-    fn trims_the_encoder_delay_and_padding() {
-        let decoder = decoder_of_song("Cure.mp3", &gapless_audio(10, 576, 1216)).unwrap();
-        // The decoder's own delay, 529 samples, comes on top of the encoder's at the start, and is
-        // part of the padding the tag says at the end.
-        let expected_frames = 10 * SAMPLES_PER_FRAME - 576 - 1216;
-
-        let format = SongFormat::of(&decoder);
-
-        assert_eq!(format.sample_rate, SAMPLE_RATE);
-        assert_eq!(format.channels, CHANNELS);
-        let expected_duration = f64::from(expected_frames) / f64::from(SAMPLE_RATE);
-        let duration = format.duration.unwrap().as_secs_f64();
-        assert!((duration - expected_duration).abs() < 1e-6, "{duration}");
-        assert_eq!(frames_of(decoder), expected_frames as usize);
-    }
-
-    #[test]
-    fn keeps_every_sample_of_a_song_without_gapless_info() {
-        let decoder = decoder_of_song("Fairy Tale.mp3", &silent_frames(10)).unwrap();
-
-        assert_eq!(frames_of(decoder), (10 * SAMPLES_PER_FRAME) as usize);
-    }
-
-    #[test]
-    fn fails_on_a_file_that_isnt_audio() {
-        let not_audio = b"Not a single MPEG frame in here.".repeat(100);
-
-        let result = decoder_of_song("Leper Messiah.mp3", &not_audio);
-
-        assert!(matches!(
-            result,
-            Err(PlaybackError::Decode { path }) if path == "Songs/Leper Messiah.mp3"
-        ));
-    }
-
-    #[test]
     fn sends_every_sample_of_the_song_in_blocks_then_its_end() {
         let song = open_song(
             "Gasoline.mp3",
@@ -565,7 +499,7 @@ mod tests {
 
         let (blocks, generation) = blocks_to_the_end(&receiver);
 
-        assert_eq!(receiver.channels, CHANNELS);
+        assert_eq!(receiver.layout.count(), CHANNELS);
         assert_eq!(generation, 0);
         assert_eq!(
             frame_count(&blocks),
@@ -691,6 +625,90 @@ mod tests {
         let expected = song_frames * f64::from(output_rate) / f64::from(SAMPLE_RATE);
         assert!((frame_count(&blocks) as f64 - expected).abs() <= 2.0);
         assert_eq!(song.format.sample_rate, SAMPLE_RATE);
+    }
+
+    #[test]
+    fn joins_two_flac_songs_without_an_extra_frame() {
+        let signal = Signal {
+            sample_rate: SAMPLE_RATE,
+            channels: CHANNELS,
+            frames: 3000,
+        };
+        let first = open_song("2 X 4.flac", &flac_song(16, signal), Duration::ZERO);
+        let second = open_song(
+            "The Great Escape.flac",
+            &flac_song(24, signal),
+            Duration::ZERO,
+        );
+
+        let sound = sound_of_songs_joined(&first, &second, SAMPLE_RATE);
+
+        assert!(sound == [samples_of(signal), samples_of(signal)].concat());
+    }
+
+    #[test]
+    fn joins_two_opus_songs_without_an_extra_frame() {
+        let song = |amplitudes| {
+            ogg_opus_song(&OpusSong {
+                amplitudes,
+                frames: 3000,
+                output_gain_q8: 0,
+                comments: &[],
+            })
+        };
+        let first = open_song("Never Understand.opus", &song(&[0.3, 0.2]), Duration::ZERO);
+        let second = open_song("Iron.opus", &song(&[0.2, 0.3]), Duration::ZERO);
+
+        let sound = sound_of_songs_joined(&first, &second, OPUS_RATE);
+
+        assert_eq!(sound.len(), 2 * 3000 * usize::from(CHANNELS));
+    }
+
+    /// What a chain at `sample_rate` plays of `first`, then `second` queued after it, without the
+    /// silent frames. The chain plays silence while a feeder hasn't sent its blocks yet, which a
+    /// test's fills can outrun, unlike an output's pace: every test signal has a sound in each
+    /// frame, so only that is left out.
+    fn sound_of_songs_joined(first: &OpenSong, second: &OpenSong, sample_rate: u32) -> Vec<f32> {
+        let (events, event_receiver) = SongChain::event_channel();
+        let (mut chain, handle) = SongChain::new(1, CHANNELS, events);
+        let chain_song = |id, song: &OpenSong| ChainSong {
+            id,
+            feed: song.feeder.decode_at(sample_rate),
+            generation: 0,
+            start_frame: 0,
+        };
+        let commands = [
+            ChainCommand::Play {
+                song: chain_song(1, first),
+                is_paused: false,
+            },
+            ChainCommand::QueueNext {
+                after: 1,
+                song: Some(chain_song(2, second)),
+            },
+        ];
+        for command in commands {
+            handle.commands.send(command).unwrap();
+        }
+
+        let mut played = Vec::new();
+        let mut buffer = [0.0; 512];
+        let deadline = std::time::Instant::now() + FEED_TIMEOUT;
+        while !event_receiver
+            .try_iter()
+            .any(|event| matches!(event, ChainEvent::Ended { id: 2, .. }))
+        {
+            assert!(std::time::Instant::now() < deadline, "timed out");
+            chain.fill(&mut buffer);
+            played.extend_from_slice(&buffer);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        played
+            .chunks(usize::from(CHANNELS))
+            .filter(|frame| frame.iter().any(|sample| *sample != 0.0))
+            .flatten()
+            .copied()
+            .collect()
     }
 
     #[test]

@@ -3,12 +3,16 @@
 //! audio thread only copies its samples to the output (`song_chain`). The webview says what should
 //! play through the commands here, and hears what does through the events.
 
+mod channel_mix;
 mod controller;
 mod engine;
 mod media_controls;
+mod mp4_trim;
+mod opus_codec;
 mod output;
 mod song_bytes;
 mod song_chain;
+mod song_decoder;
 mod song_feeder;
 
 use std::{
@@ -168,6 +172,12 @@ pub enum PlaybackError {
     Library(#[from] LibraryError),
     #[error("Couldn't decode {path}: the file may be damaged")]
     Decode { path: String },
+    /// The file holds no audio track, like a video without sound.
+    #[error("Couldn't find any sound in {path}")]
+    NoSound { path: String },
+    /// No codec of the player decodes the song's audio tracks, like 5.1 AAC.
+    #[error("Couldn't decode {path}: its sound is in a format the player can't play")]
+    UnsupportedSound { path: String },
     #[error("Couldn't start decoding {path}: {source}")]
     StartDecoding { path: String, source: io::Error },
     #[error("No sound output was found on this computer")]
@@ -326,6 +336,22 @@ mod tests {
             })
             .unwrap(),
             json!("Couldn't decode Songs/Soldier Side.mp3: the file may be damaged")
+        );
+        assert_eq!(
+            serde_json::to_value(PlaybackError::NoSound {
+                path: "Songs/Creeping Death.m4a".to_owned()
+            })
+            .unwrap(),
+            json!("Couldn't find any sound in Songs/Creeping Death.m4a")
+        );
+        assert_eq!(
+            serde_json::to_value(PlaybackError::UnsupportedSound {
+                path: "Songs/Suggestions.m4a".to_owned()
+            })
+            .unwrap(),
+            json!(
+                "Couldn't decode Songs/Suggestions.m4a: its sound is in a format the player can't play"
+            )
         );
         assert_eq!(
             serde_json::to_value(PlaybackError::OpenOutput(

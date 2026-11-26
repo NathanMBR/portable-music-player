@@ -22,13 +22,13 @@ The constraints:
 
 Songs play in Rust (`src-tauri/src/playback/`), and the webview plays no audio:
 
-- **One decode thread per song in the player** (`song_feeder.rs`): the current one and the queued one. Each reads its song's file into memory as it goes (`song_bytes.rs`), decodes it with symphonia through rodio's `Decoder`, MP3 only, with gapless trimming on, and decodes about 1.5 s ahead.
+- **One decode thread per song in the player** (`song_feeder.rs`): the current one and the queued one. Each reads its song's file into memory as it goes (`song_bytes.rs`), decodes it with symphonia (`song_decoder.rs`), MP3, M4A, AAC, Opus, Ogg, FLAC or WAV, with gapless trimming on, and decodes about 1.5 s ahead.
 - **The audio thread only copies samples** (`song_chain.rs`, in cpal's callback). It switches to the queued song's blocks on the very next sample once the current one ends. It never blocks, locks or allocates.
 - **The output is a cpal stream opened at the rate of the song that plays** (`output.rs`), so the system's mixer does any resampling. A song of another rate reopens it once the current song ends, which leaves one short gap there, the same as mpv's default. The stream is paused (corked) while the player is paused.
 - **The webview always tells Rust which song comes next** (`queue_next_song`), by the same rule the store follows when a song ends (`findTrackAfterEnd`). When Rust starts it, the store moves to it without loading anything (`songEngine.ts`). Each song carries an id the webview counts up, so events about a song no longer in the player are ignored.
 - **souvlaki takes over the media keys and the system's media controls** (`media_controls.rs`): MPRIS on Linux, over zbus, and Windows' media transport controls.
 
-The crates are rodio 0.23 (decoding only, `mp3` feature), cpal 0.18 (`pulseaudio` feature) and souvlaki 0.9 (`use_zbus`).
+The crates are symphonia 0.6 (decoding), rodio 0.23 (its resampler only, no features), cpal 0.18 (`pulseaudio` feature) and souvlaki 0.9 (`use_zbus`). rodio's `Decoder` did the decoding at first; symphonia is used directly since, so a song's trims and seeks are the app's own (see [song-formats.md](song-formats.md)).
 
 ## Why
 
@@ -70,7 +70,7 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
   - it keeps the cpal stream private, so it can't pause the device;
   - it decodes on the audio thread, where its decoder allocates a buffer per packet.
 
-  cpal is used directly instead, and rodio only for decoding, on each song's own thread.
+  cpal is used directly instead, and rodio only for its resampler, on each song's own thread.
 - **One output kept at the device's rate, resampling every song:** no gap at a rate change, but every 44.1 kHz song on a 48 kHz device would go through our resampler instead of the system's.
 
 ## Consequences
@@ -80,7 +80,7 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
 - The media keys work on any webview version, with no need for WebKitGTK 2.46's MPRIS support.
 - The app no longer opens a port on `127.0.0.1`, and a song put back when the app opens takes the sound device only once it plays.
 - The progress comes from the output's own clock, a frame count, so the estimate is gone. Seeking decodes from memory, to the exact sample.
-- A song fully read keeps playing when the drive is pulled. The player holds the files of two songs at most, plus about 1.5 s of decoded samples for each.
+- A song fully read keeps playing when the drive is pulled, if it's kept whole: one up to 128 MiB, nearly every song. A larger file keeps only a window around its readers, so it stops once the drive is pulled and its window runs out. The player holds the files of two songs at most, plus about 1.5 s of decoded samples for each.
 - Songs are about 47 ms shorter on Linux, with the padding cut. Windows already cut it.
 - Apple-encoded MP3s keep their padding of about 40 ms, since symphonia doesn't read the `iTunSMPB` comment, but the half-second gap still goes.
 - Following the output device is now this code's job:
@@ -99,5 +99,4 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
 - cpal lets the app name its PulseAudio client, so the volume mixer shows the app's own name.
 - symphonia reads `iTunSMPB`, or the library gets Apple-encoded MP3s, whose padding should then be read by hand.
 - souvlaki's zbus backend stops panicking on a lost bus, or the app needs to survive one.
-- The library takes formats other than MP3: rodio's features grow, and so does the binary.
 - A song change between two sample rates needs to be gapless too: the output would then stay at one rate and resample every song itself, with a good resampler.

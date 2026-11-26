@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     ffi::OsStr,
     fs::{self, File},
-    io::{self, BufReader},
+    io::{self, BufReader, Read, Seek},
     path::{Path, PathBuf},
 };
 
@@ -17,10 +17,14 @@ use lofty::{
 use serde::{Serialize, Serializer};
 use tauri::ipc::Response;
 
-use crate::portable;
+use crate::{crash_log, ogg_flac_tags, portable};
 
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
-const MP3_EXTENSION: &str = "mp3";
+/// The extensions of the files the scan lists as songs, compared without regard to case. They only
+/// say a file is a song: its format comes from its content.
+const SONG_EXTENSIONS: [&str; 9] = [
+    "mp3", "m4a", "aac", "opus", "ogg", "oga", "flac", "wav", "wave",
+];
 /// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
 /// "band/orchestra").
 const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
@@ -125,20 +129,50 @@ pub(crate) fn find_song_in(root: &Path, track_path: &str) -> Result<PathBuf, Lib
 /// an error: one without pictures, or whose tags can't be read, simply has no cover.
 fn read_cover_in(root: &Path, track_path: &str) -> Result<Option<Vec<u8>>, LibraryError> {
     let song = find_song_in(root, track_path)?;
-    let file = File::open(song).map_err(|source| LibraryError::ReadSong {
+    let file = File::open(&song).map_err(|source| LibraryError::ReadSong {
         path: track_path.to_owned(),
         source,
     })?;
-    Ok(read_song_cover(file))
+    let _reading = crash_log::reading_song(&song);
+    Ok(read_song_cover(file, &song))
 }
 
-fn read_song_cover(song: File) -> Option<Vec<u8>> {
+fn read_song_cover(file: File, song: &Path) -> Option<Vec<u8>> {
     // Bad tags never fail a cover, like they never fail the scan: the row shows the placeholder.
-    let tagged_file = Probe::with_file_type(BufReader::new(song), FileType::Mpeg)
-        .options(tags_with_pictures())
-        .read()
-        .ok()?;
-    cover_among(tagged_file.tags()).map(|cover| cover.data().to_vec())
+    with_tags_of(file, song, Pictures::Read, |tags| {
+        cover_among(tags).map(|cover| cover.data().to_vec())
+    })
+    .ok()
+    .flatten()
+}
+
+/// Whether a song's tags are read with their pictures.
+#[derive(Clone, Copy, PartialEq)]
+enum Pictures {
+    Skipped,
+    Read,
+}
+
+/// Reads the tags of `song` from `file` and hands them to `read`: through lofty, in the format the
+/// song's content says, except an Ogg FLAC's, which lofty doesn't read (`ogg_flac_tags`).
+fn with_tags_of<T>(
+    mut file: File,
+    song: &Path,
+    pictures: Pictures,
+    read: impl FnOnce(&[Tag]) -> T,
+) -> Result<T, FileParseError> {
+    if ogg_flac_tags::is_ogg_flac(&mut file)? {
+        let tag = ogg_flac_tags::read_ogg_flac_tag(file, pictures == Pictures::Read);
+        return Ok(read(tag.as_slice()));
+    }
+    let options = match pictures {
+        Pictures::Skipped => tags_only(),
+        Pictures::Read => tags_with_pictures(),
+    };
+    let tagged_file = probe_of(BufReader::new(file), song)?
+        .options(options)
+        .read()?;
+    Ok(read(tagged_file.tags()))
 }
 
 /// Covers are read one song at a time, as their rows come on screen, so they're read with the
@@ -176,9 +210,9 @@ pub(crate) fn missing_songs_in(root: &Path, file_names: &[String]) -> Vec<String
         .collect()
 }
 
-/// A name the scan would list as a song: a plain file name, not hidden, ending in `.mp3`.
+/// A name the scan would list as a song: a plain file name, not hidden, with a song's extension.
 pub(crate) fn is_song_file_name(name: &str) -> bool {
-    is_plain_file_name(name) && has_mp3_name(Path::new(name))
+    is_plain_file_name(name) && has_song_name(Path::new(name))
 }
 
 /// `\` is checked on every OS: it's a separator on Windows, where it could climb out of the folder.
@@ -193,7 +227,7 @@ fn find_tracks(songs_dir: &Path) -> Result<Vec<Track>, LibraryError> {
         .collect())
 }
 
-/// The songs of `songs_dir`: its MP3 files, hidden ones skipped. The scan and the search for a
+/// The songs of `songs_dir`: its files with a song's extension, hidden ones skipped. The scan and the search for a
 /// playlist's songs both look at this listing, so they never disagree on which songs are there.
 fn song_files_in(songs_dir: &Path) -> Result<Vec<PathBuf>, LibraryError> {
     let read_error = |source: io::Error| LibraryError::ReadFolder {
@@ -203,7 +237,7 @@ fn song_files_in(songs_dir: &Path) -> Result<Vec<PathBuf>, LibraryError> {
     let mut songs = Vec::new();
     for entry in fs::read_dir(songs_dir).map_err(read_error)? {
         let path = entry.map_err(read_error)?.path();
-        if is_mp3(&path) {
+        if is_song(&path) {
             songs.push(path);
         }
     }
@@ -213,7 +247,10 @@ fn song_files_in(songs_dir: &Path) -> Result<Vec<PathBuf>, LibraryError> {
 fn track_from(file: &Path) -> Track {
     let file_name = file.file_name().unwrap_or_default().to_string_lossy();
     // Bad tags never fail the scan: a song whose tags can't be read is listed under its file name.
-    let tags = read_song_tags(file).unwrap_or_default();
+    let tags = {
+        let _reading = crash_log::reading_song(file);
+        read_song_tags(file).unwrap_or_default()
+    };
     Track {
         path: format!("{SONGS_FOLDER_NAME}/{file_name}"),
         title: tags.title.unwrap_or_else(|| title_from_file_name(file)),
@@ -236,6 +273,17 @@ struct SongTags {
     artist: Option<String>,
 }
 
+/// A reader of the tags of `song`, read from `file`, in the format its content says, so a song
+/// named after another format still has its tags read: else in its extension's.
+fn probe_of<R: Read + Seek>(file: R, song: &Path) -> io::Result<Probe<R>> {
+    let probe = Probe::new(file);
+    let probe = match FileType::from_path(song) {
+        Some(file_type) => probe.set_file_type(file_type),
+        None => probe,
+    };
+    probe.guess_file_type()
+}
+
 /// The scan reads every song from a possibly slow flash drive, so it reads only their tags: not the
 /// audio's properties, which lofty finds by decoding frames, nor the embedded pictures.
 fn tags_only() -> ParseOptions {
@@ -245,9 +293,11 @@ fn tags_only() -> ParseOptions {
 }
 
 fn read_song_tags(song: &Path) -> Result<SongTags, FileParseError> {
-    let tagged_file = Probe::open(song)?.options(tags_only()).read()?;
-    let tags = tagged_file.tags();
-    Ok(SongTags {
+    with_tags_of(File::open(song)?, song, Pictures::Skipped, song_tags_among)
+}
+
+fn song_tags_among(tags: &[Tag]) -> SongTags {
+    SongTags {
         title: tag_values(tags, ItemKey::TrackTitle)
             .first()
             .map(|title| (*title).to_owned()),
@@ -256,7 +306,7 @@ fn read_song_tags(song: &Path) -> Result<SongTags, FileParseError> {
             .map(|key| tag_values(tags, key))
             .find(|artists| !artists.is_empty())
             .map(|artists| artists.join(ARTIST_SEPARATOR)),
-    })
+    }
 }
 
 /// The trimmed, non-blank values of `key` in the first of `tags` that has any. An MP3's tags come
@@ -273,20 +323,22 @@ fn tag_values(tags: &[Tag], key: ItemKey) -> Vec<&str> {
         .unwrap_or_default()
 }
 
-fn is_mp3(path: &Path) -> bool {
-    path.is_file() && has_mp3_name(path)
+fn is_song(path: &Path) -> bool {
+    path.is_file() && has_song_name(path)
 }
 
 /// Hidden names are skipped because macOS writes a `._song.mp3` metadata file next to every song
 /// copied onto a FAT/exFAT flash drive.
-pub(crate) fn has_mp3_name(path: &Path) -> bool {
+pub(crate) fn has_song_name(path: &Path) -> bool {
     let is_hidden = path
         .file_name()
         .is_some_and(|name| name.to_string_lossy().starts_with('.'));
-    let has_mp3_extension = path
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case(MP3_EXTENSION));
-    !is_hidden && has_mp3_extension
+    let has_song_extension = path.extension().is_some_and(|extension| {
+        SONG_EXTENSIONS
+            .iter()
+            .any(|song_extension| extension.eq_ignore_ascii_case(song_extension))
+    });
+    !is_hidden && has_song_extension
 }
 
 #[cfg(test)]
@@ -297,8 +349,16 @@ mod tests {
         tag::{ItemValue, TagExt, TagItem, TagType},
     };
 
+    use std::io::Cursor;
+
     use super::*;
-    use crate::test_songs::silent_audio;
+    use crate::{
+        test_media::{
+            AAC_M4A_FIXTURE, ADTS_FIXTURE, OggFlacHeaders, OpusSong, Signal, VORBIS_FIXTURE,
+            WavEncoding, flac_song, ogg_flac_song, ogg_opus_song, wav_song,
+        },
+        test_songs::silent_audio,
+    };
 
     /// The bytes of `tag`, as lofty writes it into a file.
     fn bytes_of(tag: &Tag) -> Vec<u8> {
@@ -307,15 +367,33 @@ mod tests {
         bytes
     }
 
-    /// The bytes of a `tag_type` tag holding `items`. A key given more than once holds several
-    /// values.
-    fn tag_bytes(tag_type: TagType, items: &[(ItemKey, &str)]) -> Vec<u8> {
+    /// A `tag_type` tag holding `items`. A key given more than once holds several values.
+    fn tag_holding(tag_type: TagType, items: &[(ItemKey, &str)]) -> Tag {
         let mut tag = Tag::new(tag_type);
         for &(key, value) in items {
             tag.push(TagItem::new(key, ItemValue::Text(value.to_owned())));
         }
-        bytes_of(&tag)
+        tag
     }
+
+    /// The bytes of a `tag_type` tag holding `items`.
+    fn tag_bytes(tag_type: TagType, items: &[(ItemKey, &str)]) -> Vec<u8> {
+        bytes_of(&tag_holding(tag_type, items))
+    }
+
+    /// `song`, of a format lofty writes, with `tag` saved into it.
+    fn with_tag(song: Vec<u8>, tag: &Tag) -> Vec<u8> {
+        let mut file = Cursor::new(song);
+        tag.save_to(&mut file, WriteOptions::default()).unwrap();
+        file.into_inner()
+    }
+
+    /// A short stereo signal, for songs whose audio no test listens to.
+    const SHORT_SIGNAL: Signal = Signal {
+        sample_rate: 44_100,
+        channels: 2,
+        frames: 1000,
+    };
 
     /// An MP3 whose ID3v2 tag, at its start, holds `items`.
     fn song_tagged(items: &[(ItemKey, &str)]) -> Vec<u8> {
@@ -373,43 +451,54 @@ mod tests {
     }
 
     #[test]
-    fn accepts_mp3_names_in_any_case() {
+    fn accepts_song_names_in_any_case() {
         for name in [
             "Lisbon.mp3",
             "LISBON.MP3",
             "Lisbon.Mp3",
             "Running Alone (Live).mp3",
+            "Slither.flac",
+            "THORN WITHIN.WAV",
+            "Unholy Wars.Wave",
+            "B.Y.O.B..OGG",
+            "Awake from Darkness.oga",
+            "LASTING CHILD.M4A",
+            "2 X 4.aac",
+            "The House Jack Built.OPUS",
         ] {
-            assert!(has_mp3_name(Path::new(name)), "{name} should be an mp3");
+            assert!(has_song_name(Path::new(name)), "{name} should be a song");
         }
     }
 
     #[test]
-    fn rejects_hidden_and_non_mp3_names() {
+    fn rejects_hidden_and_non_song_names() {
         for name in [
             "._Holy Land.mp3",
             ".Holy Land.mp3",
-            "Holy Land.wav",
+            "._B.Y.O.B..flac",
+            "Holy Land.jpg",
             "Holy Land.mp3.txt",
+            "The Four Horsemen.flac.txt",
             "mp3",
+            "flac",
         ] {
             assert!(
-                !has_mp3_name(Path::new(name)),
-                "{name} should not be an mp3"
+                !has_song_name(Path::new(name)),
+                "{name} should not be a song"
             );
         }
     }
 
     #[test]
-    fn rejects_folders_named_like_mp3_files() {
+    fn rejects_folders_named_like_song_files() {
         let test_dir = tempfile::tempdir().unwrap();
         let folder = test_dir.path().join("Extreme Dream.mp3");
         let file = test_dir.path().join("Nova Era.mp3");
         fs::create_dir(&folder).unwrap();
         fs::write(&file, b"").unwrap();
 
-        assert!(!is_mp3(&folder));
-        assert!(is_mp3(&file));
+        assert!(!is_song(&folder));
+        assert!(is_song(&file));
     }
 
     #[test]
@@ -435,11 +524,13 @@ mod tests {
     }
 
     #[test]
-    fn lists_only_the_mp3_files_of_the_songs_folder() {
+    fn lists_only_the_song_files_of_the_songs_folder() {
         let songs_dir = tempfile::tempdir().unwrap();
         for file_name in [
             "Spread Your Fire.mp3",
             "LASTING CHILD.MP3",
+            "Through the Never.flac",
+            "JET PILOT.WAVE",
             "notes.txt",
             "Unfinished Allegro.wav",
             "._Spread Your Fire.mp3",
@@ -456,7 +547,16 @@ mod tests {
         // The folder is read in no particular order; the frontend sorts the tracks.
         titles.sort();
 
-        assert_eq!(titles, ["LASTING CHILD", "Spread Your Fire"]);
+        assert_eq!(
+            titles,
+            [
+                "JET PILOT",
+                "LASTING CHILD",
+                "Spread Your Fire",
+                "Through the Never",
+                "Unfinished Allegro"
+            ]
+        );
     }
 
     #[test]
@@ -644,6 +744,176 @@ mod tests {
 
         assert_eq!(track.title, "Angels and Demons");
         assert_eq!(track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_tags_of_flac_and_wav_songs() {
+        let flac = with_tag(
+            flac_song(16, SHORT_SIGNAL),
+            &tag_holding(
+                TagType::VorbisComments,
+                &[
+                    (ItemKey::TrackTitle, "Extreme Dream"),
+                    (ItemKey::TrackArtist, "Angra"),
+                ],
+            ),
+        );
+        let wav = with_tag(
+            wav_song(WavEncoding::Pcm16, SHORT_SIGNAL),
+            &tag_holding(
+                TagType::RiffInfo,
+                &[
+                    (ItemKey::TrackTitle, "Sprouts of Time"),
+                    (ItemKey::TrackArtist, "Angra"),
+                ],
+            ),
+        );
+
+        let flac_track = track_of_song("01 Extreme Dream.flac", &flac);
+        let wav_track = track_of_song("02 Sprouts of Time.wav", &wav);
+
+        assert_eq!(flac_track.title, "Extreme Dream");
+        assert_eq!(flac_track.artist.as_deref(), Some("Angra"));
+        assert_eq!(wav_track.title, "Sprouts of Time");
+        assert_eq!(wav_track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_tags_and_cover_of_m4a_songs() {
+        let mut tag = tag_holding(
+            TagType::Mp4Ilst,
+            &[
+                (ItemKey::TrackTitle, "Suite-Pee"),
+                (ItemKey::TrackArtist, "System of a Down"),
+            ],
+        );
+        tag.push_picture(
+            Picture::unchecked(b"the front cover".to_vec())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        let song = with_tag(AAC_M4A_FIXTURE.to_vec(), &tag);
+
+        let track = track_of_song("01 Suite-Pee.m4a", &song);
+        let cover = cover_of_song("01 Suite-Pee.m4a", &song);
+
+        assert_eq!(track.title, "Suite-Pee");
+        assert_eq!(track.artist.as_deref(), Some("System of a Down"));
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_tags_of_raw_aac_songs() {
+        let song = with_tag(
+            ADTS_FIXTURE.to_vec(),
+            &tag_holding(
+                TagType::Id3v2,
+                &[
+                    (ItemKey::TrackTitle, "Shadows"),
+                    (ItemKey::TrackArtist, "Woodkid"),
+                ],
+            ),
+        );
+
+        let track = track_of_song("02 Shadows.aac", &song);
+
+        assert_eq!(track.title, "Shadows");
+        assert_eq!(track.artist.as_deref(), Some("Woodkid"));
+    }
+
+    #[test]
+    fn reads_the_tags_of_ogg_vorbis_songs() {
+        let song = with_tag(
+            VORBIS_FIXTURE.to_vec(),
+            &tag_holding(
+                TagType::VorbisComments,
+                &[
+                    (ItemKey::TrackTitle, "Ghost Lights"),
+                    (ItemKey::TrackArtist, "Woodkid"),
+                ],
+            ),
+        );
+
+        let track = track_of_song("01 Ghost Lights.ogg", &song);
+
+        assert_eq!(track.title, "Ghost Lights");
+        assert_eq!(track.artist.as_deref(), Some("Woodkid"));
+    }
+
+    #[test]
+    fn reads_the_tags_of_opus_songs() {
+        let song = ogg_opus_song(&OpusSong {
+            amplitudes: &[0.3, 0.2],
+            frames: 960,
+            output_gain_q8: 0,
+            comments: &[("TITLE", "Visions Prelude"), ("ARTIST", "Angra")],
+        });
+
+        let track = track_of_song("04 Visions Prelude.opus", &song);
+
+        assert_eq!(track.title, "Visions Prelude");
+        assert_eq!(track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_cover_of_an_opus_song() {
+        let song = ogg_opus_song(&OpusSong {
+            amplitudes: &[0.3, 0.2],
+            frames: 960,
+            output_gain_q8: 0,
+            comments: &[],
+        });
+        let mut tag = Tag::new(TagType::VorbisComments);
+        tag.push_picture(
+            Picture::unchecked(b"the front cover".to_vec())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Png)
+                .build(),
+        );
+        let song = with_tag(song, &tag);
+
+        let cover = cover_of_song("04 Visions Prelude.opus", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_tags_of_ogg_flac_songs() {
+        for (file_name, title, artist) in [
+            ("02 Crossing.oga", "Crossing", "Angra"),
+            ("03 Holier Than Thou.ogg", "Holier Than Thou", "Metallica"),
+        ] {
+            let headers = OggFlacHeaders {
+                comments: &[("TITLE", title), ("ARTIST", artist)],
+                ..OggFlacHeaders::default()
+            };
+            let song = ogg_flac_song(16, SHORT_SIGNAL, &headers);
+
+            let track = track_of_song(file_name, &song);
+
+            assert_eq!(track.title, title);
+            assert_eq!(track.artist.as_deref(), Some(artist));
+        }
+    }
+
+    #[test]
+    fn reads_the_tags_of_the_format_a_song_holds_whatever_its_extension() {
+        let flac = with_tag(
+            flac_song(16, SHORT_SIGNAL),
+            &tag_holding(
+                TagType::VorbisComments,
+                &[
+                    (ItemKey::TrackTitle, "Sound of a Gun"),
+                    (ItemKey::TrackArtist, "Audioslave"),
+                ],
+            ),
+        );
+
+        let track = track_of_song("03 Sound of a Gun.wav", &flac);
+
+        assert_eq!(track.title, "Sound of a Gun");
+        assert_eq!(track.artist.as_deref(), Some("Audioslave"));
     }
 
     #[test]
@@ -858,6 +1128,35 @@ mod tests {
 
             assert_eq!(cover_of_song("Fight Fire with Fire.mp3", &song), None);
         }
+    }
+
+    #[test]
+    fn reads_the_cover_of_a_flac_song() {
+        let mut tag = Tag::new(TagType::VorbisComments);
+        tag.push_picture(
+            Picture::unchecked(b"the front cover".to_vec())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        let song = with_tag(flac_song(16, SHORT_SIGNAL), &tag);
+
+        let cover = cover_of_song("Until We Fall.flac", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_cover_of_an_ogg_flac_song() {
+        let headers = OggFlacHeaders {
+            front_cover: Some(b"the front cover"),
+            ..OggFlacHeaders::default()
+        };
+        let song = ogg_flac_song(16, SHORT_SIGNAL, &headers);
+
+        let cover = cover_of_song("Cyclus Doloris.oga", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
     }
 
     #[test]

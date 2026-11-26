@@ -173,7 +173,7 @@ fn find_dropped_songs(dropped: &[PathBuf]) -> FoundSongs {
 
 impl FoundSongs {
     fn add_file(&mut self, file: &Path) {
-        if library::has_mp3_name(file) {
+        if library::has_song_name(file) {
             self.songs.push(file.to_path_buf());
         }
     }
@@ -266,22 +266,36 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_mp3s_of_dropped_files_and_of_folders_with_their_subfolders() {
+    fn finds_the_songs_of_dropped_files_and_of_folders_with_their_subfolders() {
         let drop = tempfile::tempdir().unwrap();
         let roulette = drop.path().join("Roulette.mp3");
+        let wasting_my_hate = drop.path().join("Wasting My Hate.flac");
         let album = drop.path().join("Audioslave");
         let the_last_remaining_light = album.join("The Last Remaining Light.mp3");
+        let u_fig = album.join("U-Fig.WAVE");
         let light_my_way = album.join("Disc 2").join("Light My Way.mp3");
-        for song in [&roulette, &the_last_remaining_light, &light_my_way] {
+        for song in [
+            &roulette,
+            &wasting_my_hate,
+            &the_last_remaining_light,
+            &u_fig,
+            &light_my_way,
+        ] {
             write_file(song, "");
         }
 
-        let found = find_dropped_songs(&[roulette.clone(), album]);
+        let found = find_dropped_songs(&[roulette.clone(), wasting_my_hate.clone(), album]);
 
-        // Each folder's names are sorted, and "Disc 2" comes before "The Last Remaining Light.mp3".
+        // Each folder's names are sorted: "Disc 2", "The Last Remaining Light.mp3", "U-Fig.WAVE".
         assert_eq!(
             found.songs,
-            [roulette, light_my_way, the_last_remaining_light]
+            [
+                roulette,
+                wasting_my_hate,
+                light_my_way,
+                the_last_remaining_light,
+                u_fig
+            ]
         );
         assert_eq!(found.failures, []);
     }
@@ -295,7 +309,7 @@ mod tests {
         write_file(&notes, "");
         for other_file in [
             "Metallica/cover.jpg",
-            "Metallica/Running Alone.flac",
+            "Metallica/Running Alone.txt",
             "Metallica/._Bleeding Me.mp3",
             "Metallica/.Trash-1000/Boom!.mp3",
         ] {

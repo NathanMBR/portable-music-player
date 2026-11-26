@@ -8,7 +8,7 @@ const meta = {
   args: {
     icon: FolderIcon,
     title: 'Your Songs folder is empty',
-    description: 'Copy .mp3 files into it, then scan again.'
+    description: 'Copy songs into it, then scan again.'
   },
   // A view's content is a flex column at least as tall as the view, which the state fills.
   decorators: [

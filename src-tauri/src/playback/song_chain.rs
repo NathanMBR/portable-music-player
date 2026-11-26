@@ -4,7 +4,10 @@ use std::sync::{
     mpsc::{self, Receiver, Sender, SyncSender, TryRecvError},
 };
 
-use super::song_feeder::{Block, Feed, FeedReceiver};
+use super::{
+    channel_mix::{ChannelLayout, ChannelMix},
+    song_feeder::{Block, Feed, FeedReceiver},
+};
 
 /// The webview's number for a song in the player, echoed in every event about it, so an event
 /// about a song no longer there is recognizable. The webview counts from 1.
@@ -88,7 +91,8 @@ pub(super) struct ChainHandle {
     pub(super) clock: Arc<ChainClock>,
 }
 
-/// The audio thread's whole job: it copies the current song's samples to the output, switches to
+/// The audio thread's whole job: it copies the current song's samples to the output, mixed into its
+/// channels, switches to
 /// the queued song on the very next sample once the current one ends, and plays silence while
 /// paused, idle or waiting for blocks. It never blocks, locks or allocates, since a late output
 /// buffer is a click: its feeders do everything else on their own threads.
@@ -99,6 +103,7 @@ pub(super) struct SongChain {
     events: SyncSender<ChainEvent>,
     clock: Arc<ChainClock>,
     output_channels: usize,
+    output_layout: ChannelLayout,
     current: Option<PlayingSong>,
     queued: Option<ChainSong>,
     is_paused: bool,
@@ -107,6 +112,8 @@ pub(super) struct SongChain {
 
 struct PlayingSong {
     song: ChainSong,
+    /// Its channels mixed into the output's, worked out when it becomes current.
+    mix: ChannelMix,
     block: Option<Block>,
     /// The next sample of `block`.
     offset: usize,
@@ -129,6 +136,7 @@ impl SongChain {
             events,
             clock: Arc::clone(&clock),
             output_channels: usize::from(output_channels.max(1)),
+            output_layout: ChannelLayout::standard(output_channels.max(1)),
             current: None,
             queued: None,
             is_paused: false,
@@ -167,7 +175,7 @@ impl SongChain {
         match command {
             ChainCommand::Play { song, is_paused } => {
                 self.retire_current();
-                self.current = Some(PlayingSong::new(song));
+                self.current = Some(PlayingSong::new(song, self.output_layout));
                 self.queued = None;
                 self.is_paused = is_paused;
             }
@@ -231,7 +239,7 @@ impl SongChain {
                     id: next.id,
                 });
                 current.recycle_block();
-                self.current = Some(PlayingSong::new(next));
+                self.current = Some(PlayingSong::new(next, self.output_layout));
             }
             None => {
                 current.has_ended = true;
@@ -273,9 +281,10 @@ enum Step {
 }
 
 impl PlayingSong {
-    fn new(song: ChainSong) -> Self {
+    fn new(song: ChainSong, output: ChannelLayout) -> Self {
         let frame = song.start_frame;
         Self {
+            mix: ChannelMix::between(song.feed.layout, output),
             song,
             block: None,
             offset: 0,
@@ -285,7 +294,7 @@ impl PlayingSong {
     }
 
     fn channels(&self) -> usize {
-        usize::from(self.song.feed.channels.max(1))
+        usize::from(self.song.feed.layout.count().max(1))
     }
 
     /// Makes sure a block with a whole frame left is at hand, taking the next one from the feeder
@@ -321,14 +330,14 @@ impl PlayingSong {
         }
     }
 
-    /// Writes the frame at hand, mapped to the output's channels and scaled by the volume.
+    /// Writes the frame at hand, mixed into the output's channels and scaled by the volume.
     fn write_frame(&mut self, output: &mut [f32], volume: f32) {
         let channels = self.channels();
         let Some(block) = self.block.as_ref() else {
             return;
         };
         let input = &block.samples[self.offset..self.offset + channels];
-        map_channels(input, output, volume);
+        self.mix.apply(input, output, volume);
         self.offset += channels;
         self.frame += 1;
     }
@@ -346,24 +355,9 @@ impl PlayingSong {
     }
 }
 
-/// One frame of a song, at the output's channel count: a mono song plays on every channel, a
-/// mono output gets the average, and other counts keep the channels they share, in order, with
-/// silence on the output's others.
-fn map_channels(input: &[f32], output: &mut [f32], volume: f32) {
-    match (input.len(), output.len()) {
-        (1, _) => output.fill(input[0] * volume),
-        (_, 1) => output[0] = input.iter().sum::<f32>() / input.len() as f32 * volume,
-        _ => {
-            for (index, sample) in output.iter_mut().enumerate() {
-                *sample = input.get(index).map_or(0.0, |input| input * volume);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::SyncSender;
+    use std::{f32::consts::FRAC_1_SQRT_2, sync::mpsc::SyncSender};
 
     use super::*;
     use crate::playback::song_feeder::FEED_CAPACITY;
@@ -393,6 +387,7 @@ mod tests {
         }
     }
 
+    /// A song whose channels are in the standard layout of their count.
     fn fake_song(id: SongId, channels: u16) -> (ChainSong, FakeFeeder) {
         let (blocks, block_receiver) = mpsc::sync_channel(FEED_CAPACITY);
         let (recycle, recycled) = mpsc::sync_channel(FEED_CAPACITY);
@@ -401,7 +396,7 @@ mod tests {
             feed: FeedReceiver {
                 blocks: block_receiver,
                 recycle,
-                channels,
+                layout: ChannelLayout::standard(channels),
             },
             generation: 0,
             start_frame: 0,
@@ -685,6 +680,22 @@ mod tests {
         let (stereo_song, _stereo_feeder) = song_of(1, STEREO, &[0.1, 0.2]);
         surround_output.play(stereo_song);
         assert_eq!(surround_output.fill(1), [0.1, 0.2, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn downmixes_a_surround_song_on_a_stereo_output() {
+        let mut chain = TestChain::new(STEREO);
+        // 5.1: front left and right, centre, LFE, back left and right.
+        let (song, _feeder) = song_of(1, 6, &[0.0, 0.0, 0.5, 1.0, 0.0, 0.0]);
+        chain.play(song);
+
+        let mixed = chain.fill(1);
+
+        let centre = 0.5 * FRAC_1_SQRT_2 / (1.0 + 2.0 * FRAC_1_SQRT_2);
+        assert!(
+            mixed.iter().all(|sample| (sample - centre).abs() < 1e-6),
+            "{mixed:?}"
+        );
     }
 
     #[test]

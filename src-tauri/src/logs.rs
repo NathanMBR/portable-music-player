@@ -24,6 +24,10 @@ const MAX_LOG_FILE_BYTES: u128 = 1_000_000;
 const PAST_LOG_FILES_KEPT: usize = 3;
 /// Where the webview's lines show in the log, in place of this module's path.
 const WEBVIEW_TARGET: &str = "webview";
+/// The start of every target of symphonia's crates, the song decoders, which warn of every damaged
+/// frame they get past, as an MP3's first frames after a jump, which borrow bytes from the frames it
+/// skipped: a few lines a jump, while the song plays on.
+const SONG_DECODERS_TARGET: &str = "symphonia";
 const OPENING_MESSAGE: &str = "Opening app";
 const CLOSING_MESSAGE: &str = "Closing app";
 
@@ -65,6 +69,12 @@ fn builder(logs_dir: Option<&Path>) -> tauri_plugin_log::Builder {
         .max_file_size(MAX_LOG_FILE_BYTES)
         .rotation_strategy(RotationStrategy::KeepSome(PAST_LOG_FILES_KEPT))
         .file_open_strategy(FileOpenStrategy::Rotate)
+        .filter(is_worth_keeping)
+}
+
+/// Every line but the song decoders' below errors.
+fn is_worth_keeping(metadata: &log::Metadata) -> bool {
+    !metadata.target().starts_with(SONG_DECODERS_TARGET) || metadata.level() == log::Level::Error
 }
 
 /// Says the app is opening and, when the log can't be saved, why. It runs once the plugin does:
@@ -180,6 +190,47 @@ mod tests {
             fs::read_to_string(last_session_log).unwrap(),
             "the last session's lines\n"
         );
+    }
+
+    #[test]
+    fn keeps_only_the_errors_of_the_song_decoders() {
+        let root = tempfile::tempdir().unwrap();
+        let logs_dir = writable_logs_dir_in(root.path()).unwrap();
+        let app = tauri::test::mock_app();
+        let (_plugin, _level, logger) = builder(Some(&logs_dir)).split(app.handle()).unwrap();
+        let lines = [
+            (
+                log::Level::Warn,
+                "symphonia_bundle_mp3::layer3",
+                "a decoder's warning",
+            ),
+            (
+                log::Level::Error,
+                "symphonia_bundle_mp3::layer3",
+                "a decoder's error",
+            ),
+            (
+                log::Level::Warn,
+                "portable_music_player_lib::playback",
+                "the app's warning",
+            ),
+        ];
+
+        for (level, target, message) in lines {
+            logger.log(
+                &log::Record::builder()
+                    .level(level)
+                    .target(target)
+                    .args(format_args!("{message}"))
+                    .build(),
+            );
+        }
+        logger.flush();
+
+        let saved = fs::read_to_string(log_file_in(&logs_dir)).unwrap();
+        assert!(!saved.contains("a decoder's warning"), "{saved}");
+        assert!(saved.contains("a decoder's error"), "{saved}");
+        assert!(saved.contains("the app's warning"), "{saved}");
     }
 
     #[test]

@@ -28,7 +28,7 @@ Songs play in Rust (`src-tauri/src/playback/`), and the webview plays no audio:
 - **The webview always tells Rust which song comes next** (`queue_next_song`), by the same rule the store follows when a song ends (`findTrackAfterEnd`). When Rust starts it, the store moves to it without loading anything (`songEngine.ts`). Each song carries an id the webview counts up, so events about a song no longer in the player are ignored.
 - **souvlaki takes over the media keys and the system's media controls** (`media_controls.rs`): MPRIS on Linux, over zbus, and Windows' media transport controls.
 
-The crates are symphonia 0.6 (decoding), rodio 0.23 (its resampler only, no features), cpal 0.18 (`pulseaudio` feature) and souvlaki 0.9 (`use_zbus`). rodio's `Decoder` did the decoding at first; symphonia is used directly since, so a song's trims and seeks are the app's own.
+The crates are symphonia 0.6 (decoding), rodio 0.23 (its resampler only, no features), cpal 0.18 (`pulseaudio` feature) and souvlaki 0.9 (`use_zbus`). rodio's `Decoder` did the decoding at first; symphonia is used directly since, so a song's trims and seeks are the app's own (see [song-formats.md](song-formats.md)).
 
 ## Why
 
@@ -99,5 +99,4 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
 - cpal lets the app name its PulseAudio client, so the volume mixer shows the app's own name.
 - symphonia reads `iTunSMPB`, or the library gets Apple-encoded MP3s, whose padding should then be read by hand.
 - souvlaki's zbus backend stops panicking on a lost bus, or the app needs to survive one.
-- The library takes formats other than MP3, M4A, AAC, Opus, Ogg, FLAC and WAV: symphonia's features grow, and so does the binary.
 - A song change between two sample rates needs to be gapless too: the output would then stay at one rate and resample every song itself, with a good resampler.

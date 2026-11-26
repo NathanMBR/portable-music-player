@@ -210,10 +210,13 @@ actions to the webview, which hands them to the playback store.
 
 `keyboardShortcuts.ts`, connected once from `main.tsx` as well, has the keyboard control the song in
 the player, playing or paused: Space pauses and resumes it, the left and right arrows jump 5 seconds
-back and forward, and the up and down arrows turn the volume by 5%. The keys stay with the focus
-where they work on it: in a text field, a dialog or an open list, and on a control reached with Tab
-that uses them. A control clicked with the mouse leaves them to the player. Stories never connect
-it.
+back and forward, the up and down arrows turn the volume by 5%, Ctrl with the left and right arrows
+goes to the previous and the next song, Ctrl+x stops the player, s toggles shuffle, r changes the
+repeat mode, and m mutes and unmutes. Each of the player's buttons names its keys in its tooltip,
+like "Shuffle (s)". They're the page's own key events, so they work only while the app's window has
+the focus. The keys stay with the focus where they work on it: in a text field, a dialog or an open
+list, and on a control reached with Tab that uses them. A control clicked with the mouse leaves them
+to the player. Stories never connect it.
 
 ## How the stories run without Tauri
 

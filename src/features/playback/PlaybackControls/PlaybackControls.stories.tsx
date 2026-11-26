@@ -29,6 +29,21 @@ export const Paused: Story = {
   }
 }
 
+/** Each button's tooltip names its keyboard shortcut after its label, like "Shuffle (s)". */
+export const TooltipsNameTheShortcuts: Story = {
+  play: async ({ canvas }) => {
+    const tooltips = canvas.getAllByRole('button').map(button => button.getAttribute('title'))
+    await expect(tooltips).toEqual([
+      'Shuffle (s)',
+      'Previous song (Ctrl+←)',
+      'Pause (Space)',
+      'Stop (Ctrl+x)',
+      'Next song (Ctrl+→)',
+      'Repeat off (r)'
+    ])
+  }
+}
+
 /** The last song of the queue with repeat off has no song after it, so "Next song" is disabled. */
 export const AtTheLastSong: Story = {
   args: { hasNextSong: false },

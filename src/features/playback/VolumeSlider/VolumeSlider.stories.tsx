@@ -37,6 +37,20 @@ export const Muted: Story = {
   }
 }
 
+/** The speaker's tooltip names its keyboard shortcut after its label, muted or not. */
+export const SpeakerTooltipNamesItsShortcut: Story = {
+  play: async ({ canvas, userEvent }) => {
+    const speaker = canvas.getByRole('button', { name: 'Mute' })
+    await expect(speaker).toHaveAttribute('title', 'Mute (m)')
+
+    await userEvent.click(speaker)
+    await expect(canvas.getByRole('button', { name: 'Unmute' })).toHaveAttribute(
+      'title',
+      'Unmute (m)'
+    )
+  }
+}
+
 /** Clicking the speaker silences the volume, and clicking it again brings the volume back. */
 export const MutesAndUnmutes: Story = {
   beforeEach: () => {

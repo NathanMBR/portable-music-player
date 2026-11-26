@@ -3,6 +3,7 @@ import { IconButton } from '../../../components/IconButton/IconButton'
 import { Slider } from '../../../components/Slider/Slider'
 import { logVolume } from '../playbackLog'
 import { audibleVolume, usePlaybackStore } from '../playbackStore'
+import { keysText, muteButtonName, PLAYER_KEYS } from '../playerControls'
 
 // The slider counts in percent, while the store keeps the volume from 0 to 1, like audio elements.
 const SLIDER_MAX = 100
@@ -15,7 +16,7 @@ const formatPercent = (percent: number) => `${percent}%`
 /**
  * The right end of the audio player: a slider for the volume, from silent to full, next to a
  * speaker button that is crossed out while muted. Clicking the speaker mutes, and clicking it
- * again brings the volume back. The song plays at the slider's volume as it moves, but the volume
+ * again brings the volume back; its tooltip names its keyboard shortcut. The song plays at the slider's volume as it moves, but the volume
  * is chosen only once the slider is released: released at zero, it mutes instead, keeping the
  * volume from before for unmuting. The mouse wheel over the slider turns the volume up or down by
  * 5%. The mouse over the slider shows, in a tooltip above it, the volume a click there would set.
@@ -41,7 +42,8 @@ export const VolumeSlider = () => {
     <div className="flex items-center gap-1">
       <IconButton
         icon={isMuted ? SpeakerXMarkIcon : SpeakerWaveIcon}
-        label={isMuted ? 'Unmute' : 'Mute'}
+        label={muteButtonName(isMuted)}
+        shortcut={keysText(PLAYER_KEYS.mute)}
         onClick={toggleMute}
       />
       <div className="w-28">

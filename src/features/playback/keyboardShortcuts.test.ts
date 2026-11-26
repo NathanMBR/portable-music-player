@@ -10,6 +10,12 @@ const overYourHead: Track = {
   title: 'Over Your Head',
   artist: 'Shaman'
 }
+const runBoyRun: Track = { path: 'Songs/Run Boy Run.mp3', title: 'Run Boy Run', artist: 'Woodkid' }
+const oneAndTheSame: Track = {
+  path: 'Songs/One and the Same.mp3',
+  title: 'One and the Same',
+  artist: 'Audioslave'
+}
 
 const SONG_LENGTH_SECONDS = 240
 
@@ -70,12 +76,18 @@ describe('connectKeyboardShortcuts', () => {
       playback().setVolume(0.5)
     })
 
-    it('pauses and resumes the song with Space', () => {
+    it('pauses and resumes the song with Space, logged like a click on its button', () => {
       press(' ')
       expect(session()?.isPlaying).toBe(false)
 
       press(' ')
       expect(session()?.isPlaying).toBe(true)
+      expect(loggedMessages().slice(-4)).toEqual([
+        'Pressed shortcut "Space" for "Pause"',
+        'Paused playing song "Over Your Head"',
+        'Pressed shortcut "Space" for "Play"',
+        'Resumed playing song "Over Your Head"'
+      ])
     })
 
     it('jumps 5 seconds back and forward with the left and right arrows', () => {
@@ -131,6 +143,79 @@ describe('connectKeyboardShortcuts', () => {
       expect(loggedMessages().slice(-1)).toEqual(['Set volume to 0%'])
     })
 
+    it('goes to the next and the previous song with Ctrl and the right and left arrows', () => {
+      playback().playTrack(runBoyRun, [overYourHead, runBoyRun, oneAndTheSame], SONGS_SOURCE)
+
+      press('ArrowRight', { ctrlKey: true })
+      expect(session()?.track).toEqual(oneAndTheSame)
+
+      press('ArrowLeft', { ctrlKey: true })
+      expect(session()?.track).toEqual(runBoyRun)
+      expect(loggedMessages().slice(-4)).toEqual([
+        'Pressed shortcut "Ctrl+→" for "Next song"',
+        'Started playing song "One and the Same"',
+        'Pressed shortcut "Ctrl+←" for "Previous song"',
+        'Started playing song "Run Boy Run"'
+      ])
+    })
+
+    it('stops the player with Ctrl and x', () => {
+      press('x', { ctrlKey: true })
+
+      expect(session()).toBeNull()
+      expect(loggedMessages().slice(-2)).toEqual([
+        'Pressed shortcut "Ctrl+x" for "Stop"',
+        'Stopped playing song "Over Your Head"'
+      ])
+    })
+
+    it('toggles shuffle with s, logging the state it leaves', () => {
+      press('s')
+      expect(playback().isShuffled).toBe(true)
+
+      press('s')
+      expect(playback().isShuffled).toBe(false)
+      expect(loggedMessages().slice(-2)).toEqual([
+        'Pressed shortcut "s" for "Shuffle" State: "on"',
+        'Pressed shortcut "s" for "Shuffle" State: "off"'
+      ])
+    })
+
+    it('changes the repeat mode with r, logging the state it leaves', () => {
+      const modes = ['r', 'r', 'r'].map(key => {
+        press(key)
+        return playback().repeatMode
+      })
+
+      expect(modes).toEqual(['all', 'one', 'off'])
+      expect(loggedMessages().slice(-3)).toEqual([
+        'Pressed shortcut "r" for "Repeat off" State: "all"',
+        'Pressed shortcut "r" for "Repeat all" State: "one"',
+        'Pressed shortcut "r" for "Repeat one" State: "off"'
+      ])
+    })
+
+    it('mutes and unmutes with m', () => {
+      press('m')
+      expect(playback().isMuted).toBe(true)
+
+      press('m')
+      expect(playback().isMuted).toBe(false)
+      expect(playback().volume).toBe(0.5)
+      expect(loggedMessages().slice(-2)).toEqual([
+        'Pressed shortcut "m" for "Mute"',
+        'Pressed shortcut "m" for "Unmute"'
+      ])
+    })
+
+    it('takes the letters typed in capitals by Caps Lock', () => {
+      press('S')
+      press('X', { ctrlKey: true })
+
+      expect(playback().isShuffled).toBe(true)
+      expect(session()).toBeNull()
+    })
+
     it('keeps the keys it takes, their release included, from the rest of the page', () => {
       const pageListener = vi.fn()
       document.addEventListener('keydown', pageListener)
@@ -152,38 +237,68 @@ describe('connectKeyboardShortcuts', () => {
       document.removeEventListener('keyup', pageListener)
     })
 
-    it('pauses only once while Space is held down', () => {
-      press(' ')
-      const heldDown = press(' ', { repeat: true })
+    it('acts only once while a key other than a bare arrow is held down', () => {
+      playback().playTrack(overYourHead, [overYourHead, runBoyRun, oneAndTheSame], SONGS_SOURCE)
+      const heldDowns = ['m', 'ArrowRight', ' '].map(key => {
+        const ctrlKey = key === 'ArrowRight'
+        press(key, { ctrlKey })
+        return press(key, { ctrlKey, repeat: true })
+      })
 
       expect(session()?.isPlaying).toBe(false)
-      expect(heldDown.defaultPrevented).toBe(true)
+      expect(session()?.track).toEqual(runBoyRun)
+      expect(playback().isMuted).toBe(true)
+      expect(heldDowns.every(heldDown => heldDown.defaultPrevented)).toBe(true)
     })
 
-    it('leaves the keys pressed with a modifier to the page', () => {
+    it('leaves the keys pressed with a modifier no shortcut takes to the page', () => {
       const keyDowns = [
         press(' ', { shiftKey: true }),
-        press('ArrowRight', { ctrlKey: true }),
+        press(' ', { ctrlKey: true }),
+        press('ArrowUp', { ctrlKey: true }),
+        press('ArrowRight', { ctrlKey: true, shiftKey: true }),
         press('ArrowLeft', { altKey: true }),
-        press('ArrowUp', { metaKey: true })
+        press('ArrowUp', { metaKey: true }),
+        press('S', { shiftKey: true }),
+        press('m', { ctrlKey: true }),
+        press('x')
       ]
 
       expect(keyDowns.some(keyDown => keyDown.defaultPrevented)).toBe(false)
       expect(session()?.isPlaying).toBe(true)
       expect(session()?.elapsedSeconds).toBe(60)
       expect(playback().volume).toBe(0.5)
+      expect(playback().isMuted).toBe(false)
+      expect(playback().isShuffled).toBe(false)
     })
 
-    it('leaves every key to a text field', () => {
-      show('<input type="search" aria-label="Search songs" />')
-      clickOn('input')
+    it('leaves every key to a text field or a text area', () => {
+      show(`
+        <input type="search" aria-label="Search songs" />
+        <textarea aria-label="Description"></textarea>
+      `)
 
-      const keyDowns = [press(' '), press('ArrowLeft'), press('ArrowUp')]
+      const keyDowns = ['input', 'textarea'].flatMap(selector => {
+        clickOn(selector)
+        return [
+          press(' '),
+          press('ArrowLeft'),
+          press('ArrowUp'),
+          press('ArrowRight', { ctrlKey: true }),
+          press('x', { ctrlKey: true }),
+          press('s'),
+          press('r'),
+          press('m')
+        ]
+      })
 
       expect(keyDowns.some(keyDown => keyDown.defaultPrevented)).toBe(false)
       expect(session()?.isPlaying).toBe(true)
       expect(session()?.elapsedSeconds).toBe(60)
       expect(playback().volume).toBe(0.5)
+      expect(playback().isMuted).toBe(false)
+      expect(playback().isShuffled).toBe(false)
+      expect(playback().repeatMode).toBe('off')
     })
 
     it('leaves every key to a dialog or an open list', () => {
@@ -203,19 +318,21 @@ describe('connectKeyboardShortcuts', () => {
       expect(playback().volume).toBe(0.5)
     })
 
-    it('leaves Space to a control reached with Tab, but still jumps with the arrows', () => {
+    it('leaves Space to a control reached with Tab, but still takes the arrows and letters', () => {
       show('<button>Next song</button>')
       tabTo('button')
 
       const space = press(' ')
       press('ArrowRight')
+      press('m')
 
       expect(space.defaultPrevented).toBe(false)
       expect(session()?.isPlaying).toBe(true)
       expect(session()?.elapsedSeconds).toBe(65)
+      expect(playback().isMuted).toBe(true)
     })
 
-    it('leaves the arrows to a control reached with Tab that moves with them', () => {
+    it('leaves the arrows, with Ctrl or not, to a control reached with Tab that moves with them', () => {
       show(`
         <input type="range" aria-label="Volume" />
         <button aria-haspopup="listbox">Order</button>
@@ -223,13 +340,16 @@ describe('connectKeyboardShortcuts', () => {
         <div role="button" tabindex="0" aria-roledescription="sortable">Move</div>
       `)
 
-      const keyDowns = ['input', 'button', '[role="radio"]', '[role="button"]'].map(selector => {
-        tabTo(selector)
-        return press('ArrowUp')
-      })
+      const keyDowns = ['input', 'button', '[role="radio"]', '[role="button"]'].flatMap(
+        selector => {
+          tabTo(selector)
+          return [press('ArrowUp'), press('ArrowLeft', { ctrlKey: true })]
+        }
+      )
 
       expect(keyDowns.some(keyDown => keyDown.defaultPrevented)).toBe(false)
       expect(playback().volume).toBe(0.5)
+      expect(session()?.elapsedSeconds).toBe(60)
     })
 
     it('takes the keys from a control clicked with the mouse, even after a Tab', () => {
@@ -247,10 +367,20 @@ describe('connectKeyboardShortcuts', () => {
   })
 
   it('leaves the keys to the page while no song is in the player', () => {
-    const keyDowns = [' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].map(key => press(key))
+    const keyDowns = [
+      ...[' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 's', 'r', 'm'].map(key =>
+        press(key)
+      ),
+      press('ArrowLeft', { ctrlKey: true }),
+      press('ArrowRight', { ctrlKey: true }),
+      press('x', { ctrlKey: true })
+    ]
 
     expect(keyDowns.some(keyDown => keyDown.defaultPrevented)).toBe(false)
     expect(session()).toBeNull()
     expect(playback().volume).toBe(1)
+    expect(playback().isMuted).toBe(false)
+    expect(playback().isShuffled).toBe(false)
+    expect(playback().repeatMode).toBe('off')
   })
 })

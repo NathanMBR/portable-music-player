@@ -15,6 +15,12 @@ type IconButtonProps = {
   icon: ComponentType<{ className?: string }>
   /** Accessible name and hover tooltip, since the button shows no text. */
   label: string
+  /**
+   * The keys that do the button's action, like `s`, which its tooltip names after its label:
+   * "Shuffle (s)". Screen readers hear the label alone as its name, and the tooltip as its
+   * description.
+   */
+  shortcut?: string
   /** Runs when the button is clicked or pressed from the keyboard. */
   onClick: () => void
   /**
@@ -53,7 +59,8 @@ const SHAPE_CLASSES: Record<IconButtonShape, string> = {
 
 /**
  * Button that shows only an icon. Its `label` is both the accessible name and the hover tooltip,
- * so the icon never has to explain itself. Its geometry (`shape`) and its look (`variant`) are
+ * so the icon never has to explain itself, and the tooltip names its keyboard `shortcut`, when it
+ * has one, in parentheses after the label. Its geometry (`shape`) and its look (`variant`) are
  * chosen apart. It can be a toggle (`isPressed`), have three or more states (`state`), or be
  * disabled. The spin of `isBusy` stops for users
  * who prefer reduced motion.
@@ -63,6 +70,7 @@ const SHAPE_CLASSES: Record<IconButtonShape, string> = {
 export const IconButton = ({
   icon: Icon,
   label,
+  shortcut,
   onClick,
   shape = 'circle',
   variant = 'quiet',
@@ -75,7 +83,7 @@ export const IconButton = ({
     aria-label={label}
     aria-pressed={isPressed}
     data-state={state}
-    title={label}
+    title={shortcut === undefined ? label : `${label} (${shortcut})`}
     disabled={isDisabled}
     onClick={onClick}
     className={`${SHAPE_CLASSES[shape]} ${isPressed ? ACTIVE_CLASSES : VARIANT_CLASSES[variant]} ${DISABLED_CLASSES} ${FOCUS_CLASSES}`}

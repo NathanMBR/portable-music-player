@@ -91,3 +91,16 @@ export const Disabled: Story = {
     await expect(args.onClick).not.toHaveBeenCalled()
   }
 }
+
+/**
+ * A button with a keyboard shortcut, like the audio player's: its tooltip names the keys after its
+ * label, while screen readers hear the label alone as its name and the tooltip as its description.
+ */
+export const WithShortcut: Story = {
+  args: { icon: ArrowsRightLeftIcon, label: 'Shuffle', shortcut: 's' },
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole('button', { name: 'Shuffle' })
+    await expect(button).toHaveAttribute('title', 'Shuffle (s)')
+    await expect(button).toHaveAccessibleDescription('Shuffle (s)')
+  }
+}

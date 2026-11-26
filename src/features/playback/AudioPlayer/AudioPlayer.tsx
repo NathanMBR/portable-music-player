@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Marquee } from '../../../components/Marquee/Marquee'
 import { TrackName } from '../../library/TrackName/TrackName'
 import { TITLE_ARTIST_SEPARATOR } from '../../library/trackName'
-import { findPlaylist, usePlaylistsStore } from '../../playlists/playlistsStore'
+import { findSourcePlaylist, usePlaylistsStore } from '../../playlists/playlistsStore'
 import { PlaybackControls } from '../PlaybackControls/PlaybackControls'
 import { type PlaybackSession, usePlaybackStore } from '../playbackStore'
 import { findNextTrack, findPreviousTrack, restartsOnPrevious } from '../playOrder'
@@ -22,10 +22,7 @@ const useSessionShownWhileClosing = (session: PlaybackSession | null) => {
 
 /** The song's name, then, played from a playlist, a middle dot and the playlist's title. */
 const SongName = ({ session }: { session: PlaybackSession }) => {
-  const { source } = session
-  const playlist = usePlaylistsStore(state =>
-    source.kind === 'playlist' ? findPlaylist(state.playlists, source.fileName) : undefined
-  )
+  const playlist = usePlaylistsStore(state => findSourcePlaylist(state.playlists, session.source))
 
   return (
     <>

@@ -6,7 +6,7 @@ import { useLibraryStore } from '../library/libraryStore'
 import { tracksOf } from '../library/scannedTracks'
 import { log } from '../logging/log'
 import { notifyError, notifySuccess, notifyUndoable } from '../notifications/notify'
-import { playlistSource } from '../playback/playbackSource'
+import { type PlaybackSource, playlistSource } from '../playback/playbackSource'
 import { usePlaybackStore } from '../playback/playbackStore'
 import { playlistFileName } from './playlistFileName'
 import { findPlaylistSongs, missingSongsOf, playableTracksOf, songNameOf } from './playlistSongs'
@@ -108,6 +108,10 @@ const playSongsOf = (playlist: SavedPlaylist, fromSong: string | undefined) => {
 /** The playlist saved under `fileName`, or `undefined` once it's gone. */
 export const findPlaylist = (playlists: SavedPlaylist[], fileName: string | null) =>
   playlists.find(playlist => playlist.fileName === fileName)
+
+/** The playlist a song plays from, or `undefined` from the Songs view or once it's gone. */
+export const findSourcePlaylist = (playlists: SavedPlaylist[], source: PlaybackSource) =>
+  source.kind === 'playlist' ? findPlaylist(playlists, source.fileName) : undefined
 
 /** The playlist on screen, or `undefined` while the list is, as when the open one was deleted. */
 export const selectShownPlaylist = ({ playlists, shownPlaylist }: PlaylistsStore) =>

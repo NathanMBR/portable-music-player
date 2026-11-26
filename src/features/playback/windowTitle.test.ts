@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { failingCommand, mockCommands } from '../../testing/mockCommands'
 import { shownNotifications } from '../../testing/notifications'
 import type { Track } from '../library/types'
-import { SONGS_SOURCE } from './playbackSource'
+import { usePlaylistsStore } from '../playlists/playlistsStore'
+import type { SavedPlaylist } from '../playlists/types'
+import { playlistSource, SONGS_SOURCE } from './playbackSource'
 import { usePlaybackStore } from './playbackStore'
 import { connectWindowTitle } from './windowTitle'
 
@@ -71,13 +73,13 @@ describe('connectWindowTitle', () => {
 
     expect(titles).toEqual([
       'Portable Music Player',
-      'Lasting Child — Portable Music Player',
-      'Make Believe — Portable Music Player',
+      'Lasting Child · Angra — Portable Music Player',
+      'Make Believe · Angra — Portable Music Player',
       'Portable Music Player'
     ])
   })
 
-  it("names the window after the song's tag title alone, not its file name or artist", async () => {
+  it("names the window after the song's tag title and artist, not its file name", async () => {
     const bringEmBackAlive: Track = {
       path: "Songs/05 Bring 'Em Back Alive.mp3",
       title: "Bring 'Em Back Alive",
@@ -91,8 +93,70 @@ describe('connectWindowTitle', () => {
 
     expect(titles).toEqual([
       'Portable Music Player',
-      "Bring 'Em Back Alive — Portable Music Player"
+      "Bring 'Em Back Alive · Audioslave — Portable Music Player"
     ])
+  })
+
+  it('names a song without an artist by its title alone', async () => {
+    const soldierSide: Track = {
+      path: 'Songs/Soldier Side - Intro.mp3',
+      title: 'Soldier Side - Intro',
+      artist: null
+    }
+    const titles = mockWindowTitle()
+    connect()
+
+    playback().playTrack(soldierSide, [soldierSide], SONGS_SOURCE)
+    await settle()
+
+    expect(titles.slice(-1)).toEqual(['Soldier Side - Intro — Portable Music Player'])
+  })
+
+  describe('with a song played from a playlist', () => {
+    const yourTimeHasCome: Track = {
+      path: 'Songs/Your Time Has Come.mp3',
+      title: 'Your Time Has Come',
+      artist: 'Audioslave'
+    }
+    const roadTrip: SavedPlaylist = {
+      fileName: '1764190000000-Road_trip.json',
+      title: 'Road trip',
+      description: '',
+      allSongsFound: true,
+      songs: ['Your Time Has Come.mp3']
+    }
+
+    beforeEach(() => {
+      usePlaylistsStore.setState({ playlists: [roadTrip] })
+    })
+
+    it('names the playlist after the artist, like the player bar', async () => {
+      const titles = mockWindowTitle()
+      connect()
+
+      playback().playTrack(yourTimeHasCome, [yourTimeHasCome], playlistSource(roadTrip.fileName))
+      await settle()
+
+      expect(titles.slice(-1)).toEqual([
+        'Your Time Has Come · Audioslave · Road trip — Portable Music Player'
+      ])
+    })
+
+    it('follows the playlist as it is renamed, then deleted', async () => {
+      const titles = mockWindowTitle()
+      connect()
+      playback().playTrack(yourTimeHasCome, [yourTimeHasCome], playlistSource(roadTrip.fileName))
+
+      usePlaylistsStore.setState({ playlists: [{ ...roadTrip, title: 'Long drive' }] })
+      usePlaylistsStore.setState({ playlists: [] })
+      await settle()
+
+      expect(titles.slice(-3)).toEqual([
+        'Your Time Has Come · Audioslave · Road trip — Portable Music Player',
+        'Your Time Has Come · Audioslave · Long drive — Portable Music Player',
+        'Your Time Has Come · Audioslave — Portable Music Player'
+      ])
+    })
   })
 
   it('keeps the title while the song plays on or pauses', async () => {

@@ -201,7 +201,8 @@ play" with its title, and the player pauses on it; a sound output lost with no o
 raises "Lost the sound output", and the player pauses too.
 
 `windowTitle.ts`, also connected once from `main.tsx`, names the window after the song in the
-player, playing or paused, and after the app once it's stopped.
+player, playing or paused, as the player bar names it: its title, its artist and the playlist it
+plays from, then the app's name. It names it after the app alone once the player is stopped.
 
 `mediaControls.ts`, connected once from `main.tsx` too, has the keyboard's media keys and the
 system's media controls play, pause, stop, skip and seek: Rust reaches them, MPRIS on Linux and

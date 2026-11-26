@@ -271,6 +271,12 @@ pub(super) struct SongReader {
     slot: usize,
 }
 
+impl SongReader {
+    pub(super) fn length(&self) -> u64 {
+        self.bytes.length()
+    }
+}
+
 impl Read for SongReader {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         let count = self.bytes.read_at(self.slot, self.position, buffer)?;

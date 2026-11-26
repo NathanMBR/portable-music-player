@@ -9,6 +9,7 @@ mod media_controls;
 mod output;
 mod song_bytes;
 mod song_chain;
+mod song_decoder;
 mod song_feeder;
 
 use std::{

@@ -2,13 +2,12 @@ import { Button } from '@headlessui/react'
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { FOCUS_CLASSES } from '../../../components/buttonStyles'
 import { Slider } from '../../../components/Slider/Slider'
-import { log } from '../../logging/log'
 import { POSITION_STEP_SECONDS } from '../constants'
+import { logJump } from '../playbackLog'
 import { type ShownTime, usePlaybackStore } from '../playbackStore'
 import {
   formatCountdown,
   formatPlaybackTime,
-  formatPreciseTime,
   formatTenthsTime,
   remainingSeconds
 } from '../playbackTime'
@@ -33,8 +32,6 @@ const SWITCH_HINTS: Record<ShownTime, string> = {
 }
 
 const SONG_LENGTH_NAME = 'Song length'
-
-const logJump = (seconds: number) => log(`Jumping song to ${formatPreciseTime(seconds)}`)
 
 // The bar moves in tenths of a second, but a press of an arrow key skips a few seconds, like in
 // most players.

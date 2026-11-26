@@ -1,7 +1,7 @@
 import { SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/react/20/solid'
 import { IconButton } from '../../../components/IconButton/IconButton'
 import { Slider } from '../../../components/Slider/Slider'
-import { log } from '../../logging/log'
+import { logVolume } from '../playbackLog'
 import { audibleVolume, usePlaybackStore } from '../playbackStore'
 
 // The slider counts in percent, while the store keeps the volume from 0 to 1, like audio elements.
@@ -11,8 +11,6 @@ const SLIDER_MAX = 100
 const WHEEL_STEP = 5
 
 const formatPercent = (percent: number) => `${percent}%`
-
-const logVolume = (percent: number) => log(`Set volume to ${formatPercent(percent)}`)
 
 /**
  * The right end of the audio player: a slider for the volume, from silent to full, next to a

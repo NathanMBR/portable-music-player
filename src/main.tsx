@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { useLibraryStore } from './features/library/libraryStore'
 import { connectButtonLog } from './features/logging/buttonLog'
+import { connectKeyboardShortcuts } from './features/playback/keyboardShortcuts'
 import { connectMediaControls } from './features/playback/mediaControls'
 import { connectPlaybackMemory, restorePlayback } from './features/playback/playbackMemory'
 import { connectSongEngine } from './features/playback/songEngine'
@@ -22,6 +23,7 @@ const playlistsListed = usePlaylistsStore.getState().loadPlaylists()
 connectSongEngine()
 connectWindowTitle()
 connectMediaControls()
+connectKeyboardShortcuts()
 connectButtonLog()
 connectSongDrop()
 // Waits for the settings, which say whether to look for a newer release.

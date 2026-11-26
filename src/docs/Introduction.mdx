@@ -208,6 +208,13 @@ system's media controls play, pause, stop, skip and seek: Rust reaches them, MPR
 Windows' media controls on Windows, shows them the song in the player, and sends their buttons'
 actions to the webview, which hands them to the playback store.
 
+`keyboardShortcuts.ts`, connected once from `main.tsx` as well, has the keyboard control the song in
+the player, playing or paused: Space pauses and resumes it, the left and right arrows jump 5 seconds
+back and forward, and the up and down arrows turn the volume by 5%. The keys stay with the focus
+where they work on it: in a text field, a dialog or an open list, and on a control reached with Tab
+that uses them. A control clicked with the mouse leaves them to the player. Stories never connect
+it.
+
 ## How the stories run without Tauri
 
 Storybook runs the UI in a plain browser, where there is no Rust side. Three pieces make the stories

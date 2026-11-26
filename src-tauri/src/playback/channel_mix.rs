@@ -1,7 +1,7 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 
-/// The most channels the mix places, 7.1's: a song's channels past them are left out, and an
-/// output's stay silent.
+/// The most channels the mix places, 7.1's: a song of more isn't played, and an output's channels
+/// past them stay silent.
 pub(super) const MAX_CHANNELS: usize = 8;
 
 /// A speaker a channel is meant for.

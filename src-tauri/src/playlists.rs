@@ -630,7 +630,7 @@ mod tests {
             "Songs/Angels and Demons.mp3",
             "../Angels and Demons.mp3",
             "..\\Angels and Demons.mp3",
-            "Angels and Demons.wav",
+            "Angels and Demons.jpg",
             "._Angels and Demons.mp3",
             "",
         ];
@@ -816,6 +816,22 @@ mod tests {
                 "songs": ["Jump in the Fire.mp3", "Wishing Well.mp3"]
             })
         );
+    }
+
+    #[test]
+    fn creating_finds_songs_of_every_format() {
+        let root = player_with_songs(&["Cure.flac", "Stand Away.WAVE"]);
+        let file_name = "1763581234567-Lossless.json";
+
+        let created = create_playlist_in(
+            root.path(),
+            file_name,
+            contents("Lossless", "", &["Cure.flac", "Stand Away.WAVE"]),
+        )
+        .unwrap();
+
+        assert!(created.all_songs_found);
+        assert_eq!(created.songs, ["Cure.flac", "Stand Away.WAVE"]);
     }
 
     #[test]

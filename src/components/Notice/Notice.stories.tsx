@@ -7,7 +7,7 @@ const meta = {
   component: Notice,
   args: {
     title: 'Your Songs folder is empty',
-    description: 'Copy .mp3 files into it, then scan again.'
+    description: 'Copy songs into it, then scan again.'
   },
   argTypes: { action: { control: false } }
 } satisfies Meta<typeof Notice>

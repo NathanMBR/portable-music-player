@@ -424,6 +424,8 @@ impl SongFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::playback::song_chain::{ChainCommand, ChainEvent, ChainSong, SongChain};
+    use crate::test_media::{Signal, flac_song, samples_of};
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, gapless_audio, root_with_songs, silent_frames,
     };
@@ -623,6 +625,65 @@ mod tests {
         let expected = song_frames * f64::from(output_rate) / f64::from(SAMPLE_RATE);
         assert!((frame_count(&blocks) as f64 - expected).abs() <= 2.0);
         assert_eq!(song.format.sample_rate, SAMPLE_RATE);
+    }
+
+    #[test]
+    fn joins_two_flac_songs_without_an_extra_frame() {
+        let signal = Signal {
+            sample_rate: SAMPLE_RATE,
+            channels: CHANNELS,
+            frames: 3000,
+        };
+        let first = open_song("2 X 4.flac", &flac_song(16, signal), Duration::ZERO);
+        let second = open_song(
+            "The Great Escape.flac",
+            &flac_song(24, signal),
+            Duration::ZERO,
+        );
+        let (events, event_receiver) = SongChain::event_channel();
+        let (mut chain, handle) = SongChain::new(1, CHANNELS, events);
+        let chain_song = |id, song: &OpenSong| ChainSong {
+            id,
+            feed: song.feeder.decode_at(SAMPLE_RATE),
+            generation: 0,
+            start_frame: 0,
+        };
+        let commands = [
+            ChainCommand::Play {
+                song: chain_song(1, &first),
+                is_paused: false,
+            },
+            ChainCommand::QueueNext {
+                after: 1,
+                song: Some(chain_song(2, &second)),
+            },
+        ];
+        for command in commands {
+            handle.commands.send(command).unwrap();
+        }
+
+        let mut played = Vec::new();
+        let mut buffer = [0.0; 512];
+        let deadline = std::time::Instant::now() + FEED_TIMEOUT;
+        while !event_receiver
+            .try_iter()
+            .any(|event| matches!(event, ChainEvent::Ended { id: 2, .. }))
+        {
+            assert!(std::time::Instant::now() < deadline, "timed out");
+            chain.fill(&mut buffer);
+            played.extend_from_slice(&buffer);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+
+        // The chain plays silence while a feeder hasn't sent its blocks yet, which a test's fills
+        // can outrun, unlike an output's pace. The signal is never 0, so only that is left out.
+        let sound: Vec<f32> = played
+            .chunks(usize::from(CHANNELS))
+            .filter(|frame| frame.iter().any(|sample| *sample != 0.0))
+            .flatten()
+            .copied()
+            .collect();
+        assert!(sound == [samples_of(signal), samples_of(signal)].concat());
     }
 
     #[test]

@@ -50,7 +50,7 @@ const tellNothingToAdd = ({ failures }: DroppedSongs) => {
   if (failures.length > 0) {
     notifyFailures(DROP_FAILURE_TITLE, failures)
   } else {
-    notify('No songs to add', 'Only MP3 files can be added to the Songs folder')
+    notify('No songs to add', 'Only MP3, FLAC and WAV files can be added to the Songs folder')
   }
 }
 

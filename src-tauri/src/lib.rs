@@ -9,6 +9,8 @@ mod portable;
 mod settings;
 mod song_drop;
 #[cfg(test)]
+mod test_media;
+#[cfg(test)]
 mod test_songs;
 mod updates;
 

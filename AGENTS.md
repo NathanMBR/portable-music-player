@@ -157,8 +157,8 @@ src/
 - Song drop: files and folders dropped anywhere on the window add their songs to the Songs folder (`src/features/songDrop/`).
   - `songDropEvents.ts`, connected once from `main.tsx`, follows Tauri's drag events (`getCurrentWebview().onDragDropEvent`). While a drag holding files is over the window, `SongDropOverlay` fades in, blurs the whole page behind frosted glass (`backdrop-blur`) and covers it with a dashed box saying "Drop files here", its dashes marching clockwise (`animate-march`; the border is an SVG stroke, since CSS can't move a border's dashes); a drag without files, like a selected text, shows nothing. An app only learns of a drag once it enters its window: Windows and Wayland tell no other app, so the box can't show any earlier.
   - Tauri's `dragDropEnabled` is on by default, and on Windows its drop handling replaces WebView2's, so the page gets no HTML5 drag and drop events: dragging within the page, like reordering a playlist's songs, goes through pointer events (`SortableList`, on dnd-kit).
-  - The drop's paths, absolute as the OS gives them, go straight back to Rust (`song_drop.rs`), which copies only the MP3s among them, and only into the Songs folder.
-  - `songDropStore.ts` takes a drop through the steps `SongDropDialog` shows: `check_dropped_songs` counts the MP3s of the drop, subfolders included, and names those whose file name is taken; if any is, the dialog lists them all, in a box that scrolls when they're many (`ScrollBox`), and asks to skip them, replace the songs already there, or cancel; `copy_dropped_songs` copies them flat into the Songs folder; then the Songs folder is scanned again, once any scan already running ends (the library store's `scanAgain`), and that rescan notifies. The dialog stays open, with a loader, until the rescan ends. A drop without songs notifies instead, and a drop while another is added is ignored.
+  - The drop's paths, absolute as the OS gives them, go straight back to Rust (`song_drop.rs`), which copies only the songs among them (`library::has_song_name`), and only into the Songs folder.
+  - `songDropStore.ts` takes a drop through the steps `SongDropDialog` shows: `check_dropped_songs` counts the songs of the drop, subfolders included, and names those whose file name is taken; if any is, the dialog lists them all, in a box that scrolls when they're many (`ScrollBox`), and asks to skip them, replace the songs already there, or cancel; `copy_dropped_songs` copies them flat into the Songs folder; then the Songs folder is scanned again, once any scan already running ends (the library store's `scanAgain`), and that rescan notifies. The dialog stays open, with a loader, until the rescan ends. A drop without songs notifies instead, and a drop while another is added is ignored.
 - Playlists: the Playlists view (`PlaylistsView`) shows the list of playlists (`PlaylistsOverview`), sorted by title with `compareNames` and no setting to change it, or the one opened from its row (`PlaylistPage`). The playlists store keeps the open one (`shownPlaylist`), so it stays open while other pages are on screen.
   - A click anywhere on a playlist's row opens it: its title is a button (named `See <title>`) stretched over the row (`after:absolute after:inset-0`, with `STRETCHED_FOCUS_CLASSES`, its focus ring around the row), and the row's own controls, the play button, or the alert in its place, and the menu, sit above it (`relative z-10`). `ListRow` is `relative isolate`, so the stretched button stays inside its row and the raised controls never rise above the header or the floating buttons. The row ends with a menu (`ActionMenu`): Recheck songs while songs are missing, then Edit playlist, then Delete playlist. `PlaylistsOverview` holds both dialogs, outside the rows (`useDialogAbout`).
   - `main.tsx` lists them once at launch. Scans never list them again, since nothing in a playlist's file changes with the Songs folder until Rust checks it.
@@ -185,7 +185,8 @@ src/
   - The window starts hidden (`"visible": false` in `tauri.conf.json`). `show()` reads the saved size from the plugin's file, shrinks it to fit the current screen, centers it, and only then shows the window, so it never visibly jumps.
   - The plugin's own restore is skipped because on Linux it applies the size asynchronously, too late for centering. For the same reason Tauri's `center()` can't be used: GTK reports a 0×0 outer size until the window is first drawn.
 - One module per feature (e.g. `library.rs`) holding its constants, data structs, commands and error enum.
-- `library.rs`: the scan lists the MP3s of the Songs folder and reads each one's tags with `lofty` (`read_song_tags`).
+- `library.rs`: the scan lists the songs of the Songs folder, the files with one of `SONG_EXTENSIONS` (`mp3`, `flac`, `wav`, `wave`, in any case; `has_song_name`), and reads each one's tags with `lofty` (`read_song_tags`).
+  - The extension only says a file is a song. Its tags are read in the format its content says, else its extension's (`probe_of`, lofty's `guess_file_type`), so a song named after another format still shows its tags; the player finds its container the same way (`song_decoder.rs`).
   - It reads only the tags (`tags_only()`: no audio properties, no embedded pictures), since every song comes from a possibly slow drive. lofty still reads through a picture's bytes to get past it, but doesn't decode or keep it.
   - `Track::title` is the title tag, else the file name without the extension. `Track::artist` is the artist tag (ID3's lead performer), else the album artist (ID3's band/orchestra), else `None`. Several values of one tag, like ID3v2.4's multi-value frames, are joined with `, ` (`ARTIST_SEPARATOR`). Values are trimmed, and blank counts as missing.
   - Each value comes from the first tag that has it: an MP3's ID3v2 tag first, so its ID3v1 or APE tag only fills in what the ID3v2 tag lacks.
@@ -225,7 +226,7 @@ src/
     - a file whose name doesn't fit, or a folder;
     - a file that isn't valid JSON, or holds a missing, mistyped or unknown field;
     - a blank title;
-    - a song that isn't a plain `.mp3` file name (`library::is_song_file_name`);
+    - a song that isn't a plain song file name (`library::is_song_file_name`);
     - a song listed twice, compared lowercase like the drive's file system may.
   - Hidden files, like a save's temporary file, are skipped quietly. Create and save refuse the same contents (`ContentsProblem`), so the player never writes a file it would then skip.
   - `allSongsFound` is worked out only when a playlist is created, saved or checked (`check_playlist`, which also names the songs missing), never by a listing or a scan, through `library::missing_songs_in`: the songs the scan wouldn't list, from the same listing (`song_files_in`), with names paired exactly, case included, the way the webview pairs a playlist's songs with the scan. Checking rewrites the file only when the value changes, and Rust logs each change of it.
@@ -318,7 +319,8 @@ These follow from the project goal and are easy to get wrong:
 - Every struct and error sent to the frontend has a test pinning its JSON (`serde_json::to_value`), which must match the TypeScript type in the feature's `types.ts`.
 - `unwrap`/`expect` are fine in tests: a panic is how a Rust test fails.
 - Rust tests of tag reading build their MP3s in the temp folder instead of committing fixtures: lofty writes the tag's bytes (`dump_to`), followed by two silent MPEG frames (`silent_audio()` in `test_songs.rs`). Pictures go in the same way (`tag_with_pictures`), each with its own description, since ID3v2 keeps one picture per description.
-- Rust tests of playback build their MP3s the same way (`test_songs.rs`): silent MPEG frames at 44.1 or 48 kHz, with or without the Info frame that tells the decoder the encoder's delay and padding (`gapless_audio`). The engine's tests play on a fake output (`FakeOpener`), whose chains they run by hand, so no sound device is needed.
+- Rust tests of playback build their MP3s the same way (`test_songs.rs`): silent MPEG frames at 44.1 or 48 kHz, with or without the Info frame that tells the decoder the encoder's delay and padding (`gapless_audio`).
+- Rust tests of the other formats build their files the same way (`test_media.rs`): WAV and FLAC files of a known signal (`level_at`, never 0, held exactly by every bit depth), so a test checks every sample it decodes. Their tags are saved into them by lofty (`TagExt::save_to`, on a `Cursor`). The engine's tests play on a fake output (`FakeOpener`), whose chains they run by hand, so no sound device is needed.
 - Covers in stories come from `src/testing/covers.ts`: `drawCover` draws a small PNG in the browser for `read_cover` to answer, `noCover` answers a song without one, and waits for a cover use `UNTIL_COVER_SHOWS`, longer than `waitFor`'s default. Every story that renders `TrackList` or a playlist's row (`PlaylistRow`) mocks `read_cover`.
 - **Example songs come from `test/get_mock_songs.sh`**, in stories, tests (frontend and Rust) and docs: titles, artists, file names and paths alike. Never make up a song name or artist.
   - Run `test/get_mock_songs.sh <count>`, asking for as many songs as the example needs, and use the songs it prints, picked at random from `test/mock_songs.csv`. It repeats songs only when you ask for more than the file holds.
@@ -326,7 +328,7 @@ These follow from the project goal and are easy to get wrong:
   - `test/mock_songs.csv` follows RFC 4180 under a `title,artist` header, one song per line, quoting a field only when it needs it. Every song has a title, the artist may be empty, and no field holds a line break. The script rejects a malformed file, naming the line.
   - Example songs are the exception to "No duplication": never share them through a constant or helper module, and never reuse songs written elsewhere. Every time an example needs songs, run the script again and write the songs where they're used.
   - A test that needs a special title (lowercase, accents, numbers) adapts a drawn title, e.g. lowercases it or prefixes a track number, or draws more songs and keeps the ones that fit.
-- Name a test after the rule it checks: `rejects_hidden_and_non_mp3_names`, `it('compares numbers by value')`.
+- Name a test after the rule it checks: `rejects_hidden_and_non_song_names`, `it('compares numbers by value')`.
 
 ## Test-driven development
 
@@ -402,7 +404,7 @@ Every feature logs what the user does and what the app does in response, followi
 | A song of a playlist is moved | `Moved song "<song title>" to position <n> in playlist "<title>"`, counted from 1 |
 | A song is removed from a playlist | `Removed song "<song title>" from playlist "<title>"` |
 | A removed song comes back with Undo | `Put song "<song title>" back in playlist "<title>"` |
-| Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
+| Files or folders are dropped on the window | `Dropped <count> songs`, the songs found in them, e.g. `Dropped 1 song` |
 | The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |
 | The app crashes | `Crashed while reading "<song>": <panic message> (<place in the code>)`, the song's file name, or `Crashed: <panic message> (<place in the code>)` when no song is being read |

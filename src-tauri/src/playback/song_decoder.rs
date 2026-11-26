@@ -25,7 +25,7 @@ use tauri_plugin_log::log;
 
 use super::{
     PlaybackError,
-    channel_mix::{ChannelLayout, Speaker},
+    channel_mix::{ChannelLayout, MAX_CHANNELS, Speaker},
     song_bytes::{SongBytes, SongReader},
 };
 
@@ -137,7 +137,8 @@ impl SongDecoder {
             failed_packets: 0,
             has_ended: false,
         };
-        if !song.decode_next() {
+        // A song of more channels than the mix places would lose some of them.
+        if !song.decode_next() || usize::from(song.channels()) > MAX_CHANNELS {
             return Err(undecodable());
         }
         if song.exact_duration().is_none() {
@@ -506,6 +507,7 @@ impl MediaSource for SongReader {
 mod tests {
     use super::*;
     use crate::playback::channel_mix::Speaker;
+    use crate::test_media::{Signal, WavEncoding, flac_song, samples_of, wav_song};
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, damaged_frames, gapless_audio, root_with_songs,
         silent_frames,
@@ -594,6 +596,93 @@ mod tests {
             "read {}",
             bytes.loaded_length()
         );
+    }
+
+    /// A few seconds' fraction of stereo at 44.1 kHz, over several FLAC frames.
+    const STEREO_SIGNAL: Signal = Signal {
+        sample_rate: SAMPLE_RATE,
+        channels: 2,
+        frames: 10_000,
+    };
+
+    #[test]
+    fn plays_every_frame_of_flac_and_wav_songs() {
+        let songs = [
+            ("Paradise.flac", flac_song(16, STEREO_SIGNAL)),
+            ("Phantom Lord.flac", flac_song(24, STEREO_SIGNAL)),
+            (
+                "Run Boy Run.wav",
+                wav_song(WavEncoding::Pcm16, STEREO_SIGNAL),
+            ),
+            (
+                "The Shaman.wav",
+                wav_song(WavEncoding::Pcm24, STEREO_SIGNAL),
+            ),
+            (
+                "Carry On.wave",
+                wav_song(WavEncoding::Float32, STEREO_SIGNAL),
+            ),
+        ];
+
+        for (file_name, song) in songs {
+            let decoder = decoder_of_song(file_name, &song).unwrap();
+
+            assert_eq!(decoder.sample_rate(), SAMPLE_RATE, "{file_name}");
+            assert_eq!(decoder.channels(), 2, "{file_name}");
+            let expected_duration =
+                f64::from(STEREO_SIGNAL.frames) / f64::from(STEREO_SIGNAL.sample_rate);
+            let duration = decoder.duration().unwrap().as_secs_f64();
+            assert!(
+                (duration - expected_duration).abs() < 1e-6,
+                "{file_name}: {duration}"
+            );
+            let samples: Vec<f32> = decoder.collect();
+            assert!(samples == samples_of(STEREO_SIGNAL), "{file_name}");
+        }
+    }
+
+    #[test]
+    fn seeks_to_the_exact_frame_of_a_flac_song() {
+        let song = flac_song(16, STEREO_SIGNAL);
+
+        for frame in [0, 1, 4095, 4096, 7000, STEREO_SIGNAL.frames - 1] {
+            let mut decoder = decoder_of_song("Jet Pilot.flac", &song).unwrap();
+            let position = Duration::from_secs_f64(f64::from(frame) / f64::from(SAMPLE_RATE));
+
+            decoder.seek(position).unwrap();
+
+            let samples: Vec<f32> = decoder.collect();
+            let expected = &samples_of(STEREO_SIGNAL)[frame as usize * 2..];
+            assert!(samples == expected, "from {frame}");
+        }
+    }
+
+    #[test]
+    fn places_the_channels_of_a_surround_wav() {
+        let surround = Signal {
+            channels: 6,
+            ..STEREO_SIGNAL
+        };
+
+        let decoder =
+            decoder_of_song("Orion.wav", &wav_song(WavEncoding::Pcm16, surround)).unwrap();
+
+        assert_eq!(decoder.layout(), ChannelLayout::standard(6));
+    }
+
+    #[test]
+    fn refuses_a_song_of_more_than_eight_channels() {
+        let nine_channels = Signal {
+            channels: 9,
+            ..STEREO_SIGNAL
+        };
+
+        let result = decoder_of_song("Ronnie.wav", &wav_song(WavEncoding::Pcm16, nine_channels));
+
+        assert!(matches!(
+            result,
+            Err(PlaybackError::Decode { path }) if path == "Songs/Ronnie.wav"
+        ));
     }
 
     #[test]

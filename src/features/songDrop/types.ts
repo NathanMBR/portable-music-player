@@ -14,7 +14,7 @@ export type DropFailure = {
 
 /** What a drop holds, before anything is copied (mirrors `DroppedSongs` in `song_drop.rs`). */
 export type DroppedSongs = {
-  /** The MP3s found in the files and folders dropped, subfolders included. */
+  /** The songs found in the files and folders dropped, subfolders included. */
   songCount: number
   /**
    * The file names of the dropped songs whose name is taken, by a song of the Songs folder or by

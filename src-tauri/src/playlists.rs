@@ -820,18 +820,15 @@ mod tests {
 
     #[test]
     fn creating_finds_songs_of_every_format() {
-        let root = player_with_songs(&["Cure.flac", "Stand Away.WAVE"]);
+        let songs = ["Cure.flac", "Stand Away.WAVE", "X.ogg", "Pale Yellow.oga"];
+        let root = player_with_songs(&songs);
         let file_name = "1763581234567-Lossless.json";
 
-        let created = create_playlist_in(
-            root.path(),
-            file_name,
-            contents("Lossless", "", &["Cure.flac", "Stand Away.WAVE"]),
-        )
-        .unwrap();
+        let created =
+            create_playlist_in(root.path(), file_name, contents("Lossless", "", &songs)).unwrap();
 
         assert!(created.all_songs_found);
-        assert_eq!(created.songs, ["Cure.flac", "Stand Away.WAVE"]);
+        assert_eq!(created.songs, songs);
     }
 
     #[test]

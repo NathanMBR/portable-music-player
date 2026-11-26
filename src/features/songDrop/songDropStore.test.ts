@@ -132,7 +132,7 @@ describe('dropSongs', () => {
       {
         type: 'info',
         title: 'No songs to add',
-        description: 'Only MP3, FLAC and WAV files can be added to the Songs folder'
+        description: 'Only MP3, Ogg, FLAC and WAV files can be added to the Songs folder'
       }
     ])
     expect(loggedMessages()).toEqual(['Dropped 0 songs'])

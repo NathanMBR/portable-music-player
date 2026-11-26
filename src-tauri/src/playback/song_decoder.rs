@@ -507,7 +507,10 @@ impl MediaSource for SongReader {
 mod tests {
     use super::*;
     use crate::playback::channel_mix::Speaker;
-    use crate::test_media::{Signal, WavEncoding, flac_song, samples_of, wav_song};
+    use crate::test_media::{
+        FIXTURE_FRAMES, OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding, flac_song,
+        ogg_flac_song, samples_of, wav_song,
+    };
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, damaged_frames, gapless_audio, root_with_songs,
         silent_frames,
@@ -518,6 +521,11 @@ mod tests {
         let track_path = format!("Songs/{file_name}");
         let bytes = SongBytes::open(root.path(), &track_path).unwrap();
         SongDecoder::open(bytes, &track_path)
+    }
+
+    /// Where `frame` of a song at `SAMPLE_RATE` starts.
+    fn position_of(frame: u64) -> Duration {
+        Duration::from_secs_f64(frame as f64 / f64::from(SAMPLE_RATE))
     }
 
     fn frames_of(decoder: SongDecoder) -> usize {
@@ -654,6 +662,47 @@ mod tests {
             let samples: Vec<f32> = decoder.collect();
             let expected = &samples_of(STEREO_SIGNAL)[frame as usize * 2..];
             assert!(samples == expected, "from {frame}");
+        }
+    }
+
+    #[test]
+    fn plays_every_frame_of_ogg_songs() {
+        let vorbis = decoder_of_song("Until We Fall.ogg", VORBIS_FIXTURE).unwrap();
+        let ogg_flac = ogg_flac_song(16, STEREO_SIGNAL, &OggFlacHeaders::default());
+        let flac = decoder_of_song("Creeping Death.oga", &ogg_flac).unwrap();
+
+        assert_eq!(vorbis.sample_rate(), SAMPLE_RATE);
+        assert_eq!(vorbis.channels(), 2);
+        let duration = vorbis.duration().unwrap().as_secs_f64();
+        assert!((duration - 1.0).abs() < 1e-6, "{duration}");
+        assert_eq!(frames_of(vorbis) as u64, FIXTURE_FRAMES);
+        let expected_duration =
+            f64::from(STEREO_SIGNAL.frames) / f64::from(STEREO_SIGNAL.sample_rate);
+        let duration = flac.duration().unwrap().as_secs_f64();
+        assert!((duration - expected_duration).abs() < 1e-6, "{duration}");
+        assert!(flac.collect::<Vec<f32>>() == samples_of(STEREO_SIGNAL));
+    }
+
+    #[test]
+    fn seeks_to_the_exact_frame_of_ogg_songs() {
+        let ogg_flac = ogg_flac_song(24, STEREO_SIGNAL, &OggFlacHeaders::default());
+
+        for frame in [0, 1, 4095, 4096, 7000, STEREO_SIGNAL.frames - 1] {
+            let mut decoder = decoder_of_song("Dreaming.oga", &ogg_flac).unwrap();
+            decoder.seek(position_of(frame.into())).unwrap();
+
+            let expected = &samples_of(STEREO_SIGNAL)[frame as usize * 2..];
+            assert!(decoder.collect::<Vec<f32>>() == expected, "from {frame}");
+        }
+        for frame in [0, 1, 1000, 22_050, FIXTURE_FRAMES - 1] {
+            let mut decoder = decoder_of_song("Bad Seed.ogg", VORBIS_FIXTURE).unwrap();
+            decoder.seek(position_of(frame)).unwrap();
+
+            assert_eq!(
+                frames_of(decoder) as u64,
+                FIXTURE_FRAMES - frame,
+                "from {frame}"
+            );
         }
     }
 

@@ -17,12 +17,12 @@ use lofty::{
 use serde::{Serialize, Serializer};
 use tauri::ipc::Response;
 
-use crate::{crash_log, portable};
+use crate::{crash_log, ogg_flac_tags, portable};
 
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 /// The extensions of the files the scan lists as songs, compared without regard to case. They only
 /// say a file is a song: its format comes from its content.
-const SONG_EXTENSIONS: [&str; 4] = ["mp3", "flac", "wav", "wave"];
+const SONG_EXTENSIONS: [&str; 6] = ["mp3", "ogg", "oga", "flac", "wav", "wave"];
 /// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
 /// "band/orchestra").
 const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
@@ -137,12 +137,40 @@ fn read_cover_in(root: &Path, track_path: &str) -> Result<Option<Vec<u8>>, Libra
 
 fn read_song_cover(file: File, song: &Path) -> Option<Vec<u8>> {
     // Bad tags never fail a cover, like they never fail the scan: the row shows the placeholder.
-    let tagged_file = probe_of(BufReader::new(file), song)
-        .ok()?
-        .options(tags_with_pictures())
-        .read()
-        .ok()?;
-    cover_among(tagged_file.tags()).map(|cover| cover.data().to_vec())
+    with_tags_of(file, song, Pictures::Read, |tags| {
+        cover_among(tags).map(|cover| cover.data().to_vec())
+    })
+    .ok()
+    .flatten()
+}
+
+/// Whether a song's tags are read with their pictures.
+#[derive(Clone, Copy, PartialEq)]
+enum Pictures {
+    Skipped,
+    Read,
+}
+
+/// Reads the tags of `song` from `file` and hands them to `read`: through lofty, in the format the
+/// song's content says, except an Ogg FLAC's, which lofty doesn't read (`ogg_flac_tags`).
+fn with_tags_of<T>(
+    mut file: File,
+    song: &Path,
+    pictures: Pictures,
+    read: impl FnOnce(&[Tag]) -> T,
+) -> Result<T, FileParseError> {
+    if ogg_flac_tags::is_ogg_flac(&mut file)? {
+        let tag = ogg_flac_tags::read_ogg_flac_tag(file, pictures == Pictures::Read);
+        return Ok(read(tag.as_slice()));
+    }
+    let options = match pictures {
+        Pictures::Skipped => tags_only(),
+        Pictures::Read => tags_with_pictures(),
+    };
+    let tagged_file = probe_of(BufReader::new(file), song)?
+        .options(options)
+        .read()?;
+    Ok(read(tagged_file.tags()))
 }
 
 /// Covers are read one song at a time, as their rows come on screen, so they're read with the
@@ -263,10 +291,11 @@ fn tags_only() -> ParseOptions {
 }
 
 fn read_song_tags(song: &Path) -> Result<SongTags, FileParseError> {
-    let file = BufReader::new(File::open(song)?);
-    let tagged_file = probe_of(file, song)?.options(tags_only()).read()?;
-    let tags = tagged_file.tags();
-    Ok(SongTags {
+    with_tags_of(File::open(song)?, song, Pictures::Skipped, song_tags_among)
+}
+
+fn song_tags_among(tags: &[Tag]) -> SongTags {
+    SongTags {
         title: tag_values(tags, ItemKey::TrackTitle)
             .first()
             .map(|title| (*title).to_owned()),
@@ -275,7 +304,7 @@ fn read_song_tags(song: &Path) -> Result<SongTags, FileParseError> {
             .map(|key| tag_values(tags, key))
             .find(|artists| !artists.is_empty())
             .map(|artists| artists.join(ARTIST_SEPARATOR)),
-    })
+    }
 }
 
 /// The trimmed, non-blank values of `key` in the first of `tags` that has any. An MP3's tags come
@@ -322,7 +351,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        test_media::{Signal, WavEncoding, flac_song, wav_song},
+        test_media::{
+            OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding, flac_song, ogg_flac_song, wav_song,
+        },
         test_songs::silent_audio,
     };
 
@@ -426,6 +457,8 @@ mod tests {
             "Slither.flac",
             "THORN WITHIN.WAV",
             "Unholy Wars.Wave",
+            "B.Y.O.B..OGG",
+            "Awake from Darkness.oga",
         ] {
             assert!(has_song_name(Path::new(name)), "{name} should be a song");
         }
@@ -740,6 +773,44 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_tags_of_ogg_vorbis_songs() {
+        let song = with_tag(
+            VORBIS_FIXTURE.to_vec(),
+            &tag_holding(
+                TagType::VorbisComments,
+                &[
+                    (ItemKey::TrackTitle, "Ghost Lights"),
+                    (ItemKey::TrackArtist, "Woodkid"),
+                ],
+            ),
+        );
+
+        let track = track_of_song("01 Ghost Lights.ogg", &song);
+
+        assert_eq!(track.title, "Ghost Lights");
+        assert_eq!(track.artist.as_deref(), Some("Woodkid"));
+    }
+
+    #[test]
+    fn reads_the_tags_of_ogg_flac_songs() {
+        for (file_name, title, artist) in [
+            ("02 Crossing.oga", "Crossing", "Angra"),
+            ("03 Holier Than Thou.ogg", "Holier Than Thou", "Metallica"),
+        ] {
+            let headers = OggFlacHeaders {
+                comments: &[("TITLE", title), ("ARTIST", artist)],
+                ..OggFlacHeaders::default()
+            };
+            let song = ogg_flac_song(16, SHORT_SIGNAL, &headers);
+
+            let track = track_of_song(file_name, &song);
+
+            assert_eq!(track.title, title);
+            assert_eq!(track.artist.as_deref(), Some(artist));
+        }
+    }
+
+    #[test]
     fn reads_the_tags_of_the_format_a_song_holds_whatever_its_extension() {
         let flac = with_tag(
             flac_song(16, SHORT_SIGNAL),
@@ -984,6 +1055,19 @@ mod tests {
         let song = with_tag(flac_song(16, SHORT_SIGNAL), &tag);
 
         let cover = cover_of_song("Until We Fall.flac", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_cover_of_an_ogg_flac_song() {
+        let headers = OggFlacHeaders {
+            front_cover: Some(b"the front cover"),
+            ..OggFlacHeaders::default()
+        };
+        let song = ogg_flac_song(16, SHORT_SIGNAL, &headers);
+
+        let cover = cover_of_song("Cyclus Doloris.oga", &song);
 
         assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
     }

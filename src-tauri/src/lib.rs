@@ -3,6 +3,7 @@ mod crash_log;
 mod library;
 mod logs;
 mod main_window;
+mod ogg_flac_tags;
 mod playback;
 mod playlists;
 mod portable;

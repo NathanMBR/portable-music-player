@@ -1,5 +1,12 @@
-//! Songs of formats other than MP3 built in memory for the tests: WAV and FLAC files of a known
-//! signal, so a test can check every sample it decodes. They're helpers, not example songs.
+//! Songs of formats other than MP3 built in memory for the tests: WAV, FLAC and Ogg FLAC files of
+//! a known signal, so a test can check every sample it decodes, and the committed fixtures of the
+//! codecs no Rust crate encodes. They're helpers, not example songs.
+
+/// 1 s of a tone per channel, stereo at 44.1 kHz, in Ogg Vorbis, made by
+/// `test/make_audio_fixtures.sh`.
+pub(crate) const VORBIS_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/vorbis.ogg");
+/// The frames of every fixture.
+pub(crate) const FIXTURE_FRAMES: u64 = 44_100;
 
 /// The shape of a test signal.
 #[derive(Clone, Copy)]
@@ -95,24 +102,191 @@ const VERBATIM_SUBFRAME: u8 = 0b0000_0010;
 /// A FLAC file of `signal`, in samples of `bits` bits, 16 or 24: a STREAMINFO block, then frames
 /// whose subframes store each channel's samples as they are.
 pub(crate) fn flac_song(bits: u32, signal: Signal) -> Vec<u8> {
-    let mut song = b"fLaC".to_vec();
-    song.push(LAST_METADATA_BLOCK);
-    song.extend_from_slice(&STREAMINFO_LENGTH.to_be_bytes()[1..]);
-    song.extend(stream_info(bits, signal));
-    let mut first_frame = 0;
-    let mut frame_number = 0;
-    while first_frame < signal.frames {
-        let frames = FLAC_BLOCK_FRAMES.min(signal.frames - first_frame);
-        song.extend(flac_frame(
-            bits,
-            signal,
-            frame_number,
-            first_frame..first_frame + frames,
-        ));
-        first_frame += frames;
-        frame_number += 1;
-    }
+    let mut song = FLAC_SIGNATURE.to_vec();
+    song.extend(stream_info_block(bits, signal, true));
+    song.extend(flac_frames(bits, signal).concat());
     song
+}
+
+const FLAC_SIGNATURE: &[u8; 4] = b"fLaC";
+const STREAMINFO_BLOCK: u8 = 0;
+const VORBIS_COMMENT_BLOCK: u8 = 4;
+const PICTURE_BLOCK: u8 = 6;
+/// The ID3v2 picture type FLAC's PICTURE block uses for a front cover.
+const FRONT_COVER: u32 = 3;
+const COVER_MIME_TYPE: &[u8] = b"image/png";
+/// The Ogg FLAC mapping's first packet: its type, its signature, then its version, 1.0.
+const OGG_FLAC_HEADER: &[u8; 7] = b"\x7FFLAC\x01\x00";
+const VENDOR: &[u8] = b"portable-music-player tests";
+
+/// What an Ogg FLAC file's headers hold besides its STREAMINFO.
+#[derive(Default)]
+pub(crate) struct OggFlacHeaders<'a> {
+    /// Its Vorbis comment, as `KEY=value`.
+    pub(crate) comments: &'a [(&'a str, &'a str)],
+    /// The bytes of its front cover, in a PICTURE block.
+    pub(crate) front_cover: Option<&'a [u8]>,
+}
+
+/// An Ogg FLAC file of `signal`, in samples of `bits` bits: the frames of `flac_song`, one per
+/// packet, after the headers.
+pub(crate) fn ogg_flac_song(bits: u32, signal: Signal, headers: &OggFlacHeaders) -> Vec<u8> {
+    // The mapping puts the STREAMINFO block in its first packet, then the Vorbis comment block.
+    let mut header_blocks = vec![vorbis_comment_block(
+        headers.comments,
+        headers.front_cover.is_none(),
+    )];
+    if let Some(cover) = headers.front_cover {
+        header_blocks.push(picture_block(cover));
+    }
+    let header_packets = u16::try_from(header_blocks.len()).unwrap();
+    let identification = [
+        OGG_FLAC_HEADER.as_slice(),
+        &header_packets.to_be_bytes(),
+        FLAC_SIGNATURE,
+        &stream_info_block(bits, signal, false),
+    ]
+    .concat();
+    let mut ogg = OggWriter::default();
+    ogg.write_page(&identification, 0, PageKind::First);
+    for block in &header_blocks {
+        ogg.write_page(block, 0, PageKind::Middle);
+    }
+    let frames = flac_frames(bits, signal);
+    let last = frames.len() - 1;
+    let mut end_frame = 0;
+    for (index, frame) in frames.iter().enumerate() {
+        end_frame = (end_frame + u64::from(FLAC_BLOCK_FRAMES)).min(signal.frames.into());
+        let kind = if index == last {
+            PageKind::Last
+        } else {
+            PageKind::Middle
+        };
+        // A page's granule position counts the frames up to the end of its last packet.
+        ogg.write_page(frame, end_frame, kind);
+    }
+    ogg.into_bytes()
+}
+
+/// A metadata block's header: whether it's the last before the frames, its type and length.
+fn metadata_block(block_type: u8, is_last: bool, contents: &[u8]) -> Vec<u8> {
+    let flag = if is_last { LAST_METADATA_BLOCK } else { 0 };
+    let length = u32::try_from(contents.len()).unwrap();
+    [&[flag | block_type], &length.to_be_bytes()[1..], contents].concat()
+}
+
+fn stream_info_block(bits: u32, signal: Signal, is_last: bool) -> Vec<u8> {
+    let contents = stream_info(bits, signal);
+    assert_eq!(contents.len(), STREAMINFO_LENGTH as usize);
+    metadata_block(STREAMINFO_BLOCK, is_last, &contents)
+}
+
+fn vorbis_comment_block(comments: &[(&str, &str)], is_last: bool) -> Vec<u8> {
+    let with_length =
+        |bytes: &[u8]| [&u32::try_from(bytes.len()).unwrap().to_le_bytes(), bytes].concat();
+    let mut contents = with_length(VENDOR);
+    contents.extend_from_slice(&u32::try_from(comments.len()).unwrap().to_le_bytes());
+    for (key, value) in comments {
+        contents.extend(with_length(format!("{key}={value}").as_bytes()));
+    }
+    metadata_block(VORBIS_COMMENT_BLOCK, is_last, &contents)
+}
+
+/// A PICTURE block holding `data` as the front cover, with no description and its size unknown.
+fn picture_block(data: &[u8]) -> Vec<u8> {
+    let length_of = |bytes: &[u8]| u32::try_from(bytes.len()).unwrap().to_be_bytes();
+    let contents = [
+        FRONT_COVER.to_be_bytes().as_slice(),
+        &length_of(COVER_MIME_TYPE),
+        COVER_MIME_TYPE,
+        // The description's length, then the width, height, color depth and palette size.
+        &[0; 4 * 5],
+        &length_of(data),
+        data,
+    ]
+    .concat();
+    metadata_block(PICTURE_BLOCK, true, &contents)
+}
+
+/// The FLAC frames of `signal`, each of `FLAC_BLOCK_FRAMES` but the last.
+fn flac_frames(bits: u32, signal: Signal) -> Vec<Vec<u8>> {
+    (0..signal.frames)
+        .step_by(FLAC_BLOCK_FRAMES as usize)
+        .enumerate()
+        .map(|(number, first_frame)| {
+            let end_frame = (first_frame + FLAC_BLOCK_FRAMES).min(signal.frames);
+            let number = u32::try_from(number).unwrap();
+            flac_frame(bits, signal, number, first_frame..end_frame)
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum PageKind {
+    First,
+    Middle,
+    Last,
+}
+
+/// The Ogg page header's flags for the first and last pages of a stream.
+const BEGINNING_OF_STREAM: u8 = 0x02;
+const END_OF_STREAM: u8 = 0x04;
+const OGG_SERIAL: u32 = 0x5EED;
+/// A lacing value: a packet's segment of 255 bytes is followed by more of it.
+const FULL_SEGMENT: usize = 255;
+
+/// Writes Ogg pages of one stream, a packet per page.
+#[derive(Default)]
+struct OggWriter {
+    bytes: Vec<u8>,
+    sequence: u32,
+}
+
+impl OggWriter {
+    fn write_page(&mut self, packet: &[u8], granule_position: u64, kind: PageKind) {
+        let flags = match kind {
+            PageKind::First => BEGINNING_OF_STREAM,
+            PageKind::Middle => 0,
+            PageKind::Last => END_OF_STREAM,
+        };
+        // Full segments, then the rest, even when it's empty, which ends the packet.
+        let mut lacing = vec![FULL_SEGMENT as u8; packet.len() / FULL_SEGMENT];
+        lacing.push((packet.len() % FULL_SEGMENT) as u8);
+        let mut page = [
+            b"OggS".as_slice(),
+            &[0, flags],
+            &granule_position.to_le_bytes(),
+            &OGG_SERIAL.to_le_bytes(),
+            &self.sequence.to_le_bytes(),
+            // The CRC, written once the page is whole.
+            &[0; 4],
+            &[u8::try_from(lacing.len()).unwrap()],
+            &lacing,
+            packet,
+        ]
+        .concat();
+        let crc = ogg_crc(&page);
+        page[22..26].copy_from_slice(&crc.to_le_bytes());
+        self.bytes.extend(page);
+        self.sequence += 1;
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+/// Ogg's CRC-32 of a page: polynomial 0x04C11DB7, not reflected.
+fn ogg_crc(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(0, |crc, byte| {
+        (0..8).fold(crc ^ (u32::from(*byte) << 24), |crc, _| {
+            if crc & 0x8000_0000 == 0 {
+                crc << 1
+            } else {
+                (crc << 1) ^ 0x04C1_1DB7
+            }
+        })
+    })
 }
 
 fn stream_info(bits: u32, signal: Signal) -> Vec<u8> {

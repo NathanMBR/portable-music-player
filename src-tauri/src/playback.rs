@@ -3,6 +3,7 @@
 //! audio thread only copies its samples to the output (`song_chain`). The webview says what should
 //! play through the commands here, and hears what does through the events.
 
+mod channel_mix;
 mod controller;
 mod engine;
 mod media_controls;

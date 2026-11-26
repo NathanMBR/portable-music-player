@@ -11,7 +11,9 @@ use std::{
 use rodio::{ChannelCount, SampleRate, conversions::SampleRateConverter};
 use tauri_plugin_log::log;
 
-use super::{PlaybackError, song_bytes::SongBytes, song_decoder::SongDecoder};
+use super::{
+    PlaybackError, channel_mix::ChannelLayout, song_bytes::SongBytes, song_decoder::SongDecoder,
+};
 use crate::crash_log;
 
 /// The frames of one block: about 23 ms at 44.1 kHz.
@@ -48,8 +50,8 @@ pub(super) enum Feed {
 pub(super) struct FeedReceiver {
     pub(super) blocks: Receiver<Feed>,
     pub(super) recycle: SyncSender<Vec<f32>>,
-    /// The song's channels, which its samples interleave.
-    pub(super) channels: u16,
+    /// Where the song's channels play, in the order its samples interleave them.
+    pub(super) layout: ChannelLayout,
 }
 
 enum FeederCommand {
@@ -132,7 +134,7 @@ impl SongFeeder {
         FeedReceiver {
             blocks: block_receiver,
             recycle,
-            channels: self.format.channels,
+            layout: self.format.layout,
         }
     }
 
@@ -404,7 +406,7 @@ impl Iterator for Samples {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct SongFormat {
     pub(super) sample_rate: u32,
-    pub(super) channels: u16,
+    pub(super) layout: ChannelLayout,
     /// Without the encoder's delay and padding. `None` when the song doesn't say.
     pub(super) duration: Option<Duration>,
 }
@@ -413,7 +415,7 @@ impl SongFormat {
     fn of(decoder: &SongDecoder) -> Self {
         Self {
             sample_rate: decoder.sample_rate(),
-            channels: decoder.channels(),
+            layout: decoder.layout(),
             duration: decoder.duration(),
         }
     }
@@ -495,7 +497,7 @@ mod tests {
 
         let (blocks, generation) = blocks_to_the_end(&receiver);
 
-        assert_eq!(receiver.channels, CHANNELS);
+        assert_eq!(receiver.layout.count(), CHANNELS);
         assert_eq!(generation, 0);
         assert_eq!(
             frame_count(&blocks),

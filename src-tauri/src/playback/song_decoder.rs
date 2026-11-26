@@ -8,6 +8,7 @@ use std::{
 
 use lofty::{config::ParseOptions, file::AudioFile, probe::Probe};
 use symphonia::core::{
+    audio::{ChannelLabel, Channels, Position},
     codecs::{
         CodecParameters,
         audio::{AudioCodecParameters, AudioDecoder, AudioDecoderOptions},
@@ -24,6 +25,7 @@ use tauri_plugin_log::log;
 
 use super::{
     PlaybackError,
+    channel_mix::{ChannelLayout, Speaker},
     song_bytes::{SongBytes, SongReader},
 };
 
@@ -55,7 +57,8 @@ pub(super) struct SongDecoder {
     playable: Playable,
     /// The song's length when its file says only roughly, like an MP3 without an Info frame.
     estimated_duration: Option<Duration>,
-    channels: u16,
+    /// Where its channels play, from its first decoded frames.
+    layout: ChannelLayout,
     /// The decoded samples not handed out yet, and the next of them.
     samples: Vec<f32>,
     next_sample: usize,
@@ -126,7 +129,7 @@ impl SongDecoder {
             track: timing,
             playable,
             estimated_duration: None,
-            channels: 0,
+            layout: ChannelLayout::unpositioned(0),
             samples: Vec::new(),
             next_sample: 0,
             first_frame: 0,
@@ -148,7 +151,11 @@ impl SongDecoder {
     }
 
     pub(super) fn channels(&self) -> u16 {
-        self.channels
+        self.layout.count()
+    }
+
+    pub(super) fn layout(&self) -> ChannelLayout {
+        self.layout
     }
 
     /// The song's length, without its encoder's silence: as its file says, else estimated. `None`
@@ -234,15 +241,15 @@ impl SongDecoder {
             Ok(buffer) => {
                 buffer.copy_to_vec_interleaved(&mut self.samples);
                 Decoded::Frames {
-                    channels: buffer.spec().channels().count(),
+                    layout: layout_of(buffer.spec().channels()),
                 }
             }
             Err(MediaError::DecodeError(_) | MediaError::IoError(_)) => Decoded::Damaged,
             Err(MediaError::ResetRequired) => Decoded::ResetRequired,
             Err(error) => Decoded::Failed(error),
         };
-        let channels = match decoded {
-            Decoded::Frames { channels } => channels,
+        let layout = match decoded {
+            Decoded::Frames { layout } => layout,
             Decoded::Nothing => {
                 self.failed_packets = 0;
                 return false;
@@ -264,10 +271,10 @@ impl SongDecoder {
             }
         };
         self.failed_packets = 0;
-        if self.channels == 0 {
-            self.channels = u16::try_from(channels).unwrap_or(u16::MAX);
+        if self.layout.count() == 0 {
+            self.layout = layout;
         }
-        if channels != usize::from(self.channels) {
+        if layout.count() != self.layout.count() {
             // A song's samples interleave the same channels from start to end.
             self.samples.clear();
             return false;
@@ -291,7 +298,7 @@ impl SongDecoder {
     /// Keeps of the decoded samples, which start at `first_ts`, the frames from the first one to
     /// hand out to the song's end.
     fn keep_playable(&mut self, first_ts: i64) {
-        let channels = usize::from(self.channels);
+        let channels = usize::from(self.layout.count());
         let frames = (self.samples.len() / channels) as i64;
         let first = self.track.frames_of(first_ts - self.playable.start_ts);
         let end = first + frames;
@@ -341,7 +348,7 @@ impl SongDecoder {
 /// What decoding a packet gave.
 enum Decoded {
     Frames {
-        channels: usize,
+        layout: ChannelLayout,
     },
     /// No frames, like Vorbis's first packet after a seek.
     Nothing,
@@ -407,6 +414,46 @@ fn demuxer_of(
     )
 }
 
+/// Where the channels symphonia describes play, in the order they interleave: positioned
+/// channels come in WAVE order, the order of their bits.
+fn layout_of(channels: &Channels) -> ChannelLayout {
+    let count = u16::try_from(channels.count()).unwrap_or(u16::MAX);
+    match channels {
+        Channels::Positioned(positions) => {
+            ChannelLayout::with_places(count, positions.iter().map(speaker_at))
+        }
+        Channels::Custom(labels) => ChannelLayout::with_places(
+            count,
+            labels.iter().map(|label| match label {
+                ChannelLabel::Positioned(position) => speaker_at(*position),
+                _ => None,
+            }),
+        ),
+        _ => ChannelLayout::unpositioned(count),
+    }
+}
+
+/// The speaker of a single position, `None` for one the mix doesn't place, like a height channel.
+fn speaker_at(position: Position) -> Option<Speaker> {
+    const SPEAKERS: [(Position, Speaker); 11] = [
+        (Position::FRONT_LEFT, Speaker::FrontLeft),
+        (Position::FRONT_RIGHT, Speaker::FrontRight),
+        (Position::FRONT_CENTER, Speaker::FrontCenter),
+        (Position::LFE1, Speaker::Lfe),
+        (Position::REAR_LEFT, Speaker::BackLeft),
+        (Position::REAR_RIGHT, Speaker::BackRight),
+        (Position::FRONT_LEFT_CENTER, Speaker::FrontLeftOfCenter),
+        (Position::FRONT_RIGHT_CENTER, Speaker::FrontRightOfCenter),
+        (Position::REAR_CENTER, Speaker::BackCenter),
+        (Position::SIDE_LEFT, Speaker::SideLeft),
+        (Position::SIDE_RIGHT, Speaker::SideRight),
+    ];
+    SPEAKERS
+        .iter()
+        .find(|(known, _)| *known == position)
+        .map(|(_, speaker)| *speaker)
+}
+
 /// lofty's estimate of a song's length, from its audio's bytes and bitrate, for a file that doesn't
 /// say it, like a constant-bitrate MP3 without an Info frame.
 fn estimated_duration(bytes: &Arc<SongBytes>) -> Option<Duration> {
@@ -458,6 +505,7 @@ impl MediaSource for SongReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::playback::channel_mix::Speaker;
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, damaged_frames, gapless_audio, root_with_songs,
         silent_frames,
@@ -545,6 +593,46 @@ mod tests {
             bytes.loaded_length() < song.len() / 2,
             "read {}",
             bytes.loaded_length()
+        );
+    }
+
+    #[test]
+    fn places_the_channels_where_the_file_says() {
+        let surround = Position::FRONT_LEFT
+            | Position::FRONT_RIGHT
+            | Position::FRONT_CENTER
+            | Position::LFE1
+            | Position::REAR_LEFT
+            | Position::REAR_RIGHT;
+        let with_height = Position::FRONT_LEFT | Position::FRONT_RIGHT | Position::TOP_CENTER;
+        let labelled = Channels::Custom(Box::new([
+            ChannelLabel::Positioned(Position::FRONT_LEFT),
+            ChannelLabel::Positioned(Position::FRONT_RIGHT),
+            ChannelLabel::Discrete(0),
+        ]));
+
+        assert_eq!(
+            layout_of(&Channels::Positioned(surround)),
+            ChannelLayout::positioned(&[
+                Some(Speaker::FrontLeft),
+                Some(Speaker::FrontRight),
+                Some(Speaker::FrontCenter),
+                Some(Speaker::Lfe),
+                Some(Speaker::BackLeft),
+                Some(Speaker::BackRight),
+            ])
+        );
+        assert_eq!(
+            layout_of(&Channels::Positioned(with_height)),
+            ChannelLayout::positioned(&[Some(Speaker::FrontLeft), Some(Speaker::FrontRight), None])
+        );
+        assert_eq!(
+            layout_of(&labelled),
+            ChannelLayout::positioned(&[Some(Speaker::FrontLeft), Some(Speaker::FrontRight), None])
+        );
+        assert_eq!(
+            layout_of(&Channels::Discrete(3)),
+            ChannelLayout::unpositioned(3)
         );
     }
 

@@ -425,7 +425,7 @@ impl SongFormat {
 mod tests {
     use super::*;
     use crate::playback::song_chain::{ChainCommand, ChainEvent, ChainSong, SongChain};
-    use crate::test_media::{Signal, flac_song, samples_of};
+    use crate::test_media::{OPUS_RATE, OpusSong, Signal, flac_song, ogg_opus_song, samples_of};
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, gapless_audio, root_with_songs, silent_frames,
     };
@@ -640,22 +640,51 @@ mod tests {
             &flac_song(24, signal),
             Duration::ZERO,
         );
+
+        let sound = sound_of_songs_joined(&first, &second, SAMPLE_RATE);
+
+        assert!(sound == [samples_of(signal), samples_of(signal)].concat());
+    }
+
+    #[test]
+    fn joins_two_opus_songs_without_an_extra_frame() {
+        let song = |amplitudes| {
+            ogg_opus_song(&OpusSong {
+                amplitudes,
+                frames: 3000,
+                output_gain_q8: 0,
+                comments: &[],
+            })
+        };
+        let first = open_song("Never Understand.opus", &song(&[0.3, 0.2]), Duration::ZERO);
+        let second = open_song("Iron.opus", &song(&[0.2, 0.3]), Duration::ZERO);
+
+        let sound = sound_of_songs_joined(&first, &second, OPUS_RATE);
+
+        assert_eq!(sound.len(), 2 * 3000 * usize::from(CHANNELS));
+    }
+
+    /// What a chain at `sample_rate` plays of `first`, then `second` queued after it, without the
+    /// silent frames. The chain plays silence while a feeder hasn't sent its blocks yet, which a
+    /// test's fills can outrun, unlike an output's pace: every test signal has a sound in each
+    /// frame, so only that is left out.
+    fn sound_of_songs_joined(first: &OpenSong, second: &OpenSong, sample_rate: u32) -> Vec<f32> {
         let (events, event_receiver) = SongChain::event_channel();
         let (mut chain, handle) = SongChain::new(1, CHANNELS, events);
         let chain_song = |id, song: &OpenSong| ChainSong {
             id,
-            feed: song.feeder.decode_at(SAMPLE_RATE),
+            feed: song.feeder.decode_at(sample_rate),
             generation: 0,
             start_frame: 0,
         };
         let commands = [
             ChainCommand::Play {
-                song: chain_song(1, &first),
+                song: chain_song(1, first),
                 is_paused: false,
             },
             ChainCommand::QueueNext {
                 after: 1,
-                song: Some(chain_song(2, &second)),
+                song: Some(chain_song(2, second)),
             },
         ];
         for command in commands {
@@ -674,16 +703,12 @@ mod tests {
             played.extend_from_slice(&buffer);
             std::thread::sleep(Duration::from_millis(1));
         }
-
-        // The chain plays silence while a feeder hasn't sent its blocks yet, which a test's fills
-        // can outrun, unlike an output's pace. The signal is never 0, so only that is left out.
-        let sound: Vec<f32> = played
+        played
             .chunks(usize::from(CHANNELS))
             .filter(|frame| frame.iter().any(|sample| *sample != 0.0))
             .flatten()
             .copied()
-            .collect();
-        assert!(sound == [samples_of(signal), samples_of(signal)].concat());
+            .collect()
     }
 
     #[test]

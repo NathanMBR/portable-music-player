@@ -1,6 +1,7 @@
 //! Songs of formats other than MP3 built in memory for the tests: WAV, FLAC and Ogg FLAC files of
-//! a known signal, so a test can check every sample it decodes, and the committed fixtures of the
-//! codecs no Rust crate encodes. They're helpers, not example songs.
+//! a known signal, so a test can check every sample it decodes, Ogg Opus files of tones, encoded by
+//! opus-pure, and the committed fixtures of the codecs no Rust crate encodes. They're helpers, not
+//! example songs.
 
 use std::{borrow::Cow, io::Cursor};
 
@@ -8,6 +9,9 @@ use lofty::{
     config::WriteOptions,
     mp4::{Atom, AtomData, AtomIdent, Ilst},
     tag::TagExt,
+};
+use opus_pure::{
+    Application, MAX_PACKET_BYTES, OggOpusWriter, OpusEncoder, OpusHead, OpusMSEncoder, OpusTags,
 };
 
 /// 1 s of a tone per channel, stereo at 44.1 kHz, in Ogg Vorbis, made by
@@ -27,7 +31,9 @@ pub(crate) const ALAC_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures
 pub(crate) const ADTS_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/adts.aac");
 /// An MP4 holding a picture track and no sound.
 pub(crate) const NO_SOUND_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/no-sound.m4a");
-/// The frames of every fixture.
+/// The same in Opus in MP4, at 48 kHz, whose edit list cuts the pre-skip.
+pub(crate) const OPUS_M4A_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/opus.m4a");
+/// The frames of every fixture at 44.1 kHz.
 pub(crate) const FIXTURE_FRAMES: u64 = 44_100;
 /// The frames of an AAC packet, and of the priming FFmpeg's encoder adds.
 pub(crate) const AAC_PACKET_FRAMES: u64 = 1024;
@@ -65,6 +71,130 @@ const EDIT_BOX: &[u8; 4] = b"edts";
 const FREE_BOX: &[u8; 4] = b"free";
 const ITUNES_MEAN: &str = "com.apple.iTunes";
 const ITUNSMPB_NAME: &str = "iTunSMPB";
+
+/// An Opus song to build: a tone per channel at 48 kHz, encoded by opus-pure.
+pub(crate) struct OpusSong<'a> {
+    /// The amplitude of each channel's tone, in Vorbis order, Opus's.
+    pub(crate) amplitudes: &'a [f32],
+    pub(crate) frames: usize,
+    /// The gain its header asks the player to apply, in 1/256 dB.
+    pub(crate) output_gain_q8: i16,
+    /// Its Vorbis comment's fields.
+    pub(crate) comments: &'a [(&'a str, &'a str)],
+}
+
+/// Opus's rate, which every Opus song decodes at.
+pub(crate) const OPUS_RATE: u32 = 48_000;
+/// The frequency of every channel's tone: low enough that Opus's LFE stream keeps it.
+const OPUS_TONE_HZ: f32 = 100.0;
+/// 20 ms, the frame size encoders use by default.
+const OPUS_PACKET_FRAMES: usize = 960;
+
+/// `song` in Ogg Opus. It ends where its tones do, as gapless files do: its last page's granule
+/// position cuts the padding of its last packet (RFC 7845, 4.4).
+pub(crate) fn ogg_opus_song(song: &OpusSong) -> Vec<u8> {
+    let channels = song.amplitudes.len();
+    let samples = opus_tones(song);
+    let mut encoder = OpusSongEncoder::new(channels);
+    let mut head = encoder.head();
+    head.output_gain_q8 = song.output_gain_q8;
+    let pre_skip = usize::from(head.pre_skip);
+    let mut tags = OpusTags::new();
+    for (name, value) in song.comments {
+        tags.push(name, value).unwrap();
+    }
+    let mut writer = OggOpusWriter::with_tags(Vec::new(), head, tags).unwrap();
+    // The pre-skip delays the song: the packets carry it as well.
+    let packets = (pre_skip + song.frames).div_ceil(OPUS_PACKET_FRAMES);
+    let final_granule = (pre_skip + song.frames) as i64;
+    let mut block = vec![0.0; OPUS_PACKET_FRAMES * channels];
+    let mut packet = vec![0; MAX_PACKET_BYTES];
+    for index in 0..packets {
+        let start = (index * block.len()).min(samples.len());
+        let end = (start + block.len()).min(samples.len());
+        block.fill(0.0);
+        block[..end - start].copy_from_slice(&samples[start..end]);
+        let length = encoder.encode(&block, &mut packet);
+        if index + 1 == packets {
+            let duration = final_granule - writer.granule();
+            writer
+                .write_packet_with_duration(&packet[..length], duration as u32)
+                .unwrap();
+        } else {
+            writer.write_packet(&packet[..length]).unwrap();
+        }
+    }
+    writer.finish().unwrap()
+}
+
+/// `song`'s samples, interleaved. Each channel's tone starts at its own phase, so no frame is
+/// silent on every channel.
+fn opus_tones(song: &OpusSong) -> Vec<f32> {
+    (0..song.frames)
+        .flat_map(|frame| {
+            song.amplitudes
+                .iter()
+                .enumerate()
+                .map(move |(channel, amplitude)| {
+                    let time = frame as f32 / OPUS_RATE as f32;
+                    amplitude
+                        * (std::f32::consts::TAU * OPUS_TONE_HZ * time + 1.0 + channel as f32).sin()
+                })
+        })
+        .collect()
+}
+
+/// The root mean square of each channel of `samples`, interleaved in `channels`: an amplitude
+/// over a square root of 2 for a tone.
+pub(crate) fn levels_of(samples: &[f32], channels: usize) -> Vec<f32> {
+    let frames = (samples.len() / channels) as f32;
+    (0..channels)
+        .map(|channel| {
+            let energy: f32 = samples
+                .iter()
+                .skip(channel)
+                .step_by(channels)
+                .map(|sample| sample * sample)
+                .sum();
+            (energy / frames).sqrt()
+        })
+        .collect()
+}
+
+enum OpusSongEncoder {
+    Single(Box<OpusEncoder>),
+    Surround(Box<OpusMSEncoder>),
+}
+
+impl OpusSongEncoder {
+    fn new(channels: usize) -> Self {
+        let rate = OPUS_RATE as i32;
+        if channels <= 2 {
+            Self::Single(Box::new(
+                OpusEncoder::new(rate, channels, Application::Audio).unwrap(),
+            ))
+        } else {
+            Self::Surround(Box::new(
+                OpusMSEncoder::new(rate, channels, 1, Application::Audio).unwrap(),
+            ))
+        }
+    }
+
+    fn head(&self) -> OpusHead {
+        match self {
+            Self::Single(encoder) => OpusHead::for_encoder(encoder, OPUS_RATE),
+            Self::Surround(encoder) => OpusHead::for_ms_encoder(encoder, OPUS_RATE),
+        }
+    }
+
+    fn encode(&mut self, block: &[f32], packet: &mut [u8]) -> usize {
+        match self {
+            Self::Single(encoder) => encoder.encode(block, OPUS_PACKET_FRAMES, packet),
+            Self::Surround(encoder) => encoder.encode(block, OPUS_PACKET_FRAMES, packet),
+        }
+        .unwrap()
+    }
+}
 
 /// The shape of a test signal.
 #[derive(Clone, Copy)]

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Makes the songs the Rust tests can't build themselves, since no Rust crate encodes their codec,
-# into audio_fixtures/ next to this script. Each holds 1 s of a synthetic signal at 44.1 kHz, a
-# quiet tone per channel, stereo unless its name says otherwise, without tags, in a few KB. The
-# tests read the committed files: run this again only to change one. Needs FFmpeg with libvorbis.
+# or, for Opus in MP4, writes their container, into audio_fixtures/ next to this script. Each holds
+# 1 s of a synthetic signal at 44.1 kHz, or 48 kHz in Opus, a quiet tone per channel, stereo unless
+# its name says otherwise, without tags, in a few KB. The tests read the committed files: run this
+# again only to change one. Needs FFmpeg with libvorbis and libopus.
 # Usage: make_audio_fixtures.sh
 set -euo pipefail
 
@@ -40,6 +41,9 @@ encode -c:a libvorbis -q:a 2 "${FIXTURES_DIR}/vorbis.ogg"
 encode -c:a aac -b:a 64k "${FIXTURES_DIR}/aac.m4a"
 # 16-bit samples: FFmpeg would otherwise store the signal in 32.
 encode -c:a alac -sample_fmt s16p "${FIXTURES_DIR}/alac.m4a"
+# Opus in MP4, its pre-skip cut by the edit list FFmpeg writes. FFmpeg resamples the signal to
+# 48 kHz, Opus's rate. The name would pick the iPod muxer, which refuses Opus.
+encode -c:a libopus -b:a 64k -f mp4 "${FIXTURES_DIR}/opus.m4a"
 # Raw AAC in ADTS frames: nothing in it says where its priming ends.
 encode -c:a aac -b:a 64k -f adts "${FIXTURES_DIR}/adts.aac"
 # A chapter track besides the audio, like a podcast's or an audiobook's. The global metadata comes

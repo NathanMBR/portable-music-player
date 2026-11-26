@@ -8,6 +8,7 @@ mod controller;
 mod engine;
 mod media_controls;
 mod mp4_trim;
+mod opus_codec;
 mod output;
 mod song_bytes;
 mod song_chain;

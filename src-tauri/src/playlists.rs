@@ -827,6 +827,7 @@ mod tests {
             "Pale Yellow.oga",
             "X.m4a",
             "Bounce.aac",
+            "Ritual.opus",
         ];
         let root = player_with_songs(&songs);
         let file_name = "1763581234567-Lossless.json";

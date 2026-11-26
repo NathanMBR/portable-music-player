@@ -11,13 +11,16 @@ use symphonia::core::{
     audio::{ChannelLabel, Channels, Position},
     codecs::{
         CodecParameters,
-        audio::{AudioCodecParameters, AudioDecoder, AudioDecoderOptions},
+        audio::{
+            AudioCodecParameters, AudioDecoder, AudioDecoderOptions, well_known::CODEC_ID_OPUS,
+        },
         registry::CodecRegistry,
     },
     errors::Error as MediaError,
     formats::{
-        FormatOptions, FormatReader, SeekMode, SeekTo, Track, TrackFlags, probe::Hint,
-        well_known::FORMAT_ID_ISOMP4,
+        FormatOptions, FormatReader, SeekMode, SeekTo, Track, TrackFlags,
+        probe::Hint,
+        well_known::{FORMAT_ID_ISOMP4, FORMAT_ID_OGG},
     },
     io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
     meta::MetadataOptions,
@@ -30,13 +33,15 @@ use super::{
     PlaybackError,
     channel_mix::{ChannelLayout, MAX_CHANNELS, Speaker},
     mp4_trim,
+    opus_codec::OpusCodec,
     song_bytes::{SongBytes, SongReader},
 };
 
-/// The decoders of every codec symphonia's features enable.
+/// The decoders of every codec symphonia's features enable, and Opus's.
 static CODECS: LazyLock<CodecRegistry> = LazyLock::new(|| {
     let mut codecs = CodecRegistry::new();
     symphonia::default::register_enabled_codecs(&mut codecs);
+    codecs.register_audio_decoder::<OpusCodec>();
     codecs
 });
 
@@ -85,13 +90,20 @@ struct TrackTiming {
 }
 
 /// The part of a track that's the song: past the silence its encoder added, in the cases symphonia
-/// doesn't cut it on its own, MP4's.
+/// doesn't cut it on its own, MP4's and Ogg Opus's.
 #[derive(Clone, Copy)]
 struct Playable {
     /// The timestamp of the song's first frame.
     start_ts: i64,
     /// The song's frames, when its container says exactly where it ends.
     frames: Option<u64>,
+}
+
+impl Playable {
+    const WHOLE_TRACK: Self = Self {
+        start_ts: 0,
+        frames: None,
+    };
 }
 
 impl SongDecoder {
@@ -125,7 +137,7 @@ impl SongDecoder {
                 .ok_or_else(undecodable)?,
             start_ts: track.start_ts.get(),
         };
-        let playable = playable_of(&bytes, demuxer.as_ref(), timing);
+        let playable = playable_of(&bytes, demuxer.as_ref(), track, timing);
         let decoder = new_decoder(&params).map_err(|error| match error {
             MediaError::Unsupported(_) => unsupported(),
             _ => undecodable(),
@@ -484,22 +496,44 @@ fn estimated_duration(bytes: &Arc<SongBytes>) -> Option<Duration> {
     Some(song.properties().duration()).filter(|duration| !duration.is_zero())
 }
 
-/// The song's part of its track: from MP4's boxes, which symphonia reads without applying them.
-/// Every other container's trims are marked on its packets, which symphonia's decoders cut.
-fn playable_of(bytes: &Arc<SongBytes>, demuxer: &dyn FormatReader, track: TrackTiming) -> Playable {
-    let whole_track = Playable {
-        start_ts: 0,
-        frames: None,
-    };
-    if demuxer.format_info().format != FORMAT_ID_ISOMP4 {
-        return whole_track;
+/// The song's part of `track`: from MP4's boxes, which symphonia reads without applying them, or
+/// past Ogg Opus's pre-skip. Every other track's trims are marked on its packets, which symphonia's
+/// decoders cut.
+fn playable_of(
+    bytes: &Arc<SongBytes>,
+    demuxer: &dyn FormatReader,
+    track: &Track,
+    timing: TrackTiming,
+) -> Playable {
+    let format = demuxer.format_info().format;
+    let is_opus = matches!(
+        &track.codec_params,
+        Some(CodecParameters::Audio(params)) if params.codec == CODEC_ID_OPUS
+    );
+    if format == FORMAT_ID_ISOMP4 {
+        mp4_trim::playable_range(&mut bytes.reader(), timing.id, timing.sample_rate).map_or(
+            Playable::WHOLE_TRACK,
+            |range| Playable {
+                start_ts: range.start_ts,
+                frames: Some(range.frames),
+            },
+        )
+    } else if format == FORMAT_ID_OGG && is_opus {
+        past_pre_skip(track)
+    } else {
+        Playable::WHOLE_TRACK
     }
-    match mp4_trim::playable_range(&mut bytes.reader(), track.id, track.sample_rate) {
-        Some(range) => Playable {
-            start_ts: range.start_ts,
-            frames: Some(range.frames),
-        },
-        None => whole_track,
+}
+
+/// An Ogg Opus track past its pre-skip, the encoder's delay. Its granule positions count the
+/// pre-skip, which symphonia gives as the track's delay without marking it on the packets.
+fn past_pre_skip(track: &Track) -> Playable {
+    let pre_skip = track.delay.unwrap_or(0);
+    Playable {
+        start_ts: track.start_ts.get() + i64::from(pre_skip),
+        frames: track
+            .num_frames
+            .map(|frames| frames.saturating_sub(u64::from(pre_skip))),
     }
 }
 
@@ -549,10 +583,14 @@ mod tests {
     use crate::playback::channel_mix::Speaker;
     use crate::test_media::{
         AAC_CHAPTERS_FIXTURE, AAC_M4A_FIXTURE, AAC_PACKET_FRAMES, AAC_SURROUND_FIXTURE,
-        ADTS_FIXTURE, ALAC_FIXTURE, FIXTURE_FRAMES, NO_SOUND_FIXTURE, OggFlacHeaders, Signal,
-        VORBIS_FIXTURE, WavEncoding, aac_m4a_with_itunsmpb, flac_song, ogg_flac_song, samples_of,
-        wav_song,
+        ADTS_FIXTURE, ALAC_FIXTURE, FIXTURE_FRAMES, NO_SOUND_FIXTURE, OPUS_M4A_FIXTURE, OPUS_RATE,
+        OggFlacHeaders, OpusSong, Signal, VORBIS_FIXTURE, WavEncoding, aac_m4a_with_itunsmpb,
+        flac_song, levels_of, ogg_flac_song, ogg_opus_song, samples_of, wav_song,
     };
+
+    /// The frames of the Opus songs built: not a whole number of packets, so the last one is
+    /// padded.
+    const OPUS_SONG_FRAMES: u64 = 30_000;
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, damaged_frames, gapless_audio, root_with_songs,
         silent_frames,
@@ -823,6 +861,101 @@ mod tests {
         }
     }
 
+    /// A stereo Opus song of `frames` frames, without tags or gain.
+    fn stereo_opus_song(frames: usize) -> Vec<u8> {
+        ogg_opus_song(&OpusSong {
+            amplitudes: &[0.3, 0.2],
+            frames,
+            output_gain_q8: 0,
+            comments: &[],
+        })
+    }
+
+    #[test]
+    fn cuts_the_pre_skip_and_padding_of_an_ogg_opus_song() {
+        let song = stereo_opus_song(OPUS_SONG_FRAMES as usize);
+
+        let decoder = decoder_of_song("Faithless Sanctuary.opus", &song).unwrap();
+
+        let duration = decoder.duration().unwrap().as_secs_f64();
+        assert!((duration - OPUS_SONG_FRAMES as f64 / f64::from(OPUS_RATE)).abs() < 1e-6);
+        assert_eq!(frames_of(decoder) as u64, OPUS_SONG_FRAMES);
+    }
+
+    #[test]
+    fn seeks_to_the_exact_frame_of_an_ogg_opus_song() {
+        let song = stereo_opus_song(OPUS_SONG_FRAMES as usize);
+
+        for frame in [0, 1, 1000, 15_000, OPUS_SONG_FRAMES - 1] {
+            let mut decoder = decoder_of_song("Shimmy.opus", &song).unwrap();
+            decoder
+                .seek(Duration::from_secs_f64(frame as f64 / f64::from(OPUS_RATE)))
+                .unwrap();
+
+            assert_eq!(
+                frames_of(decoder) as u64,
+                OPUS_SONG_FRAMES - frame,
+                "from {frame}"
+            );
+        }
+    }
+
+    #[test]
+    fn cuts_the_pre_skip_and_padding_of_opus_in_mp4_by_its_edit_list() {
+        let decoder = decoder_of_song("Late Redemption.m4a", OPUS_M4A_FIXTURE).unwrap();
+
+        let duration = decoder.duration().unwrap().as_secs_f64();
+        assert!((duration - 1.0).abs() < 1e-6, "{duration}");
+        assert_eq!(frames_of(decoder) as u32, OPUS_RATE);
+    }
+
+    #[test]
+    fn places_the_channels_of_a_surround_opus_song_in_wave_order() {
+        // Opus orders 5.1 as Vorbis does: front left, center, front right, rear left, rear right,
+        // LFE.
+        let song = ogg_opus_song(&OpusSong {
+            amplitudes: &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            frames: OPUS_SONG_FRAMES as usize,
+            output_gain_q8: 0,
+            comments: &[],
+        });
+
+        let decoder = decoder_of_song("Light My Way.opus", &song).unwrap();
+        assert_eq!(decoder.layout(), ChannelLayout::standard(6));
+        let levels = levels_of(&decoder.collect::<Vec<f32>>(), 6);
+
+        // WAVE order: front left, front right, center, LFE, rear left, rear right.
+        for (level, amplitude) in levels.iter().zip([0.1, 0.3, 0.2, 0.6, 0.4, 0.5]) {
+            let expected = amplitude * std::f32::consts::FRAC_1_SQRT_2;
+            assert!((level / expected - 1.0).abs() < 0.1, "{levels:?}");
+        }
+    }
+
+    #[test]
+    fn applies_the_output_gain_of_an_opus_song() {
+        let song_with_gain = |output_gain_q8| {
+            ogg_opus_song(&OpusSong {
+                amplitudes: &[0.3, 0.2],
+                frames: OPUS_SONG_FRAMES as usize,
+                output_gain_q8,
+                comments: &[],
+            })
+        };
+        let level_of = |song: &[u8]| {
+            let decoder = decoder_of_song("For Tomorrow.opus", song).unwrap();
+            levels_of(&decoder.collect::<Vec<f32>>(), 2)[0]
+        };
+
+        // The gain is in 1/256 dB: -6.02 dB halves the level.
+        let level = level_of(&song_with_gain(0));
+        let halved_level = level_of(&song_with_gain(-1541));
+
+        assert!(
+            (halved_level / level - 0.5).abs() < 0.01,
+            "{halved_level} / {level}"
+        );
+    }
+
     #[test]
     fn keeps_the_priming_and_padding_of_raw_aac() {
         let decoder = decoder_of_song("Dead Man On Display.aac", ADTS_FIXTURE).unwrap();
@@ -866,6 +999,8 @@ mod tests {
             ("m4a", AAC_M4A_FIXTURE.to_vec()),
             ("m4a", ALAC_FIXTURE.to_vec()),
             ("aac", ADTS_FIXTURE.to_vec()),
+            ("opus", stereo_opus_song(OPUS_SONG_FRAMES as usize)),
+            ("m4a", OPUS_M4A_FIXTURE.to_vec()),
         ];
         // The release build aborts on a panic: a damaged song must fail, or play what it can.
         for (extension, song) in songs {

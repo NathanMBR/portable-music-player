@@ -52,7 +52,7 @@ const tellNothingToAdd = ({ failures }: DroppedSongs) => {
   } else {
     notify(
       'No songs to add',
-      'Only MP3, M4A, AAC, Ogg, FLAC and WAV files can be added to the Songs folder'
+      'Only MP3, M4A, AAC, Opus, Ogg, FLAC and WAV files can be added to the Songs folder'
     )
   }
 }

@@ -22,7 +22,9 @@ use crate::{crash_log, ogg_flac_tags, portable};
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 /// The extensions of the files the scan lists as songs, compared without regard to case. They only
 /// say a file is a song: its format comes from its content.
-const SONG_EXTENSIONS: [&str; 8] = ["mp3", "m4a", "aac", "ogg", "oga", "flac", "wav", "wave"];
+const SONG_EXTENSIONS: [&str; 9] = [
+    "mp3", "m4a", "aac", "opus", "ogg", "oga", "flac", "wav", "wave",
+];
 /// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
 /// "band/orchestra").
 const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
@@ -352,8 +354,8 @@ mod tests {
     use super::*;
     use crate::{
         test_media::{
-            AAC_M4A_FIXTURE, ADTS_FIXTURE, OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding,
-            flac_song, ogg_flac_song, wav_song,
+            AAC_M4A_FIXTURE, ADTS_FIXTURE, OggFlacHeaders, OpusSong, Signal, VORBIS_FIXTURE,
+            WavEncoding, flac_song, ogg_flac_song, ogg_opus_song, wav_song,
         },
         test_songs::silent_audio,
     };
@@ -462,6 +464,7 @@ mod tests {
             "Awake from Darkness.oga",
             "LASTING CHILD.M4A",
             "2 X 4.aac",
+            "The House Jack Built.OPUS",
         ] {
             assert!(has_song_name(Path::new(name)), "{name} should be a song");
         }
@@ -836,6 +839,43 @@ mod tests {
 
         assert_eq!(track.title, "Ghost Lights");
         assert_eq!(track.artist.as_deref(), Some("Woodkid"));
+    }
+
+    #[test]
+    fn reads_the_tags_of_opus_songs() {
+        let song = ogg_opus_song(&OpusSong {
+            amplitudes: &[0.3, 0.2],
+            frames: 960,
+            output_gain_q8: 0,
+            comments: &[("TITLE", "Visions Prelude"), ("ARTIST", "Angra")],
+        });
+
+        let track = track_of_song("04 Visions Prelude.opus", &song);
+
+        assert_eq!(track.title, "Visions Prelude");
+        assert_eq!(track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_cover_of_an_opus_song() {
+        let song = ogg_opus_song(&OpusSong {
+            amplitudes: &[0.3, 0.2],
+            frames: 960,
+            output_gain_q8: 0,
+            comments: &[],
+        });
+        let mut tag = Tag::new(TagType::VorbisComments);
+        tag.push_picture(
+            Picture::unchecked(b"the front cover".to_vec())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Png)
+                .build(),
+        );
+        let song = with_tag(song, &tag);
+
+        let cover = cover_of_song("04 Visions Prelude.opus", &song);
+
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
     }
 
     #[test]

@@ -22,7 +22,7 @@ The constraints:
 
 Songs play in Rust (`src-tauri/src/playback/`), and the webview plays no audio:
 
-- **One decode thread per song in the player** (`song_feeder.rs`): the current one and the queued one. Each reads its song's file into memory as it goes (`song_bytes.rs`), decodes it with symphonia (`song_decoder.rs`), MP3, Ogg, FLAC or WAV, with gapless trimming on, and decodes about 1.5 s ahead.
+- **One decode thread per song in the player** (`song_feeder.rs`): the current one and the queued one. Each reads its song's file into memory as it goes (`song_bytes.rs`), decodes it with symphonia (`song_decoder.rs`), MP3, M4A, AAC, Ogg, FLAC or WAV, with gapless trimming on, and decodes about 1.5 s ahead.
 - **The audio thread only copies samples** (`song_chain.rs`, in cpal's callback). It switches to the queued song's blocks on the very next sample once the current one ends. It never blocks, locks or allocates.
 - **The output is a cpal stream opened at the rate of the song that plays** (`output.rs`), so the system's mixer does any resampling. A song of another rate reopens it once the current song ends, which leaves one short gap there, the same as mpv's default. The stream is paused (corked) while the player is paused.
 - **The webview always tells Rust which song comes next** (`queue_next_song`), by the same rule the store follows when a song ends (`findTrackAfterEnd`). When Rust starts it, the store moves to it without loading anything (`songEngine.ts`). Each song carries an id the webview counts up, so events about a song no longer in the player are ignored.
@@ -99,5 +99,5 @@ So only Chromium could be gapless from the webview, and WebKitGTK plays the padd
 - cpal lets the app name its PulseAudio client, so the volume mixer shows the app's own name.
 - symphonia reads `iTunSMPB`, or the library gets Apple-encoded MP3s, whose padding should then be read by hand.
 - souvlaki's zbus backend stops panicking on a lost bus, or the app needs to survive one.
-- The library takes formats other than MP3, Ogg, FLAC and WAV: symphonia's features grow, and so does the binary.
+- The library takes formats other than MP3, M4A, AAC, Ogg, FLAC and WAV: symphonia's features grow, and so does the binary.
 - A song change between two sample rates needs to be gapless too: the output would then stay at one rate and resample every song itself, with a good resampler.

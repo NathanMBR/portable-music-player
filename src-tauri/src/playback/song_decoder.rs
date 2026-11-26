@@ -15,7 +15,10 @@ use symphonia::core::{
         registry::CodecRegistry,
     },
     errors::Error as MediaError,
-    formats::{FormatOptions, FormatReader, SeekMode, SeekTo, Track, TrackFlags, probe::Hint},
+    formats::{
+        FormatOptions, FormatReader, SeekMode, SeekTo, Track, TrackFlags, probe::Hint,
+        well_known::FORMAT_ID_ISOMP4,
+    },
     io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
     meta::MetadataOptions,
     packet::Packet,
@@ -26,6 +29,7 @@ use tauri_plugin_log::log;
 use super::{
     PlaybackError,
     channel_mix::{ChannelLayout, MAX_CHANNELS, Speaker},
+    mp4_trim,
     song_bytes::{SongBytes, SongReader},
 };
 
@@ -81,7 +85,7 @@ struct TrackTiming {
 }
 
 /// The part of a track that's the song: past the silence its encoder added, in the cases symphonia
-/// doesn't cut it on its own.
+/// doesn't cut it on its own, MP4's.
 #[derive(Clone, Copy)]
 struct Playable {
     /// The timestamp of the song's first frame.
@@ -93,11 +97,17 @@ struct Playable {
 impl SongDecoder {
     /// Opens the song `bytes` holds and decodes its first frames, which tell its channels.
     pub(super) fn open(bytes: Arc<SongBytes>, track_path: &str) -> Result<Self, PlaybackError> {
-        let undecodable = || PlaybackError::Decode {
-            path: track_path.to_owned(),
-        };
+        let path = || track_path.to_owned();
+        let undecodable = || PlaybackError::Decode { path: path() };
+        let unsupported = || PlaybackError::UnsupportedSound { path: path() };
         let demuxer = demuxer_of(&bytes, track_path).map_err(|_| undecodable())?;
-        let track = audio_track(demuxer.as_ref()).ok_or_else(undecodable)?;
+        let track = audio_track(demuxer.as_ref()).ok_or_else(|| {
+            if has_audio(demuxer.as_ref()) {
+                unsupported()
+            } else {
+                PlaybackError::NoSound { path: path() }
+            }
+        })?;
         let Some(CodecParameters::Audio(params)) = &track.codec_params else {
             return Err(undecodable());
         };
@@ -115,11 +125,11 @@ impl SongDecoder {
                 .ok_or_else(undecodable)?,
             start_ts: track.start_ts.get(),
         };
-        let playable = Playable {
-            start_ts: 0,
-            frames: None,
-        };
-        let decoder = new_decoder(&params).map_err(|_| undecodable())?;
+        let playable = playable_of(&bytes, demuxer.as_ref(), timing);
+        let decoder = new_decoder(&params).map_err(|error| match error {
+            MediaError::Unsupported(_) => unsupported(),
+            _ => undecodable(),
+        })?;
         let mut song = Self {
             bytes,
             track_path: track_path.to_owned(),
@@ -137,9 +147,12 @@ impl SongDecoder {
             failed_packets: 0,
             has_ended: false,
         };
-        // A song of more channels than the mix places would lose some of them.
-        if !song.decode_next() || usize::from(song.channels()) > MAX_CHANNELS {
+        if !song.decode_next() {
             return Err(undecodable());
+        }
+        // A song of more channels than the mix places would lose some of them.
+        if usize::from(song.channels()) > MAX_CHANNELS {
+            return Err(unsupported());
         }
         if song.exact_duration().is_none() {
             song.estimated_duration = estimated_duration(&song.bytes);
@@ -471,6 +484,33 @@ fn estimated_duration(bytes: &Arc<SongBytes>) -> Option<Duration> {
     Some(song.properties().duration()).filter(|duration| !duration.is_zero())
 }
 
+/// The song's part of its track: from MP4's boxes, which symphonia reads without applying them.
+/// Every other container's trims are marked on its packets, which symphonia's decoders cut.
+fn playable_of(bytes: &Arc<SongBytes>, demuxer: &dyn FormatReader, track: TrackTiming) -> Playable {
+    let whole_track = Playable {
+        start_ts: 0,
+        frames: None,
+    };
+    if demuxer.format_info().format != FORMAT_ID_ISOMP4 {
+        return whole_track;
+    }
+    match mp4_trim::playable_range(&mut bytes.reader(), track.id, track.sample_rate) {
+        Some(range) => Playable {
+            start_ts: range.start_ts,
+            frames: Some(range.frames),
+        },
+        None => whole_track,
+    }
+}
+
+/// Whether `demuxer` holds any audio track, decodable or not.
+fn has_audio(demuxer: &dyn FormatReader) -> bool {
+    demuxer
+        .tracks()
+        .iter()
+        .any(|track| matches!(track.codec_params, Some(CodecParameters::Audio(_))))
+}
+
 /// The audio track to play: the one the file flags as its default among those a codec can decode,
 /// else the first of them. Other tracks are never decoded.
 fn audio_track(demuxer: &dyn FormatReader) -> Option<&Track> {
@@ -508,8 +548,10 @@ mod tests {
     use super::*;
     use crate::playback::channel_mix::Speaker;
     use crate::test_media::{
-        FIXTURE_FRAMES, OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding, flac_song,
-        ogg_flac_song, samples_of, wav_song,
+        AAC_CHAPTERS_FIXTURE, AAC_M4A_FIXTURE, AAC_PACKET_FRAMES, AAC_SURROUND_FIXTURE,
+        ADTS_FIXTURE, ALAC_FIXTURE, FIXTURE_FRAMES, NO_SOUND_FIXTURE, OggFlacHeaders, Signal,
+        VORBIS_FIXTURE, WavEncoding, aac_m4a_with_itunsmpb, flac_song, ogg_flac_song, samples_of,
+        wav_song,
     };
     use crate::test_songs::{
         CHANNELS, SAMPLE_RATE, SAMPLES_PER_FRAME, damaged_frames, gapless_audio, root_with_songs,
@@ -706,6 +748,154 @@ mod tests {
         }
     }
 
+    /// Asserts `decoder` holds exactly the fixtures' 1 s, by its length and its frames.
+    fn assert_plays_one_second(decoder: SongDecoder, file_name: &str) {
+        let duration = decoder.duration().unwrap().as_secs_f64();
+        assert!((duration - 1.0).abs() < 1e-6, "{file_name}: {duration}");
+        assert_eq!(frames_of(decoder) as u64, FIXTURE_FRAMES, "{file_name}");
+    }
+
+    #[test]
+    fn cuts_the_priming_and_padding_of_aac_in_mp4_by_its_edit_list() {
+        let decoder = decoder_of_song("Mr. Jack.m4a", AAC_M4A_FIXTURE).unwrap();
+
+        assert_plays_one_second(decoder, "Mr. Jack.m4a");
+    }
+
+    #[test]
+    fn cuts_the_priming_and_padding_of_aac_in_mp4_by_its_itunsmpb() {
+        let song = aac_m4a_with_itunsmpb();
+
+        let decoder = decoder_of_song("Lease of Life.m4a", &song).unwrap();
+
+        assert_plays_one_second(decoder, "Lease of Life.m4a");
+    }
+
+    #[test]
+    fn plays_every_frame_of_an_alac_song() {
+        let decoder = decoder_of_song("The Shadow Hunter.m4a", ALAC_FIXTURE).unwrap();
+
+        assert_plays_one_second(decoder, "The Shadow Hunter.m4a");
+    }
+
+    #[test]
+    fn seeks_to_the_exact_frame_of_m4a_songs() {
+        for (file_name, song) in [
+            ("Here In The Now.m4a", AAC_M4A_FIXTURE),
+            ("Trapped Under Ice.m4a", ALAC_FIXTURE),
+        ] {
+            for frame in [0, 1, 1000, 22_050, FIXTURE_FRAMES - 1] {
+                let mut decoder = decoder_of_song(file_name, song).unwrap();
+                decoder.seek(position_of(frame)).unwrap();
+
+                let frames = frames_of(decoder) as u64;
+                assert_eq!(frames, FIXTURE_FRAMES - frame, "{file_name} from {frame}");
+            }
+        }
+    }
+
+    #[test]
+    fn seeks_to_the_exact_frame_where_the_demuxer_cant_seek() {
+        let whole: Vec<f32> = decoder_of_song("Boom!.m4a", AAC_CHAPTERS_FIXTURE)
+            .unwrap()
+            .collect();
+
+        // Past the chapter track's last sample, every seek of symphonia's MP4 demuxer fails.
+        for frame in [22_050, 40_000] {
+            let mut decoder = decoder_of_song("Boom!.m4a", AAC_CHAPTERS_FIXTURE).unwrap();
+            decoder.seek(position_of(frame)).unwrap();
+
+            let samples: Vec<f32> = decoder.collect();
+            let rest = &whole[frame as usize * 2..];
+            assert_eq!(samples.len(), rest.len(), "from {frame}");
+            // AAC's noise substitution draws its noise from every packet decoded since the
+            // decoder started, so a seek changes it a little. A frame off would differ by about
+            // 3e-3 on these tones.
+            let largest_difference = samples
+                .iter()
+                .zip(rest)
+                .map(|(sample, expected)| (sample - expected).abs())
+                .fold(0.0, f32::max);
+            assert!(
+                largest_difference < 5e-4,
+                "from {frame}: {largest_difference}"
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_the_priming_and_padding_of_raw_aac() {
+        let decoder = decoder_of_song("Dead Man On Display.aac", ADTS_FIXTURE).unwrap();
+
+        // Nothing in ADTS frames says where they are: the priming and padding play, about 40 ms.
+        let packets = (FIXTURE_FRAMES + AAC_PACKET_FRAMES).div_ceil(AAC_PACKET_FRAMES);
+        assert_eq!(frames_of(decoder) as u64, packets * AAC_PACKET_FRAMES);
+    }
+
+    #[test]
+    fn refuses_a_song_whose_sound_it_cant_decode() {
+        let result = decoder_of_song("Z.I.T.O..m4a", AAC_SURROUND_FIXTURE);
+
+        assert!(matches!(
+            result,
+            Err(PlaybackError::UnsupportedSound { path }) if path == "Songs/Z.I.T.O..m4a"
+        ));
+    }
+
+    #[test]
+    fn refuses_a_file_without_sound() {
+        let result = decoder_of_song("Deep Blue.m4a", NO_SOUND_FIXTURE);
+
+        assert!(matches!(
+            result,
+            Err(PlaybackError::NoSound { path }) if path == "Songs/Deep Blue.m4a"
+        ));
+    }
+
+    #[test]
+    fn never_panics_on_a_damaged_song() {
+        let songs = [
+            ("mp3", gapless_audio(20, 576, 1216)),
+            ("flac", flac_song(16, STEREO_SIGNAL)),
+            ("wav", wav_song(WavEncoding::Pcm24, STEREO_SIGNAL)),
+            (
+                "oga",
+                ogg_flac_song(16, STEREO_SIGNAL, &OggFlacHeaders::default()),
+            ),
+            ("ogg", VORBIS_FIXTURE.to_vec()),
+            ("m4a", AAC_M4A_FIXTURE.to_vec()),
+            ("m4a", ALAC_FIXTURE.to_vec()),
+            ("aac", ADTS_FIXTURE.to_vec()),
+        ];
+        // The release build aborts on a panic: a damaged song must fail, or play what it can.
+        for (extension, song) in songs {
+            let file_name = format!("Battery.{extension}");
+            for damaged in damaged_copies_of(&song) {
+                if let Ok(mut decoder) = decoder_of_song(&file_name, &damaged) {
+                    let _ = decoder.seek(Duration::from_millis(100));
+                    decoder.for_each(drop);
+                }
+            }
+        }
+    }
+
+    /// Copies of `song` cut short, or with bytes overwritten, at places spread over it.
+    fn damaged_copies_of(song: &[u8]) -> Vec<Vec<u8>> {
+        const PLACES: usize = 6;
+        const DAMAGE: [u8; 16] = [0xFF; 16];
+        (1..PLACES)
+            .flat_map(|place| {
+                let at = song.len() * place / PLACES;
+                let mut overwritten = song.to_vec();
+                let end = (at + DAMAGE.len()).min(song.len());
+                overwritten[at..end].copy_from_slice(&DAMAGE[..end - at]);
+                let mut zeroed = song.to_vec();
+                zeroed[at..end].fill(0);
+                [song[..at].to_vec(), overwritten, zeroed]
+            })
+            .collect()
+    }
+
     #[test]
     fn places_the_channels_of_a_surround_wav() {
         let surround = Signal {
@@ -730,7 +920,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(PlaybackError::Decode { path }) if path == "Songs/Ronnie.wav"
+            Err(PlaybackError::UnsupportedSound { path }) if path == "Songs/Ronnie.wav"
         ));
     }
 

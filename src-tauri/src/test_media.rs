@@ -2,11 +2,69 @@
 //! a known signal, so a test can check every sample it decodes, and the committed fixtures of the
 //! codecs no Rust crate encodes. They're helpers, not example songs.
 
+use std::{borrow::Cow, io::Cursor};
+
+use lofty::{
+    config::WriteOptions,
+    mp4::{Atom, AtomData, AtomIdent, Ilst},
+    tag::TagExt,
+};
+
 /// 1 s of a tone per channel, stereo at 44.1 kHz, in Ogg Vorbis, made by
 /// `test/make_audio_fixtures.sh`.
 pub(crate) const VORBIS_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/vorbis.ogg");
+/// The same in AAC in MP4, whose edit list cuts the encoder's priming and padding.
+pub(crate) const AAC_M4A_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/aac.m4a");
+/// The same AAC in MP4, besides a chapter track that has no sample after the song's first quarter.
+pub(crate) const AAC_CHAPTERS_FIXTURE: &[u8] =
+    include_bytes!("../../test/audio_fixtures/aac-chapters.m4a");
+/// A tone per channel of 5.1, in AAC in MP4.
+pub(crate) const AAC_SURROUND_FIXTURE: &[u8] =
+    include_bytes!("../../test/audio_fixtures/aac-surround.m4a");
+/// The same in ALAC in MP4.
+pub(crate) const ALAC_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/alac.m4a");
+/// The same AAC in ADTS frames, with nothing saying where its priming and padding are.
+pub(crate) const ADTS_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/adts.aac");
+/// An MP4 holding a picture track and no sound.
+pub(crate) const NO_SOUND_FIXTURE: &[u8] = include_bytes!("../../test/audio_fixtures/no-sound.m4a");
 /// The frames of every fixture.
 pub(crate) const FIXTURE_FRAMES: u64 = 44_100;
+/// The frames of an AAC packet, and of the priming FFmpeg's encoder adds.
+pub(crate) const AAC_PACKET_FRAMES: u64 = 1024;
+
+/// The AAC in MP4 fixture without its edit list, which an `iTunSMPB` comment replaces, as in
+/// Apple's encoders' files: it says the priming, the padding and the song's frames.
+pub(crate) fn aac_m4a_with_itunsmpb() -> Vec<u8> {
+    let edit_list_box = AAC_M4A_FIXTURE
+        .windows(EDIT_BOX.len())
+        .position(|window| window == EDIT_BOX)
+        .unwrap();
+    // A free box of the same size: the edit list is skipped as empty space.
+    let mut song = AAC_M4A_FIXTURE.to_vec();
+    song[edit_list_box..edit_list_box + FREE_BOX.len()].copy_from_slice(FREE_BOX);
+    let padding = (FIXTURE_FRAMES + AAC_PACKET_FRAMES).next_multiple_of(AAC_PACKET_FRAMES)
+        - AAC_PACKET_FRAMES
+        - FIXTURE_FRAMES;
+    let itunsmpb = format!(
+        " 00000000 {AAC_PACKET_FRAMES:08X} {padding:08X} {FIXTURE_FRAMES:016X} 00000000 00000000"
+    );
+    let mut ilst = Ilst::default();
+    ilst.insert(Atom::new(
+        AtomIdent::Freeform {
+            mean: Cow::Borrowed(ITUNES_MEAN),
+            name: Cow::Borrowed(ITUNSMPB_NAME),
+        },
+        AtomData::UTF8(itunsmpb),
+    ));
+    let mut file = Cursor::new(song);
+    ilst.save_to(&mut file, WriteOptions::default()).unwrap();
+    file.into_inner()
+}
+
+const EDIT_BOX: &[u8; 4] = b"edts";
+const FREE_BOX: &[u8; 4] = b"free";
+const ITUNES_MEAN: &str = "com.apple.iTunes";
+const ITUNSMPB_NAME: &str = "iTunSMPB";
 
 /// The shape of a test signal.
 #[derive(Clone, Copy)]

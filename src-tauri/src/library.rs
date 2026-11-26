@@ -22,7 +22,7 @@ use crate::{crash_log, ogg_flac_tags, portable};
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 /// The extensions of the files the scan lists as songs, compared without regard to case. They only
 /// say a file is a song: its format comes from its content.
-const SONG_EXTENSIONS: [&str; 6] = ["mp3", "ogg", "oga", "flac", "wav", "wave"];
+const SONG_EXTENSIONS: [&str; 8] = ["mp3", "m4a", "aac", "ogg", "oga", "flac", "wav", "wave"];
 /// The tags a song's artist comes from, best first: its lead performer, then its album artist (ID3's
 /// "band/orchestra").
 const ARTIST_KEYS: [ItemKey; 2] = [ItemKey::TrackArtist, ItemKey::AlbumArtist];
@@ -352,7 +352,8 @@ mod tests {
     use super::*;
     use crate::{
         test_media::{
-            OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding, flac_song, ogg_flac_song, wav_song,
+            AAC_M4A_FIXTURE, ADTS_FIXTURE, OggFlacHeaders, Signal, VORBIS_FIXTURE, WavEncoding,
+            flac_song, ogg_flac_song, wav_song,
         },
         test_songs::silent_audio,
     };
@@ -459,6 +460,8 @@ mod tests {
             "Unholy Wars.Wave",
             "B.Y.O.B..OGG",
             "Awake from Darkness.oga",
+            "LASTING CHILD.M4A",
+            "2 X 4.aac",
         ] {
             assert!(has_song_name(Path::new(name)), "{name} should be a song");
         }
@@ -770,6 +773,50 @@ mod tests {
         assert_eq!(flac_track.artist.as_deref(), Some("Angra"));
         assert_eq!(wav_track.title, "Sprouts of Time");
         assert_eq!(wav_track.artist.as_deref(), Some("Angra"));
+    }
+
+    #[test]
+    fn reads_the_tags_and_cover_of_m4a_songs() {
+        let mut tag = tag_holding(
+            TagType::Mp4Ilst,
+            &[
+                (ItemKey::TrackTitle, "Suite-Pee"),
+                (ItemKey::TrackArtist, "System of a Down"),
+            ],
+        );
+        tag.push_picture(
+            Picture::unchecked(b"the front cover".to_vec())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        let song = with_tag(AAC_M4A_FIXTURE.to_vec(), &tag);
+
+        let track = track_of_song("01 Suite-Pee.m4a", &song);
+        let cover = cover_of_song("01 Suite-Pee.m4a", &song);
+
+        assert_eq!(track.title, "Suite-Pee");
+        assert_eq!(track.artist.as_deref(), Some("System of a Down"));
+        assert_eq!(cover.as_deref(), Some(b"the front cover".as_slice()));
+    }
+
+    #[test]
+    fn reads_the_tags_of_raw_aac_songs() {
+        let song = with_tag(
+            ADTS_FIXTURE.to_vec(),
+            &tag_holding(
+                TagType::Id3v2,
+                &[
+                    (ItemKey::TrackTitle, "Shadows"),
+                    (ItemKey::TrackArtist, "Woodkid"),
+                ],
+            ),
+        );
+
+        let track = track_of_song("02 Shadows.aac", &song);
+
+        assert_eq!(track.title, "Shadows");
+        assert_eq!(track.artist.as_deref(), Some("Woodkid"));
     }
 
     #[test]

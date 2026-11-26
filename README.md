@@ -8,7 +8,7 @@ Portable music player made with Node.js, TypeScript, Tauri and React
 - Keeps all its data next to the executable
 - Log of clicks, switches, songs, jumps, pages and sound outputs, in the terminal and the `Logs` folder
 - Songs library from the `Songs` folder
-- Plays MP3, Ogg, FLAC and WAV files
+- Plays MP3, M4A, AAC, Ogg, FLAC and WAV files
 - Song titles and artists from their tags, in the song list and the player
 - Song cover miniatures from their tags
 - Songs sorted by title or by filename

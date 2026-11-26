@@ -820,7 +820,14 @@ mod tests {
 
     #[test]
     fn creating_finds_songs_of_every_format() {
-        let songs = ["Cure.flac", "Stand Away.WAVE", "X.ogg", "Pale Yellow.oga"];
+        let songs = [
+            "Cure.flac",
+            "Stand Away.WAVE",
+            "X.ogg",
+            "Pale Yellow.oga",
+            "X.m4a",
+            "Bounce.aac",
+        ];
         let root = player_with_songs(&songs);
         let file_name = "1763581234567-Lossless.json";
 

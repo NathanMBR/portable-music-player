@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::{
         Arc,
         mpsc::{self, Receiver, RecvTimeoutError, Sender, SyncSender, TryRecvError, TrySendError},
@@ -14,6 +15,7 @@ use super::{
     PlaybackError,
     song_bytes::{SongBytes, SongReader},
 };
+use crate::crash_log;
 
 /// Every song of the library is an MP3: the hint spares the decoder from guessing.
 const MP3_EXTENSION: &str = "mp3";
@@ -89,6 +91,7 @@ impl SongFeeder {
         thread::Builder::new()
             .name(FEEDER_THREAD_NAME.to_owned())
             .spawn(move || {
+                let _reading = crash_log::reading_song(Path::new(&path));
                 let decoder = match decoder_of(&bytes, &path) {
                     Ok(decoder) => decoder,
                     Err(error) => {

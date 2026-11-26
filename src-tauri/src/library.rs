@@ -17,7 +17,7 @@ use lofty::{
 use serde::{Serialize, Serializer};
 use tauri::ipc::Response;
 
-use crate::portable;
+use crate::{crash_log, portable};
 
 pub(crate) const SONGS_FOLDER_NAME: &str = "Songs";
 const MP3_EXTENSION: &str = "mp3";
@@ -125,10 +125,11 @@ pub(crate) fn find_song_in(root: &Path, track_path: &str) -> Result<PathBuf, Lib
 /// an error: one without pictures, or whose tags can't be read, simply has no cover.
 fn read_cover_in(root: &Path, track_path: &str) -> Result<Option<Vec<u8>>, LibraryError> {
     let song = find_song_in(root, track_path)?;
-    let file = File::open(song).map_err(|source| LibraryError::ReadSong {
+    let file = File::open(&song).map_err(|source| LibraryError::ReadSong {
         path: track_path.to_owned(),
         source,
     })?;
+    let _reading = crash_log::reading_song(&song);
     Ok(read_song_cover(file))
 }
 
@@ -213,7 +214,10 @@ fn song_files_in(songs_dir: &Path) -> Result<Vec<PathBuf>, LibraryError> {
 fn track_from(file: &Path) -> Track {
     let file_name = file.file_name().unwrap_or_default().to_string_lossy();
     // Bad tags never fail the scan: a song whose tags can't be read is listed under its file name.
-    let tags = read_song_tags(file).unwrap_or_default();
+    let tags = {
+        let _reading = crash_log::reading_song(file);
+        read_song_tags(file).unwrap_or_default()
+    };
     Track {
         path: format!("{SONGS_FOLDER_NAME}/{file_name}"),
         title: tags.title.unwrap_or_else(|| title_from_file_name(file)),

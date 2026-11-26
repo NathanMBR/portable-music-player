@@ -1,4 +1,5 @@
 mod atomic_write;
+mod crash_log;
 mod library;
 mod logs;
 mod main_window;
@@ -13,6 +14,7 @@ mod updates;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    crash_log::log_crashes();
     let logs_dir = logs::writable_logs_dir();
     tauri::Builder::default()
         .plugin(logs::plugin(logs_dir.as_deref().ok()))

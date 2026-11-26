@@ -60,7 +60,7 @@ Both sign the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_
   - drops: the song drop store logs the songs a drop holds and the songs it copied;
   - updates: the update store logs what each check found, a check at launch that failed, and an update skipped; `PatchNotes` logs a link it opens; Rust logs a download opened in the browser and an install starting;
   - the sound output: Rust logs each one it opens, with its device and rate, and one it loses (`playback/engine.rs`);
-  - Rust logs the app's opening and closing (see `logs.rs`).
+  - Rust logs the app's opening and closing (see `logs.rs`), and a crash, with the song being read then (`crash_log.rs`).
 - Frontend state is managed with Zustand (`create<State>()(...)` stores). Persistent data still goes through Rust commands to the JSON files, not Zustand's `persist` middleware (which would use webview `localStorage`, outside the flash drive).
 - `src-tauri/`: Rust backend. `main.rs` only calls `portable_music_player_lib::run()` in `lib.rs`, where commands are registered in `generate_handler![...]`. New permissions for plugins have to be added in `src-tauri/capabilities/default.json`.
 - Release profile in `Cargo.toml` is tuned for small binaries (LTO, strip, `panic = "abort"`).
@@ -223,6 +223,7 @@ src/
   - `allSongsFound` is worked out only when a playlist is created, saved or checked (`check_playlist`, which also names the songs missing), never by a listing or a scan, through `library::missing_songs_in`: the songs the scan wouldn't list, from the same listing (`song_files_in`), with names paired exactly, case included, the way the webview pairs a playlist's songs with the scan. Checking rewrites the file only when the value changes, and Rust logs each change of it.
   - Create never overwrites a file (`Taken`), and can recreate a deleted playlist under its old name. Every write goes through `write_atomically`.
 - `atomic_write.rs`: `write_atomically` writes a file under a hidden temporary name next to it, `.<name>.tmp`, then renames it over the file, so pulling the drive mid-write leaves the old file or the new one, never half of one. The settings and the playlists save through it.
+- `crash_log.rs`: the release build aborts on panic, so a damaged song that crashes a tag reader or a decoder closes the app, at every launch if the scan reads it. `log_crashes`, called first thing in `run`, installs a panic hook that logs the panic, and the song its thread was reading, before the abort, then prints it as usual: the plugin's file is flushed at each line, so the line reaches the drive. The scan, the cover read and each feeder note their song for as long as they read it (`reading_song`, a guard bound to its thread).
 - `logs.rs`: the log, through the official `tauri-plugin-log`, printed to stdout and saved in `Logs/portable-music-player.log` next to the executable (its `Folder` target: the plugin's default `LogDir` is in the user's profile, off the drive). It takes everything logged through the `log` crate, which the plugin re-exports (`tauri_plugin_log::log`).
   - Each opening starts a new file (`FileOpenStrategy::Rotate`): the last session's is renamed `portable-music-player_<date>.log`, the date it's set aside, in UTC, so the opening after it. A full file (`MAX_LOG_FILE_BYTES`, 1 MB, instead of the plugin's 40 KB) is renamed the same way and a new one starts. The 3 newest renamed files are kept, sessions and full ones alike (`PAST_LOG_FILES_KEPT`).
   - The plugin's settings come from `builder`, so a test can get its logger from a mock app (`split`, with Tauri's `test` feature, a dev-dependency) without installing it as the global logger.
@@ -396,6 +397,7 @@ Every feature logs what the user does and what the app does in response, followi
 | Files or folders are dropped on the window | `Dropped <count> songs`, the MP3s found in them, e.g. `Dropped 1 song` |
 | The songs of a drop are copied | `Copied <count> songs to the Songs folder` |
 | The app opens and closes | `Opening app`, `Closing app` |
+| The app crashes | `Crashed while reading "<song>": <panic message> (<place in the code>)`, the song's file name, or `Crashed: <panic message> (<place in the code>)` when no song is being read |
 | A sound output opens, for a song or another device | `Opened sound output "<device name>" at <rate> Hz`, the rate it runs at, e.g. `Opened sound output "Speakers" at 44100 Hz` |
 | The sound output fails, as when its device is unplugged | `Lost sound output "<device name>"` |
 | Rust finds songs of a playlist missing, when its file said they were all there or is new | `Found <count> songs missing from playlist "<title>"`, e.g. `Found 1 song missing from playlist "Road trip"` |

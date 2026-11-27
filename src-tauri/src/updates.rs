@@ -46,8 +46,8 @@ pub struct PendingUpdate(Mutex<Option<Update>>);
 /// How the running app got on the computer, which decides how it updates.
 #[derive(Debug, PartialEq)]
 enum Build {
-    /// Installed on Windows by the NSIS or MSI installer: the updater installs the new version in
-    /// its place.
+    /// Installed on Windows by the NSIS installer: the updater installs the new version in its
+    /// place.
     Installed,
     /// Run from any folder, like a flash drive: the browser downloads the new file, for the user
     /// to put in place of this one.
@@ -139,11 +139,11 @@ pub async fn install_update(pending_update: State<'_, PendingUpdate>) -> Result<
     }
 }
 
-/// The bundler marks the executable inside each installer and the AppImage with their type, and
+/// The bundler marks the executable inside the installer and the AppImage with their type, and
 /// leaves the bare executables it uploads unmarked.
 fn build_of(bundle_type: Option<BundleType>, os: &str) -> Build {
     match bundle_type {
-        Some(BundleType::Nsis | BundleType::Msi) => Build::Installed,
+        Some(BundleType::Nsis) => Build::Installed,
         Some(BundleType::AppImage) => Build::Portable(PortableBuild::AppImage),
         _ if os == "windows" => Build::Portable(PortableBuild::WindowsExecutable),
         _ => Build::Portable(PortableBuild::LinuxExecutable),
@@ -229,7 +229,6 @@ mod tests {
             build_of(Some(BundleType::Nsis), "windows"),
             Build::Installed
         );
-        assert_eq!(build_of(Some(BundleType::Msi), "windows"), Build::Installed);
     }
 
     #[test]

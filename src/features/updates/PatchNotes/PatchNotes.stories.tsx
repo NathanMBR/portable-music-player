@@ -5,7 +5,7 @@ import { failingCommand, mockCommands } from '../../../testing/mockCommands'
 import { withNotificationArea } from '../../../testing/withNotificationArea'
 import { PatchNotes } from './PatchNotes'
 
-const RELEASE_URL = 'https://github.com/NathanMBR/portable-music-player/releases/tag/v0.2.0'
+const RELEASE_URL = 'https://github.com/NathanMBR/chopi/releases/tag/v0.2.0'
 
 const NOTES = `## New features
 
@@ -79,7 +79,7 @@ export const LinkFailure: Story = {
 export const NoImagesOrHtml: Story = {
   args: {
     notes:
-      '- Plays songs <b>offline</b>\n- ![Screenshot](https://github.com/NathanMBR/portable-music-player/screenshot.png)'
+      '- Plays songs <b>offline</b>\n- ![Screenshot](https://github.com/NathanMBR/chopi/screenshot.png)'
   },
   play: async ({ canvas, canvasElement }) => {
     await expect(canvas.queryByRole('img')).not.toBeInTheDocument()

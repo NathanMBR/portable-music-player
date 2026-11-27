@@ -254,8 +254,7 @@ mod tests {
 
     #[test]
     fn downloads_the_release_files_by_the_names_the_stable_workflow_gives_them() {
-        let releases =
-            "https://github.com/NathanMBR/portable-music-player/releases/download/v0.2.0";
+        let releases = "https://github.com/NathanMBR/chopi/releases/download/v0.2.0";
 
         assert_eq!(
             download_url(PortableBuild::AppImage, "0.2.0"),

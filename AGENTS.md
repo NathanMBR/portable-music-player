@@ -293,7 +293,7 @@ These follow from the project goal and are easy to get wrong:
   - stories that set store state use `renderInOwnFrame`, so they don't overwrite each other on Docs pages;
 - MDX pages have a `summary` on `<Meta>` and write all their content in the file, because the manifest doesn't follow imports. `DesignTokens.mdx` repeats the token values of `src/index.css`, so keep them in sync.
 - `README.md` lists the user-facing features under **Features**, one short line each that names the feature without explaining it.
-- `docs/changelog/` holds the patch notes of each stable release, one Markdown file per version, written when it's released (see Releases). The folder is created with the first release's notes.
+- `docs/changelog/` holds the patch notes of each stable release, one Markdown file per version, written when it's released (see Releases).
 - `docs/technical-decisions/` holds why parts of the app are built the way they are, one Markdown file per decision, named in kebab-case after what it decides, e.g. `linux-song-server.md`.
   - The user chooses which decisions get a file. Suggest one when a change settles a choice worth explaining (an obvious approach that was rejected, a platform workaround, a constraint the code doesn't show), and write it only once the user agrees.
   - Each file starts with a `# <title>`, then these sections in order: **Status** (`Current`, or `Superseded by <file>` with the date), **Context** (the problem and its constraints), **Decision**, **Why** (the evidence: measurements, bugs, documentation), **Alternatives rejected** (each with its reason), **Consequences** (what it costs, and the code it shapes) and **Revisit when** (what would make it worth deciding again).
@@ -376,7 +376,7 @@ Features and fixes are developed test first. A test states a rule the system mus
 - Code that others build on counts as changed for them too: a change to `src/components/`, a store, `src/index.css` or `src/testing/` also runs the tests of the code that uses it.
 - There's no need to run them again before committing: the CI workflow runs every test on every push.
 
-Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
+Commit messages follow Conventional Commits with a short lowercase subject and no body (e.g. `chore: add headlessui and heroicons`, `ci: add quality assurance github workflow`). A release's commit always follows the pattern `chore: release vX.X.X`, the version it releases, e.g. `chore: release v1.0.0` (see Releases). Never add a `Co-Authored-By` trailer or any other AI attribution line to commits or pull requests.
 
 ## Releases
 
@@ -387,7 +387,7 @@ A stable release is made by hand, in these steps:
 3. **Group them**: `feat` commits under **New features**, `fix` commits under **Bug fixes**, everything else under **Other**. Leave out a group with nothing in it.
 4. **Pick the version**, in semver: a breaking change raises the major, a new feature the minor, only fixes the patch. Set it in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` (then `cargo check --manifest-path src-tauri/Cargo.toml` updates `Cargo.lock`) and `package.json` (`pnpm version <version> --no-git-tag-version`). The tag, the release's name and the notes' file name all come from it.
 5. **Write the patch notes** in `docs/changelog/v<major>-<minor>-<patch>.md`, e.g. `docs/changelog/v1-0-0.md` for 1.0.0, creating the folder if it's missing: a `## New features`, `## Bug fixes` and `## Other` heading for each group, in that order, each followed by `- ` items, and no title, since the release's name says the version. The update dialog renders them as Markdown (`PatchNotes`), without images or HTML, and links open in the browser.
-6. **Commit** (`chore: release v<version>`), push `development` and open a pull request from it into `master`. Approving it has `publish-stable.yml` build the draft release, with the notes as its description and as `latest.json`'s `notes`, and fail if the notes' file is missing. Merging it builds the draft again, from `master`, once Quality Assurance passes. Publish the draft by hand on GitHub: only then is it the latest release, the one the app's update check reads.
+6. **Commit** the version and the notes together, always as `chore: release vX.X.X`, the version's major, minor and patch with nothing else in the message, e.g. `chore: release v1.0.0`. Then push `development` and open a pull request from it into `master`. Approving it has `publish-stable.yml` build the draft release, with the notes as its description and as `latest.json`'s `notes`, and fail if the notes' file is missing. Merging it builds the draft again, from `master`, once Quality Assurance passes. Publish the draft by hand on GitHub: only then is it the latest release, the one the app's update check reads.
 
 ## Logging
 

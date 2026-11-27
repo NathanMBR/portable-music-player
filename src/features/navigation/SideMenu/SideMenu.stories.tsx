@@ -57,7 +57,7 @@ export const Open: Story = {
   play: async ({ canvasElement }) => {
     // The drawer renders in a portal on <body>, outside the story's canvas.
     const page = within(canvasElement.ownerDocument.body)
-    await expect(await page.findByRole('dialog', { name: 'Portable Music Player' })).toBeVisible()
+    await expect(await page.findByRole('dialog', { name: 'Chopi' })).toBeVisible()
     await expect(page.queryByRole('button', { name: 'Update' })).not.toBeInTheDocument()
   }
 }

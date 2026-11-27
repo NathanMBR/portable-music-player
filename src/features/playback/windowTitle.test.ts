@@ -59,7 +59,7 @@ describe('connectWindowTitle', () => {
     connect()
     await settle()
 
-    expect(titles).toEqual(['Portable Music Player'])
+    expect(titles).toEqual(['Chopi'])
   })
 
   it('names the window after the song in the player, and back after the app on Stop', async () => {
@@ -72,10 +72,10 @@ describe('connectWindowTitle', () => {
     await settle()
 
     expect(titles).toEqual([
-      'Portable Music Player',
-      'Lasting Child · Angra — Portable Music Player',
-      'Make Believe · Angra — Portable Music Player',
-      'Portable Music Player'
+      'Chopi',
+      'Lasting Child · Angra — Chopi',
+      'Make Believe · Angra — Chopi',
+      'Chopi'
     ])
   })
 
@@ -91,10 +91,7 @@ describe('connectWindowTitle', () => {
     playback().playTrack(bringEmBackAlive, [bringEmBackAlive], SONGS_SOURCE)
     await settle()
 
-    expect(titles).toEqual([
-      'Portable Music Player',
-      "Bring 'Em Back Alive · Audioslave — Portable Music Player"
-    ])
+    expect(titles).toEqual(['Chopi', "Bring 'Em Back Alive · Audioslave — Chopi"])
   })
 
   it('names a song without an artist by its title alone', async () => {
@@ -109,7 +106,7 @@ describe('connectWindowTitle', () => {
     playback().playTrack(soldierSide, [soldierSide], SONGS_SOURCE)
     await settle()
 
-    expect(titles.slice(-1)).toEqual(['Soldier Side - Intro — Portable Music Player'])
+    expect(titles.slice(-1)).toEqual(['Soldier Side - Intro — Chopi'])
   })
 
   describe('with a song played from a playlist', () => {
@@ -137,9 +134,7 @@ describe('connectWindowTitle', () => {
       playback().playTrack(yourTimeHasCome, [yourTimeHasCome], playlistSource(roadTrip.fileName))
       await settle()
 
-      expect(titles.slice(-1)).toEqual([
-        'Your Time Has Come · Audioslave · Road trip — Portable Music Player'
-      ])
+      expect(titles.slice(-1)).toEqual(['Your Time Has Come · Audioslave · Road trip — Chopi'])
     })
 
     it('follows the playlist as it is renamed, then deleted', async () => {
@@ -152,9 +147,9 @@ describe('connectWindowTitle', () => {
       await settle()
 
       expect(titles.slice(-3)).toEqual([
-        'Your Time Has Come · Audioslave · Road trip — Portable Music Player',
-        'Your Time Has Come · Audioslave · Long drive — Portable Music Player',
-        'Your Time Has Come · Audioslave — Portable Music Player'
+        'Your Time Has Come · Audioslave · Road trip — Chopi',
+        'Your Time Has Come · Audioslave · Long drive — Chopi',
+        'Your Time Has Come · Audioslave — Chopi'
       ])
     })
   })

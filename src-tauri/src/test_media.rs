@@ -305,7 +305,7 @@ const FRONT_COVER: u32 = 3;
 const COVER_MIME_TYPE: &[u8] = b"image/png";
 /// The Ogg FLAC mapping's first packet: its type, its signature, then its version, 1.0.
 const OGG_FLAC_HEADER: &[u8; 7] = b"\x7FFLAC\x01\x00";
-const VENDOR: &[u8] = b"portable-music-player tests";
+const VENDOR: &[u8] = b"chopi tests";
 
 /// What an Ogg FLAC file's headers hold besides its STREAMINFO.
 #[derive(Default)]

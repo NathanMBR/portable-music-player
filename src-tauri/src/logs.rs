@@ -14,7 +14,7 @@ use crate::portable;
 
 const LOGS_FOLDER_NAME: &str = "Logs";
 /// The log file's name, without the extension the plugin adds.
-const LOG_FILE_NAME: &str = "portable-music-player";
+const LOG_FILE_NAME: &str = "chopi";
 const LOG_FILE_EXTENSION: &str = "log";
 const LOG_LEVEL: LevelFilter = LevelFilter::Info;
 /// The plugin's own limit, 40 KB, would empty the log every few hundred lines.
@@ -209,11 +209,7 @@ mod tests {
                 "symphonia_bundle_mp3::layer3",
                 "a decoder's error",
             ),
-            (
-                log::Level::Warn,
-                "portable_music_player_lib::playback",
-                "the app's warning",
-            ),
+            (log::Level::Warn, "chopi_lib::playback", "the app's warning"),
         ];
 
         for (level, target, message) in lines {
@@ -237,10 +233,7 @@ mod tests {
     fn writes_the_log_to_a_file_named_after_the_app() {
         let logs_dir = Path::new("Logs");
 
-        assert_eq!(
-            log_file_in(logs_dir),
-            logs_dir.join("portable-music-player.log")
-        );
+        assert_eq!(log_file_in(logs_dir), logs_dir.join("chopi.log"));
     }
 
     #[test]

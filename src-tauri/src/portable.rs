@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn uses_the_folder_of_the_executable() {
-        let executable = Path::new("/media/usb/Player/portable-music-player");
+        let executable = Path::new("/media/usb/Player/chopi");
 
         assert_eq!(
             root_dir_of(executable, None).unwrap(),
@@ -63,10 +63,10 @@ mod tests {
     #[test]
     fn uses_the_folder_of_the_appimage_rather_than_its_read_only_mount() {
         let app_image = AppImage {
-            file: PathBuf::from("/media/usb/Player/portable-music-player.AppImage"),
+            file: PathBuf::from("/media/usb/Player/chopi.AppImage"),
             mount_dir: PathBuf::from("/tmp/.mount_portabXyZ12"),
         };
-        let executable = Path::new("/tmp/.mount_portabXyZ12/usr/bin/portable-music-player");
+        let executable = Path::new("/tmp/.mount_portabXyZ12/usr/bin/chopi");
 
         assert_eq!(
             root_dir_of(executable, Some(&app_image)).unwrap(),
@@ -81,7 +81,7 @@ mod tests {
             file: PathBuf::from("/home/someone/Apps/Terminal.AppImage"),
             mount_dir: PathBuf::from("/tmp/.mount_TermiAbC34"),
         };
-        let executable = Path::new("/media/usb/Player/portable-music-player");
+        let executable = Path::new("/media/usb/Player/chopi");
 
         assert_eq!(
             root_dir_of(executable, Some(&app_image)).unwrap(),

@@ -14,12 +14,12 @@ use tauri_plugin_log::log;
 use super::engine::NowPlaying;
 
 /// What the system's media controls show as the player's name.
-const DISPLAY_NAME: &str = "Portable Music Player";
+const DISPLAY_NAME: &str = "Chopi";
 /// A field of the media controls with nothing in it.
 const BLANK: &str = "";
 /// The player's name on the session bus, after `org.mpris.MediaPlayer2.`.
 #[cfg(target_os = "linux")]
-const BUS_NAME: &str = "portable_music_player";
+const BUS_NAME: &str = "chopi";
 
 /// What a media key or a button of the system's media controls asks the player to do.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -412,7 +412,7 @@ mod tests {
 
         #[test]
         fn checks_an_abstract_bus_too() {
-            let name = format!("portable-music-player-test-{}", std::process::id());
+            let name = format!("chopi-test-{}", std::process::id());
             let socket = BusSocket::Abstract(name.clone());
             assert!(!accepts_connections(&socket));
 
@@ -423,7 +423,7 @@ mod tests {
 
         #[test]
         fn names_each_instance_on_the_bus() {
-            assert_eq!(instance_name(4242), "portable_music_player.instance4242");
+            assert_eq!(instance_name(4242), "chopi.instance4242");
         }
     }
 }

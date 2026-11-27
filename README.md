@@ -1,6 +1,11 @@
-# Portable Music Player
+# Chopi
 
-Portable music player made with Node.js, TypeScript, Tauri and React
+Chopi is a portable music player made with Node.js, TypeScript, Tauri and React
+
+## The name
+
+"Chopi" is an onomatopoeia in Guarani, an Indigenous language spoken in Brazil: it stands for the
+song of the chopi blackbird, the bird on the app's icon.
 
 ## Features
 

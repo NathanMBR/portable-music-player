@@ -150,13 +150,16 @@ fn build_of(bundle_type: Option<BundleType>, os: &str) -> Build {
     }
 }
 
-/// The direct link to a release's file for this build, named by the stable workflow's
-/// `releaseAssetNamePattern`. Releases are built for x64 only.
+/// The direct link to a release's file for this build, named by the stable workflow: the AppImage
+/// by its `releaseAssetNamePattern`, the bare executables by its step that uploads them. Releases
+/// are built for x64 only.
 fn download_url(build: PortableBuild, version: &str) -> String {
     let file_name = match build {
         PortableBuild::AppImage => format!("{APP_NAME}_{version}_linux_amd64.AppImage"),
-        PortableBuild::LinuxExecutable => format!("{APP_NAME}_{version}_linux_x64"),
-        PortableBuild::WindowsExecutable => format!("{APP_NAME}_{version}_windows_x64.exe"),
+        PortableBuild::LinuxExecutable => format!("{APP_NAME}_{version}_linux_x64-portable"),
+        PortableBuild::WindowsExecutable => {
+            format!("{APP_NAME}_{version}_windows_x64-portable.exe")
+        }
     };
     format!("{RELEASE_DOWNLOADS_URL}/v{version}/{file_name}")
 }
@@ -256,15 +259,15 @@ mod tests {
 
         assert_eq!(
             download_url(PortableBuild::AppImage, "0.2.0"),
-            format!("{releases}/portable-music-player_0.2.0_linux_amd64.AppImage")
+            format!("{releases}/chopi_0.2.0_linux_amd64.AppImage")
         );
         assert_eq!(
             download_url(PortableBuild::LinuxExecutable, "0.2.0"),
-            format!("{releases}/portable-music-player_0.2.0_linux_x64")
+            format!("{releases}/chopi_0.2.0_linux_x64-portable")
         );
         assert_eq!(
             download_url(PortableBuild::WindowsExecutable, "0.2.0"),
-            format!("{releases}/portable-music-player_0.2.0_windows_x64.exe")
+            format!("{releases}/chopi_0.2.0_windows_x64-portable.exe")
         );
     }
 }

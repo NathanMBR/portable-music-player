@@ -82,7 +82,8 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v1
+      - id: tauri
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Signs the updater artifacts, without which no updater JSON is uploaded.
@@ -90,18 +91,35 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: 'v__VERSION__'
-          releaseName: 'Portable Music Player v__VERSION__'
+          releaseName: 'Chopi v__VERSION__'
           # Also latest.json's notes.
           releaseBody: ${{ steps.patch-notes.outputs.notes }}
           releaseDraft: true
           prerelease: false
           releaseCommitish: ${{ github.event.workflow_run.head_sha }}
-          # The app's download of a portable build links to these names (download_url in updates.rs).
+          # The app's download of the AppImage links to this name (download_url in updates.rs).
           releaseAssetNamePattern: '[mainBinaryName]_[version]_[platform]_[arch][setup][ext]'
-          # The bare executables are the player's portable builds.
-          uploadPlainBinary: true
           # latest.json, which the app's update check reads.
           uploadUpdaterJson: true
           # Updater artifacts are made only here, where the signing key is: a local tauri build has
           # none to sign them with.
           args: --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+      # The app's download of a bare executable links to its name (download_url in updates.rs).
+      # The bare executables are the player's portable builds, uploaded apart under names that end
+      # in -portable, as the NSIS installer's end in -setup: the asset name pattern names every file
+      # alike, so it can't mark them alone. --clobber replaces the file of an earlier attempt.
+      - name: upload the portable executable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.tauri.outputs.releaseId }}
+          VERSION: ${{ steps.tauri.outputs.appVersion }}
+          # Cargo's package name, which names the executable.
+          EXECUTABLE_NAME: chopi
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then platform=windows; extension=.exe; else platform=linux; extension=; fi
+          asset="${EXECUTABLE_NAME}_${VERSION}_${platform}_x64-portable${extension}"
+          cp "src-tauri/target/release/${EXECUTABLE_NAME}${extension}" "$asset"
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --jq .tag_name)
+          gh release upload "$tag" "$asset" --clobber --repo "$GITHUB_REPOSITORY"

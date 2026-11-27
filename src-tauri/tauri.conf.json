@@ -26,6 +26,12 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "Nathan Murillo",
+    "homepage": "https://github.com/NathanMBR/chopi",
+    "copyright": "Copyright © 2026 Nathan Murillo",
+    "category": "Music",
+    "shortDescription": "Music player for Windows and Linux, installed or portable",
+    "longDescription": "Chopi plays MP3, M4A, AAC, Opus, Ogg, FLAC and WAV songs, with gapless playback, playlists, shuffle, repeat, keyboard shortcuts, media keys and the system's media controls.\n\nRun it installed, or portable with nothing to install, from any folder or drive: it keeps your songs, playlists and settings in its own folder.",
     "targets": ["appimage", "nsis"],
     "icon": [
       "icons/32x32.png",

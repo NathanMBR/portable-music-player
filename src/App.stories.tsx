@@ -154,6 +154,28 @@ export const NavigatesFromTheSideMenu: Story = {
 }
 
 /**
+ * Open, the side menu's name takes the place of the page title it covers, at the same size and on
+ * the same line, as its close button takes the menu button's.
+ */
+export const SideMenuNameTakesThePageTitlesPlace: Story = {
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const page = within(canvasElement.ownerDocument.body)
+    const pageTitle = canvas.getByRole('heading', { level: 1 })
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Open menu' }))
+    const menu = await page.findByRole('dialog', { name: 'Chopi' })
+    const name = within(menu).getByRole('heading', { name: 'Chopi' })
+
+    const middleOf = (element: HTMLElement) => {
+      const box = element.getBoundingClientRect()
+      return box.top + box.height / 2
+    }
+    await expect(getComputedStyle(name).fontSize).toBe(getComputedStyle(pageTitle).fontSize)
+    await expect(Math.abs(middleOf(name) - middleOf(pageTitle))).toBeLessThanOrEqual(0.5)
+  }
+}
+
+/**
  * Once a check finds a newer release, a dot on the menu button leads to the side menu's Update
  * option, which opens the update's dialog in place of the menu.
  */
@@ -171,7 +193,7 @@ export const OffersTheUpdateFromTheSideMenu: Story = {
 
     await expect(await page.findByRole('dialog', { name: 'Update found!' })).toBeVisible()
     await waitFor(() =>
-      expect(page.queryByRole('dialog', { name: 'Portable Music Player' })).not.toBeInTheDocument()
+      expect(page.queryByRole('dialog', { name: 'Chopi' })).not.toBeInTheDocument()
     )
   }
 }

@@ -1,7 +1,7 @@
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { IconButton } from '../../../components/IconButton/IconButton'
-import { APP_TITLE_LINES } from '../../../constants'
+import { APP_NAME } from '../../../constants'
 import { ThemeToggle } from '../../settings/ThemeToggle/ThemeToggle'
 import { useUpdateStore } from '../../updates/updateStore'
 import { CategoryList } from '../CategoryList/CategoryList'
@@ -29,11 +29,11 @@ const UpdateOption = () => {
 }
 
 /**
- * Drawer that slides in from the left over a dimmed page, with the app's name, the categories and
- * the theme toggle. While an update is offered, an Update option follows the categories, with a
- * dot on its icon, and opens the update's dialog. Its close button sits exactly where the menu
- * button was. It closes with that button, Escape, a click outside, by choosing a category, or with
- * Update.
+ * Drawer that slides in from the left over a dimmed page, with the app's name in place of the
+ * page title, the categories and the theme toggle. While an update is offered, an Update option
+ * follows the categories, with a dot on its icon, and opens the update's dialog. Its close button
+ * sits exactly where the menu button was. It closes with that button, Escape, a click outside, by
+ * choosing a category, or with Update.
  *
  * @summary Side menu drawer
  */
@@ -60,13 +60,10 @@ export const SideMenu = () => {
             variant="outlined"
             onClick={closeMenu}
           />
-          {/* Same type as the page title. The trailing spaces keep the accessible name "Portable Music Player". */}
-          <DialogTitle className="text-lg leading-tight font-extrabold tracking-tight text-ink font-stretch-expanded">
-            {APP_TITLE_LINES.map(line => (
-              <span key={line} className="block">
-                {line}{' '}
-              </span>
-            ))}
+          {/* The page title's type, on a line of the close button's height, so it covers the page
+              title exactly as the close button covers the menu button. */}
+          <DialogTitle className="text-4xl leading-10 font-extrabold tracking-tight text-ink font-stretch-expanded">
+            {APP_NAME}
           </DialogTitle>
         </div>
         <div className="mt-8">

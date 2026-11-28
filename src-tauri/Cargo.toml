@@ -1,10 +1,10 @@
 [package]
 name = "chopi"
-version = "0.1.0"
+version = "1.0.0"
 description = "A music player that can run without installation on Windows and Linux"
 authors = ["Nathan Murillo"]
 license = "MIT"
-repository = "https://github.com/NathanMBR/portable-music-player"
+repository = "https://github.com/NathanMBR/chopi"
 edition = "2024"
 
 [lib]

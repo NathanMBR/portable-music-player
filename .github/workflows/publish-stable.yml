@@ -1,41 +1,29 @@
 # Tauri's official publish workflow (https://v2.tauri.app/distribute/pipelines/github/): every push
-# to master that passes Quality Assurance, and every approval of a pull request into master, builds
-# the Linux and Windows releases into a stable release, kept as a draft until it's published by
-# hand. Its description, and latest.json's notes, which the app's update dialog shows, are the
-# version's patch notes, written by hand (see Releases in AGENTS.md). macOS isn't a target of the
-# player.
+# to master that passes Quality Assurance builds the Linux and Windows releases into a stable
+# release, kept as a draft until it's published by hand. Its description, and latest.json's notes,
+# which the app's update dialog shows, are the version's patch notes, written by hand (see Releases
+# in AGENTS.md). macOS isn't a target of the player.
 name: 'publish stable'
 
 # Starts when Quality Assurance finishes on master, and builds only if it passed. A workflow_run
 # runs from master's newest commit, so the build checks out and tags the commit QA tested instead.
-# It also starts at every review of a pull request, and builds only an approval of one into master
-# from this repository (pull_request_review has no branch filter), from the pull request's last
-# commit: a fork's pull request gets neither the signing key nor a token that can write.
 on:
   workflow_run:
     workflows: ['Quality Assurance']
     types: [completed]
     branches:
       - master
-  pull_request_review:
-    types: [submitted]
 
 jobs:
   publish-tauri:
-    if: >-
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved' &&
-      github.event.pull_request.base.ref == 'master' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
-    # One build of each platform at a time: an approval's build and the merge's that follows both
-    # upload to the same draft, and would otherwise replace each other's files at once.
+    # One build of each platform at a time: two pushes of the same version, like a fix pushed to
+    # master while the merge's build runs, upload to the same draft, and would otherwise replace
+    # each other's files at once.
     concurrency:
       group: publish-stable-${{ matrix.platform }}
-    env:
-      # The commit built and tagged: the one QA tested, or the approved pull request's last.
-      RELEASE_COMMIT: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_COMMIT }}
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # First, so a release without patch notes fails before anything is built.
       - name: read the patch notes
@@ -113,7 +101,7 @@ jobs:
           releaseBody: ${{ steps.patch-notes.outputs.notes }}
           releaseDraft: true
           prerelease: false
-          releaseCommitish: ${{ env.RELEASE_COMMIT }}
+          releaseCommitish: ${{ github.event.workflow_run.head_sha }}
           # The app's download of the AppImage links to this name (download_url in updates.rs).
           releaseAssetNamePattern: '[mainBinaryName]_[version]_[platform]_[arch][setup][ext]'
           # latest.json, which the app's update check reads.
